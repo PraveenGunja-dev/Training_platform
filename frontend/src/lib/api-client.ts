@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/training/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -53,7 +53,7 @@ apiClient.interceptors.response.use(
         refreshQueue.forEach(({ reject }) => reject(e));
         refreshQueue = [];
         useAuthStore.getState().logout();
-        window.location.href = '/login';
+        window.location.href = '/training/login';
         throw e;
       } finally {
         isRefreshing = false;
