@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to ACLP Training System</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4f8;padding:40px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="600" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10);">
+
+          <!-- ── Header ── -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#002060 0%,#003087 60%,#004aad 100%);padding:36px 48px;text-align:center;">
+
+              <!-- Brand mark — works in every email client -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 10px;">
+                <tr>
+                  <td style="background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.30);
+                             border-radius:10px;padding:10px 22px;text-align:center;">
+                    <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;
+                                 font-weight:700;color:#ffffff;letter-spacing:4px;
+                                 text-shadow:0 1px 3px rgba(0,0,0,0.25);">
+                      AGEL
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:6px 0 0;color:#a8c4f0;font-size:12px;letter-spacing:2px;
+                        text-transform:uppercase;font-weight:600;">
+                AGEL Team &nbsp;&bull;&nbsp; ACLP Training System
+              </p>
+            </td>
+          </tr>
+
+          <!-- ── Body ── -->
+          <tr>
+            <td style="padding:40px 48px 32px;">
+
+              {% if full_name %}
+              <h2 style="margin:0 0 8px;color:#0d1b3e;font-size:22px;font-weight:700;">
+                Welcome aboard, {{ full_name }}!
+              </h2>
+              {% else %}
+              <h2 style="margin:0 0 8px;color:#0d1b3e;font-size:22px;font-weight:700;">
+                Welcome aboard!
+              </h2>
+              {% endif %}
+
+              <p style="margin:0 0 20px;color:#4b5563;font-size:15px;line-height:1.6;">
+                You have been invited to the <strong>ACLP Training System</strong> &mdash;
+                the centralised learning and performance portal for AGEL.
+                Your account is ready and you can log in right away.
+              </p>
+
+              <!-- Role badge -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="background:#e8f0fe;border-left:4px solid #003087;border-radius:4px;padding:10px 16px;">
+                    <span style="color:#003087;font-size:14px;font-weight:600;">
+                      Your Role: &nbsp;{{ role_display }}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Credentials box -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                     style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:24px 28px;">
+                    <p style="margin:0 0 16px;color:#374151;font-size:14px;font-weight:700;
+                               text-transform:uppercase;letter-spacing:0.8px;">
+                      Your Login Credentials
+                    </p>
+
+                    <!-- Email row -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
+                      <tr>
+                        <td width="40%" style="color:#9ca3af;font-size:13px;vertical-align:top;padding-top:2px;">
+                          Email Address
+                        </td>
+                        <td style="color:#0d1b3e;font-size:14px;font-weight:600;">{{ email }}</td>
+                      </tr>
+                    </table>
+
+                    <!-- Divider -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
+                      <tr>
+                        <td style="border-top:1px solid #e2e8f0;height:1px;font-size:0;">&nbsp;</td>
+                      </tr>
+                    </table>
+
+                    <!-- Password row -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td width="40%" style="color:#9ca3af;font-size:13px;vertical-align:top;padding-top:6px;">
+                          Temporary Password
+                        </td>
+                        <td>
+                          <span style="display:inline-block;background:#003087;color:#ffffff;
+                                       font-family:'Courier New',Courier,monospace;
+                                       font-size:17px;font-weight:700;letter-spacing:3px;
+                                       padding:6px 14px;border-radius:5px;">
+                            {{ temp_password }}
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA button -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td align="center">
+                    <a href="{{ login_url }}"
+                       style="display:inline-block;background:#003087;color:#ffffff;
+                              text-decoration:none;font-size:15px;font-weight:700;
+                              padding:14px 44px;border-radius:7px;letter-spacing:0.5px;">
+                      Log In to Portal &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Security notice -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:16px 20px;">
+                    <p style="margin:0;color:#92400e;font-size:13px;line-height:1.6;">
+                      <strong>Security Reminder:</strong> This is a temporary password generated for your
+                      account. After logging in, please go to
+                      <em>Profile &rarr; Change Password</em> to set your own password.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- ── Footer ── -->
+          <tr>
+            <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:22px 48px;text-align:center;">
+              <p style="margin:0 0 6px;color:#9ca3af;font-size:12px;">
+                This is an automated email &mdash; please do not reply directly to this message.
+              </p>
+              <p style="margin:0;color:#9ca3af;font-size:12px;">
+                &copy; {{ year }} AGEL Team. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

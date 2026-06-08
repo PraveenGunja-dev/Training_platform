@@ -1,0 +1,77 @@
+@import './styles/theme.css';
+@import './styles/gradients.css';
+@import './styles/fullcalendar.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ── Adani Blue + Red professional palette ───────────────────────── */
+
+  --background:           210 35% 96%;   /* light steel-blue page fill */
+  --foreground:           212 60% 15%;   /* dark navy text              */
+
+  --card:                 0 0% 100%;     /* pure white cards            */
+  --card-foreground:      212 60% 15%;
+
+  --popover:              0 0% 100%;
+  --popover-foreground:   212 60% 15%;
+
+  --primary:              212 100% 32%;  /* Adani blue  #0052A5         */
+  --primary-foreground:   0 0% 100%;
+
+  --secondary:            210 30% 92%;   /* soft blue tint              */
+  --secondary-foreground: 212 60% 25%;
+
+  --muted:                210 25% 93%;
+  --muted-foreground:     210 15% 50%;   /* muted blue-gray             */
+
+  --accent:               350 78% 49%;   /* Adani red   #E31837         */
+  --accent-foreground:    0 0% 100%;
+
+  --destructive:          0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border:               210 25% 85%;   /* soft blue border            */
+  --input:                210 25% 85%;
+  --ring:                 212 100% 32%;
+
+  --radius:               0.5rem;
+
+  /* Semantic status */
+  --success:              142 71% 45%;
+  --success-foreground:   0 0% 100%;
+  --warning:              38 92% 50%;
+  --warning-foreground:   20 14% 4%;
+  --info:                 199 89% 48%;
+  --info-foreground:      0 0% 100%;
+}
+
+@layer base {
+  * { @apply border-border; }
+
+  html, body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: theme('fontFamily.sans');
+  }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@layer utilities {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 82, 165, 0.04) 0%,
+      rgba(0, 82, 165, 0.09) 50%,
+      rgba(0, 82, 165, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+}

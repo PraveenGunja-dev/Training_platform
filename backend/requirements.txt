@@ -1,0 +1,27 @@
+Django==5.0.9
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+psycopg[binary]==3.2.3
+django-environ==0.11.2
+django-cors-headers==4.5.0
+argon2-cffi==23.1.0
+drf-spectacular==0.27.2
+django-redis==5.4.0
+# B-06: Azure Blob SAS upload
+azure-storage-blob==12.23.1
+django-storages[azure]==1.14.4
+# python-magic-bin==0.4.14  # Windows dev — install manually if MIME sniffing is needed
+# python-magic==0.4.27       # Linux prod equivalent
+# B-12: user management filtering
+django-filter==24.3
+pytest==8.3.3
+pytest-django==4.9.0
+factory-boy==3.3.1
+ruff==0.7.0
+mypy==1.13.0
+django-stubs==5.0.4
+djangorestframework-stubs==3.15.1
+# B-08: Celery async
+celery==5.4.0
+django-celery-beat==2.7.0
+redis==5.1.1

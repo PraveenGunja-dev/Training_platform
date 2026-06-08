@@ -1,0 +1,11 @@
+/* Brand raw color tokens — Adani Blue + Red */
+:root {
+  --brand-blue:        #0052A5;   /* primary Adani blue   */
+  --brand-red:         #E31837;   /* primary Adani red    */
+  --brand-navy:        #00285A;   /* sidebar / dark text  */
+  --brand-light:       #EBF3FB;   /* page background tint */
+  --brand-surface:     #FFFFFF;   /* card background      */
+
+  --gradient-accent:   linear-gradient(135deg, #0052A5 0%, #E31837 100%);
+  --gradient-sidebar:  linear-gradient(180deg, #00285A 0%, #001635 100%);
+}

@@ -1,0 +1,8 @@
+Hello,
+
+Attendance is now open for "{{ class_title }}" (started {{ started_at }}).
+
+Please log in and click "Mark Attendance" before the session ends:
+{{ frontend_url }}/me/dashboard
+
+— Employee Management System

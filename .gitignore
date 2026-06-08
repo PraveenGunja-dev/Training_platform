@@ -1,0 +1,43 @@
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/dist-ssr
+frontend/*.local
+frontend/.env
+frontend/.env.local
+
+# Backend
+backend/__pycache__
+backend/**/__pycache__
+backend/*.pyc
+backend/**/*.pyc
+backend/.venv
+backend/venv
+backend/.env
+backend/.env.local
+backend/staticfiles
+backend/media
+backend/db.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Planning + learning docs (local only)
+plan/
+learn/
+docs/
+
+# Database dumps
+*.dump
