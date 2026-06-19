@@ -141,4 +141,6 @@ export const router = createBrowserRouter([
   },
   { path: '/change-password', element: <ForceChangePasswordPage /> },
   { path: '*', element: <NotFoundPage /> },
-]);
+], {
+  basename: import.meta.env.BASE_URL
+});
