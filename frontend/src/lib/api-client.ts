@@ -55,7 +55,7 @@ apiClient.interceptors.response.use(
         refreshQueue = [];
         useAuthStore.getState().logout();
         queryClient.clear();
-        window.location.href = '/login';
+        window.location.href = import.meta.env.BASE_URL + 'login';
         throw e;
       } finally {
         isRefreshing = false;
@@ -69,7 +69,7 @@ apiClient.interceptors.response.use(
       if (method === 'get' && !reqUrl.includes('/auth/')) {
         if (window.location.pathname !== '/403') {
           queryClient.clear();
-          window.location.href = '/403';
+          window.location.href = import.meta.env.BASE_URL + '403';
         }
       }
     }
