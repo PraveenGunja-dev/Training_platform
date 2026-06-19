@@ -1,8 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
 import { usersApi } from '@/api/users';
+import { groupsApi } from '@/api/groups';
 import { apiClient } from '@/lib/api-client';
 import { inviteSchema, type InviteFormValues } from './userSchema';
 import { Button } from '@/components/ui/button';
@@ -45,6 +47,19 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
   });
 
   const selectedGroupIds = watch('group_ids') ?? [];
+  const selectedRole = watch('role');
+  const emailValue = watch('email');
+  const debouncedEmail = useDebounce(emailValue, 500);
+
+  const { data: emailCheckData } = useQuery({
+    queryKey: ['users', 'check-email', debouncedEmail],
+    queryFn: () => usersApi.checkEmailExists(debouncedEmail),
+    enabled: !!debouncedEmail && /\S+@\S+\.\S+/.test(debouncedEmail),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const emailAlreadyExists = emailCheckData?.data?.exists === true;
 
   const toggleGroup = (id: string) => {
     const current = selectedGroupIds;
@@ -55,18 +70,33 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
   };
 
   const onSubmit = async (values: InviteFormValues) => {
+    let result: Awaited<ReturnType<typeof usersApi.invite>>;
     try {
-      await usersApi.invite(values);
-      toast.success(`User registered: ${values.email} (default password: admin123)`);
-      await qc.invalidateQueries({ queryKey: ['users'] });
-      reset();
-      onClose();
+      result = await usersApi.invite({ ...values });
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { errors?: { message?: string; detail?: string }[] } } };
+      const e = err as { response?: { data?: { errors?: { message?: string; detail?: string }[]; detail?: string } } };
       const firstError = e?.response?.data?.errors?.[0];
-      const msg = firstError?.message ?? firstError?.detail ?? 'Failed to register user';
+      const msg = firstError?.message ?? firstError?.detail ?? e?.response?.data?.detail ?? 'Failed to register user';
       toast.error(msg);
+      return;
     }
+
+    if (values.role === 'GROUP_ADMIN' && values.group_admin_group_id) {
+      try {
+        await groupsApi.assignGroupAdmin(values.group_admin_group_id, result.data.id);
+      } catch {
+        toast.warning(`User "${values.email}" was created but could not be assigned as Group Admin. Please assign manually from the Group page.`);
+        await qc.invalidateQueries({ queryKey: ['users'] });
+        reset();
+        onClose();
+        return;
+      }
+    }
+
+    toast.success(`User registered: ${values.email} (default password: admin123)`);
+    await qc.invalidateQueries({ queryKey: ['users'] });
+    reset();
+    onClose();
   };
 
   const handleClose = () => {
@@ -93,6 +123,9 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
             {errors.email && (
               <p className="text-xs text-red-500">{errors.email.message}</p>
             )}
+            {emailAlreadyExists && (
+              <p className="text-xs text-amber-600 mt-1">A user with this email already exists.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -108,12 +141,36 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
                 <SelectItem value="ADMIN">Super Admin</SelectItem>
                 <SelectItem value="INSTRUCTOR">Instructor</SelectItem>
                 <SelectItem value="PARTICIPANT">Participant</SelectItem>
+                <SelectItem value="GROUP_ADMIN">Group Admin</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && (
               <p className="text-xs text-red-500">{errors.role.message}</p>
             )}
           </div>
+
+          {selectedRole === 'GROUP_ADMIN' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-admin-group">
+                Admin of Group <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                onValueChange={v => setValue('group_admin_group_id', v)}
+              >
+                <SelectTrigger id="invite-admin-group">
+                  <SelectValue placeholder="Select a group…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.group_admin_group_id && (
+                <p className="text-xs text-red-500">{errors.group_admin_group_id.message}</p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="invite-name">Full Name <span className="text-muted-foreground/70 text-xs">(optional)</span></Label>
@@ -145,7 +202,7 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || emailAlreadyExists}>
               {isSubmitting ? 'Registering…' : 'Register User'}
             </Button>
           </DialogFooter>

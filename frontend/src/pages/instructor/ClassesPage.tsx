@@ -1,22 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { CalendarDays, Clock, ArrowRight, Users, Plus, QrCode, Send } from 'lucide-react';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { CalendarDays, Clock, ArrowRight, Users, Plus } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { ScheduleClassDialog } from '@/features/admin/scheduling/ScheduleClassDialog';
 import { useCan } from '@/hooks/useCan';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from '@/components/ui/dialog';
 import { ErrorState } from '@/components/states/ErrorState';
 import type { ClassSession, ClassStatus } from '@/lib/types';
 
@@ -49,147 +43,10 @@ function sortClasses(list: ClassSession[]): ClassSession[] {
   });
 }
 
-function isInQRWindow(endsAt: string): boolean {
-  const now = Date.now();
-  const end = new Date(endsAt).getTime();
-  return now >= end && now <= end + 5 * 60 * 1000;
-}
-
-interface QRDialogProps {
-  cls: ClassSession;
-  open: boolean;
-  onClose: () => void;
-}
-
-function QRDialog({ cls, open, onClose }: QRDialogProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  const participantsQuery = useQuery({
-    queryKey: ['class', cls.id, 'participants'],
-    queryFn: () => classesApi.getParticipants(cls.id),
-    enabled: open,
-    staleTime: 0,
-  });
-
-  const participants = participantsQuery.data?.data ?? [];
-
-  const shareMutation = useMutation({
-    mutationFn: (ids: string[]) => classesApi.shareQR(cls.id, ids),
-    onSuccess: (res) => {
-      toast.success(`QR shared with ${res.data.sent} participant${res.data.sent !== 1 ? 's' : ''}`);
-      setSelectedIds([]);
-      onClose();
-    },
-    onError: () => toast.error('Failed to share QR code. The sharing window may have expired.'),
-  });
-
-  const handleClose = () => {
-    setSelectedIds([]);
-    onClose();
-  };
-
-  const toggleId = (id: string) =>
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-
-  const toggleAll = () =>
-    setSelectedIds(prev => prev.length === participants.length ? [] : participants.map(p => p.id));
-
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/me/classes/${cls.id}`)}`;
-
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-teal-600" />
-            Share Late Attendance QR
-          </DialogTitle>
-          <DialogDescription className="text-slate-500">{cls.title}</DialogDescription>
-        </DialogHeader>
-
-        {/* QR code */}
-        <div className="flex justify-center py-2">
-          <div className="rounded-xl border-2 border-[#C5D8EC] p-3 bg-white shadow-sm">
-            <img src={qrUrl} alt="Attendance QR Code" width={200} height={200} className="rounded-md" />
-          </div>
-        </div>
-
-        {/* Participant selection */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-semibold text-slate-700">Select Participants</Label>
-            {participants.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleAll}
-                className="text-xs text-[#0052A5] hover:underline"
-              >
-                {selectedIds.length === participants.length ? 'Deselect all' : 'Select all'}
-              </button>
-            )}
-          </div>
-
-          {participantsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0052A5]" />
-            </div>
-          ) : participants.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">No participants in this group.</p>
-          ) : (
-            <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {participants.map(p => (
-                <label
-                  key={p.id}
-                  className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                  <Checkbox
-                    checked={selectedIds.includes(p.id)}
-                    onCheckedChange={() => toggleId(p.id)}
-                  />
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-slate-700 block truncate">
-                      {p.full_name || p.email}
-                    </span>
-                    {p.full_name && (
-                      <span className="text-xs text-slate-400 block truncate">{p.email}</span>
-                    )}
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => shareMutation.mutate(selectedIds)}
-            disabled={selectedIds.length === 0 || shareMutation.isPending}
-            className="gap-1.5"
-          >
-            <Send className="h-3.5 w-3.5" />
-            {shareMutation.isPending ? 'Sharing…' : `Share QR (${selectedIds.length})`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function ClassCard({ cls }: { cls: ClassSession }) {
   const cfg = STATUS_CONFIG[cls.status] ?? STATUS_CONFIG.COMPLETED;
   const isLive = cls.status === 'ONGOING';
   const attendanceLive = cls.active_session?.status === 'ACTIVE';
-
-  const [inWindow, setInWindow] = useState(() => isInQRWindow(cls.ends_at));
-  const [qrOpen, setQrOpen]     = useState(false);
-
-  useEffect(() => {
-    const id = setInterval(() => setInWindow(isInQRWindow(cls.ends_at)), 1000);
-    return () => clearInterval(id);
-  }, [cls.ends_at]);
 
   return (
     <>
@@ -258,24 +115,12 @@ function ClassCard({ cls }: { cls: ClassSession }) {
           )}
 
           <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
-            {inWindow && (
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setQrOpen(true); }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded-lg border border-teal-200 transition-colors"
-              >
-                <QrCode className="h-3 w-3" />
-                Share QR
-              </button>
-            )}
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ${!inWindow ? 'ml-auto' : ''}`}>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
               View <ArrowRight className="h-3 w-3" />
             </span>
           </div>
         </div>
       </Link>
-
-      {qrOpen && <QRDialog cls={cls} open={qrOpen} onClose={() => setQrOpen(false)} />}
     </>
   );
 }

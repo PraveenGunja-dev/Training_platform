@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
+import { isGroupAdmin } from '@/lib/types';
 import type { LoginInput } from './schemas';
 
 export function useLogin() {
@@ -19,6 +21,7 @@ export function useLogin() {
       // a participant who was redirected from /admin/* (or vice-versa) would
       // land on a route their RoleGuard blocks, showing 403.
       const rolePrefix =
+        isGroupAdmin(res.data.user) || res.data.user.role === 'GROUP_ADMIN' ? '/group-admin/' :
         res.data.user.role === 'ADMIN' ? '/admin/' :
         res.data.user.role === 'INSTRUCTOR' ? '/instructor/' :
         '/me/';

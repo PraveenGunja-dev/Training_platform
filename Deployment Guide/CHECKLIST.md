@@ -120,7 +120,7 @@ Complete deployment checklist for a deployment engineer with no prior project kn
 
 ### 4.3 Database Setup
 - [ ] `python manage.py migrate --noinput` completed with no errors
-- [ ] (Optional) Restore data from dump: `pg_restore -h <server> -U aclp_user -d aclp --no-owner `
+- [ ] (Optional) Restore data from dump: `pg_restore -h <server> -U aclp_user -d aclp --no-owner aclp_data.dump`
 - [ ] `python manage.py collectstatic --noinput` completed
 - [ ] Static files are in `/srv/aclp/app/backend/staticfiles/`
 

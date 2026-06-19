@@ -1,6 +1,14 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RootRedirect } from './RootRedirect';
-import { AdminLayout, ParticipantLayout, InstructorLayout } from '@/components/layout/AppShell';
+import { MustChangePasswordGuard } from './MustChangePasswordGuard';
+import { AdminLayout, ParticipantLayout, InstructorLayout, GroupAdminLayout } from '@/components/layout/AppShell';
+import { ForceChangePasswordPage } from '@/pages/auth/ForceChangePasswordPage';
+import GroupAdminDashboardPage from '@/pages/group-admin/DashboardPage';
+import GroupAdminSubGroupDetailPage from '@/pages/group-admin/SubGroupDetailPage';
+import GroupAdminParticipantsPage from '@/pages/group-admin/ParticipantsPage';
+import GroupAdminAnalyticsPage from '@/pages/group-admin/AnalyticsPage';
+import GroupAdminInstructorsPage from '@/pages/group-admin/InstructorsPage';
+import GroupAdminSubGroupsPage from '@/pages/group-admin/SubGroupsPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { SetPasswordPage } from '@/pages/auth/SetPasswordPage';
 import { ProfilePage } from '@/pages/auth/ProfilePage';
@@ -24,11 +32,11 @@ import AdminAttendancePage from '@/pages/admin/AttendancePage';
 import AdminAttendanceReportPage from '@/pages/admin/AttendanceReportPage';
 import AdminCalendarPage from '@/pages/admin/CalendarPage';
 import AdminOrgChartPage from '@/pages/admin/OrgChartPage';
+import AdminSubGroupDetailPage from '@/pages/admin/SubGroupDetailPage';
 import ParticipantDashboardPage from '@/pages/me/DashboardPage';
 import NotificationsPage from '@/pages/me/NotificationsPage';
 import CalendarPage from '@/pages/me/CalendarPage';
 import ClassDetailPage from '@/pages/me/ClassDetailPage';
-import QRPage from '@/pages/me/QRPage';
 import TasksPage from '@/pages/me/TasksPage';
 import TaskDetailPage from '@/pages/me/TaskDetailPage';
 import SubmissionsPage from '@/pages/me/SubmissionsPage';
@@ -55,13 +63,14 @@ export const router = createBrowserRouter([
   { path: '/403', element: <ForbiddenPage /> },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    element: <MustChangePasswordGuard><AdminLayout /></MustChangePasswordGuard>,
     children: [
       { path: 'dashboard', element: <AdminDashboardPage /> },
       { path: 'users', element: <AdminUsersPage /> },
       { path: 'users/:id', element: <AdminUserDetailPage /> },
       { path: 'groups', element: <AdminGroupsPage /> },
       { path: 'groups/:id', element: <AdminGroupDetailPage /> },
+      { path: 'groups/:groupId/sub-groups/:subGroupId', element: <AdminSubGroupDetailPage /> },
       { path: 'classes', element: <AdminClassesPage /> },
       { path: 'classes/:id', element: <AdminClassDetailPage /> },
       { path: 'assignments', element: <AdminAssignmentsPage /> },
@@ -81,13 +90,12 @@ export const router = createBrowserRouter([
   },
   {
     path: '/me',
-    element: <ParticipantLayout />,
+    element: <MustChangePasswordGuard><ParticipantLayout /></MustChangePasswordGuard>,
     children: [
       { path: 'dashboard', element: <ParticipantDashboardPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'classes/:id', element: <ClassDetailPage /> },
-      { path: 'qr/:classId', element: <QRPage /> },
-      { path: 'tasks', element: <TasksPage /> },
+{ path: 'tasks', element: <TasksPage /> },
       { path: 'tasks/:id', element: <TaskDetailPage /> },
       { path: 'submissions', element: <SubmissionsPage /> },
       { path: 'documents', element: <DocumentsPage /> },
@@ -97,7 +105,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/instructor',
-    element: <InstructorLayout />,
+    element: <MustChangePasswordGuard><InstructorLayout /></MustChangePasswordGuard>,
     children: [
       { path: 'dashboard', element: <InstructorDashboardPage /> },
       { path: 'calendar', element: <InstructorCalendarPage /> },
@@ -116,5 +124,21 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <ProfilePage /> },
     ],
   },
+  {
+    path: '/group-admin',
+    element: <MustChangePasswordGuard><GroupAdminLayout /></MustChangePasswordGuard>,
+    children: [
+      { index: true, element: <Navigate to="dashboard" replace /> },
+      { path: 'dashboard', element: <GroupAdminDashboardPage /> },
+      { path: 'participants', element: <GroupAdminParticipantsPage /> },
+      { path: 'instructors', element: <GroupAdminInstructorsPage /> },
+      { path: 'analytics', element: <GroupAdminAnalyticsPage /> },
+      { path: 'sub-groups', element: <GroupAdminSubGroupsPage /> },
+      { path: 'sub-groups/:subGroupId', element: <GroupAdminSubGroupDetailPage /> },
+      { path: 'profile', element: <ProfilePage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
+    ],
+  },
+  { path: '/change-password', element: <ForceChangePasswordPage /> },
   { path: '*', element: <NotFoundPage /> },
-], { basename: '/training' });
+]);

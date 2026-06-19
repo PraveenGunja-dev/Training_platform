@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
@@ -15,11 +16,13 @@ import type { Role } from '@/lib/types';
 function profilePath(role: Role): string {
   if (role === 'ADMIN') return '/admin/profile';
   if (role === 'INSTRUCTOR') return '/instructor/profile';
+  if (role === 'GROUP_ADMIN') return '/group-admin/profile';
   return '/me/profile';
 }
 
 export function UserMenu() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const logout = useAuthStore(s => s.logout);
 
@@ -34,6 +37,7 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     await authApi.logout();
+    queryClient.clear();
     logout();
     navigate('/login');
   };

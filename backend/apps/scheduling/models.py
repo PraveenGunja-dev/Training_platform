@@ -42,6 +42,13 @@ class Class(TimestampedModel):
     )
 
     meeting_link = models.URLField(max_length=500, blank=True, default="")
+    sub_group = models.ForeignKey(
+        'groups.SubGroup',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='classes',
+    )
 
     # Attendance window (absolute datetimes, relative to class start)
     attendance_open_at = models.DateTimeField(null=True, blank=True)
@@ -57,6 +64,20 @@ class Class(TimestampedModel):
 
     def __str__(self) -> str:
         return self.title
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.sub_group_id is not None and self.group_id is not None:
+            # Import here to avoid circular imports
+            from apps.groups.models import SubGroup
+            try:
+                sub = SubGroup.objects.get(pk=self.sub_group_id)
+                if str(sub.parent_group_id) != str(self.group_id):
+                    raise ValidationError(
+                        {"sub_group": "Sub-group does not belong to the selected group."}
+                    )
+            except SubGroup.DoesNotExist:
+                raise ValidationError({"sub_group": "Sub-group not found."})
 
     @property
     def computed_status(self) -> str:

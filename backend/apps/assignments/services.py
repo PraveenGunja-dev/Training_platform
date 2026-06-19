@@ -40,6 +40,18 @@ def create_submission(
         in_group = GroupMembership.objects.filter(group=task.group, user=user).exists()
         if not in_group:
             raise AssignmentError("perm.not_in_group", "You are not in this group", 403)
+        # Sub-group scoping: if the task is restricted to a sub-group, enforce it
+        if task.sub_group_id is not None:
+            from apps.groups.models import SubGroupMembership  # noqa: PLC0415
+            in_sub_group = SubGroupMembership.objects.filter(
+                sub_group_id=task.sub_group_id, user=user
+            ).exists()
+            if not in_sub_group:
+                raise AssignmentError(
+                    "perm.not_in_sub_group",
+                    "This assignment is restricted to a sub-group you are not part of.",
+                    403,
+                )
 
     past_deadline = now > task.deadline_at
 

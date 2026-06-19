@@ -7,12 +7,25 @@ export interface OrgChartPerson {
   email: string;
 }
 
+export interface OrgChartSubGroup {
+  id: string;
+  name: string;
+  participants: OrgChartPerson[];
+  participants_count: number;
+}
+
 export interface OrgChartGroup {
   id: string;
   name: string;
   is_archived: boolean;
   instructors: OrgChartPerson[];
   participants: OrgChartPerson[];
+  sub_groups: OrgChartSubGroup[];
+  group_admin: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }
 
 export interface OrgChartData {
@@ -21,6 +34,8 @@ export interface OrgChartData {
     total_groups: number;
     total_instructors: number;
     total_participants: number;
+    total_group_admins: number;
+    total_sub_groups: number;
   };
   admins: OrgChartPerson[];
   groups: OrgChartGroup[];

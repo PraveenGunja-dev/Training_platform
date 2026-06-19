@@ -69,13 +69,40 @@ class DocumentWriteSerializer(serializers.Serializer):
     file_name = serializers.CharField(max_length=255)
     file_type = serializers.CharField(max_length=100)
     file_size = serializers.IntegerField(min_value=1)
-    doc_type = serializers.ChoiceField(choices=Document.DOC_TYPE_CHOICES, default=Document.GUIDE)
+    doc_type = serializers.CharField(max_length=100, default=Document.GUIDE)
     visibility = serializers.ChoiceField(
         choices=Document.VISIBILITY_CHOICES, default=Document.VIS_GROUP
     )
     allowed_user_ids = serializers.ListField(
-        child=serializers.CharField(), required=False, default=list
+        child=serializers.UUIDField(), required=False, default=list
     )
+
+    def validate(self, data):
+        visibility = data.get('visibility', Document.VIS_GROUP)
+        if visibility == Document.VIS_SELECTED and not data.get('allowed_user_ids'):
+            raise serializers.ValidationError(
+                {'allowed_user_ids': 'At least one user must be selected for "Selected Participants Only" visibility.'}
+            )
+        if visibility == Document.VIS_PUBLIC_TO_CLASS and not data.get('class_obj'):
+            raise serializers.ValidationError(
+                {'class_id': 'A linked class is required for "Public to Assigned Class" visibility.'}
+            )
+        return data
+
+    def validate_allowed_user_ids(self, value: list) -> list:
+        if not value:
+            return value
+        from django.contrib.auth import get_user_model  # noqa: PLC0415
+        User = get_user_model()
+        existing = set(
+            User.objects.filter(pk__in=value, is_active=True).values_list("id", flat=True)
+        )
+        invalid = [str(uid) for uid in value if uid not in existing]
+        if invalid:
+            raise serializers.ValidationError(
+                f"The following user IDs do not exist: {', '.join(invalid)}"
+            )
+        return [str(uid) for uid in value]
 
 
 # ---------------------------------------------------------------------------

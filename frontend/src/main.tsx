@@ -1,19 +1,31 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
+import axios from 'axios';
 import './index.css';
 import App from './App.tsx';
+import { queryClient } from '@/lib/query-client';
+import { useAuthStore } from '@/store/auth';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+function AuthInitializer() {
+  const { user, accessToken, setAuth, logout } = useAuthStore();
+
+  useEffect(() => {
+    if (user && !accessToken) {
+      const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+      axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+        .then(res => {
+          setAuth(user, res.data.data.access);
+        })
+        .catch(() => {
+          logout();
+        });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+}
 
 async function enableMocks() {
   if (import.meta.env.VITE_MOCK_API === 'true') {
@@ -36,6 +48,7 @@ enableMocks().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
+        <AuthInitializer />
         <App />
         <Toaster
           richColors

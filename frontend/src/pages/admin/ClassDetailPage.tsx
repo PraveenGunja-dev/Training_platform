@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Pencil, XCircle, CheckCircle2, Users, CalendarDays, Clock, MapPin, ClipboardList, Video, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Pencil, XCircle, CheckCircle2, Users, CalendarDays, Clock, ClipboardList, Video, ExternalLink, ShieldCheck, GraduationCap, FolderKanban, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
 import { classesApi } from '@/api/classes';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
@@ -18,6 +21,7 @@ import { EditClassDialog } from '@/features/admin/class/EditClassDialog';
 import { CancelClassDialog } from '@/features/admin/class/CancelClassDialog';
 import { ClassSubmissionsPanel } from '@/features/admin/class/ClassSubmissionsPanel';
 import { ClassAttendanceHistory } from '@/features/admin/attendance/ClassAttendanceHistory';
+import { ClassActivityLog } from '@/features/admin/class/ClassActivityLog';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   UPCOMING:  { label: 'Upcoming',  className: 'bg-blue-50 text-[#0052A5] border border-blue-200'   },
@@ -51,9 +55,11 @@ function DetailSkeleton() {
 export default function AdminClassDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [allocateOpen, setAllocateOpen] = useState(false);
   const [editOpen, setEditOpen]         = useState(false);
   const [cancelOpen, setCancelOpen]     = useState(false);
+  const [deleteOpen, setDeleteOpen]     = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['class', id],
@@ -72,6 +78,17 @@ export default function AdminClassDetailPage() {
       toast.success('Class marked as completed.');
     },
     onError: () => toast.error('Failed to update class status.'),
+  });
+
+  const deleteClass = useMutation({
+    mutationFn: () => classesApi.delete(data!.data!.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['classes'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'admin'] });
+      toast.success('Class deleted successfully.');
+      navigate('/admin/classes');
+    },
+    onError: () => toast.error('Failed to delete class.'),
   });
 
   if (isLoading) return <DetailSkeleton />;
@@ -128,7 +145,7 @@ export default function AdminClassDetailPage() {
         </div>
 
         {/* Meta row */}
-        <div className="px-6 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm border-b border-[#EBF3FB]">
+        <div className="px-6 py-4 grid grid-cols-2 gap-4 text-sm border-b border-[#EBF3FB]">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-50 flex-shrink-0">
               <CalendarDays className="h-3.5 w-3.5 text-[#0066BB]" />
@@ -149,13 +166,65 @@ export default function AdminClassDetailPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 flex-shrink-0">
-              <MapPin className="h-3.5 w-3.5 text-amber-500" />
+        </div>
+
+        {/* Batch / Admin / Instructors row */}
+        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-b border-[#EBF3FB]">
+          <div className="flex items-start gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 flex-shrink-0 mt-0.5">
+              <FolderKanban className="h-3.5 w-3.5 text-indigo-500" />
             </div>
             <div>
               <p className="text-xs text-[#5A7A9A]">Group</p>
-              <p className="font-semibold text-[#00285A]">{cls.group_name}</p>
+              <Link
+                to={`/admin/groups/${cls.group_id}`}
+                className="font-semibold text-[#0052A5] hover:underline"
+              >
+                {cls.group_name}
+              </Link>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-teal-50 flex-shrink-0 mt-0.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-xs text-[#5A7A9A]">Group Admin</p>
+              {cls.group_admin ? (
+                <Link
+                  to={`/admin/users/${cls.group_admin.id}`}
+                  className="font-semibold text-[#00285A] hover:underline"
+                >
+                  {cls.group_admin.full_name}
+                </Link>
+              ) : (
+                <p className="font-semibold text-slate-400 italic">Not assigned</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 flex-shrink-0 mt-0.5">
+              <GraduationCap className="h-3.5 w-3.5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-[#5A7A9A]">Instructors</p>
+              {cls.instructors && cls.instructors.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {cls.instructors.map(inst => (
+                    <Link
+                      key={inst.id}
+                      to={`/admin/users/${inst.id}`}
+                      className="font-semibold text-[#00285A] hover:underline text-sm"
+                    >
+                      {inst.full_name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-semibold text-slate-400 italic">None assigned</p>
+              )}
             </div>
           </div>
         </div>
@@ -245,6 +314,15 @@ export default function AdminClassDetailPage() {
               Cancel
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400 ml-auto"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Delete Class
+          </Button>
         </div>
       </div>
 
@@ -293,11 +371,14 @@ export default function AdminClassDetailPage() {
       {/* ── Assignment Submissions ───────────────────────────────────── */}
       <ClassSubmissionsPanel classId={cls.id} groupId={cls.group_id} />
 
+      {/* ── Activity Log ─────────────────────────────────────────────── */}
+      <ClassActivityLog classId={cls.id} />
+
       {/* Allocate Assignment dialog — group + class pre-filled from this class */}
       <CreateAssignmentDialog
         open={allocateOpen}
         onClose={() => setAllocateOpen(false)}
-        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '' }]}
+        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '', instructors: [] }]}
         defaultGroupId={cls.group_id}
         defaultClassId={cls.id}
       />
@@ -314,6 +395,55 @@ export default function AdminClassDetailPage() {
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
       />
+
+      {/* Delete Class confirmation */}
+      <Dialog open={deleteOpen} onOpenChange={v => { if (!v) setDeleteOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <DialogTitle className="text-left text-red-700">Delete Class</DialogTitle>
+            </div>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-left text-sm text-slate-600">
+                <p>
+                  You are about to permanently delete{' '}
+                  <span className="font-semibold text-slate-800">"{cls.title}"</span>.
+                </p>
+                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 space-y-1.5">
+                  <p className="font-medium text-red-800 text-xs uppercase tracking-wide">This will permanently remove:</p>
+                  <ul className="list-disc list-inside space-y-1 text-red-700 text-sm">
+                    <li>All attendance sessions and records</li>
+                    <li>All assignment submissions linked to this class</li>
+                    <li>All class documents</li>
+                    <li>All activity logs for this class</li>
+                  </ul>
+                </div>
+                <p className="font-medium text-red-700">This action cannot be undone.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteClass.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => deleteClass.mutate()}
+              disabled={deleteClass.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              {deleteClass.isPending ? 'Deleting…' : 'Yes, Delete Class'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

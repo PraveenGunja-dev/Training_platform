@@ -384,9 +384,11 @@ sudo -u aclp bash -c '
   cd /srv/aclp/app/backend
   source /srv/aclp/venv/bin/activate
   set -a && source /etc/app/env && set +a
-  python manage.py seed_demo
+  python manage.py import_detu
 '
 ```
+
+> `import_detu` imports participants from `detu.xlsx` (included in the repo), creates groups, registers 1129 participants across 25 batches, and assigns instructors automatically.
 
 ---
 
@@ -644,7 +646,7 @@ Expected response:
 ### 11.2 End-to-End Smoke Test
 
 1. Open `https://yourdomain.com` → login screen appears
-2. Login as admin (`kiran.kr@adani.com` if demo data loaded)
+2. Login as Super Admin (`super.admin@adani.com` / `password123`)
 3. Navigate to `/admin/dashboard` → KPI cards load
 4. Create a test class → verify notification fires
 5. Check Swagger UI: `https://yourdomain.com/api/docs/`
@@ -1007,7 +1009,7 @@ The following known gaps should be addressed before production launch:
 ## 18. Restoring from Database Dump
 
 The deployment package includes `aclp_data.dump` — a PostgreSQL binary dump containing all live data:
-- **1 Super Admin**, **4 Instructors**, **1130 Participants** across **25 Batches**
+- **1 Super Admin**, **55 Instructors**, **27 Group Admins**, **1129 Participants** across **25 Batches**
 - All groups, memberships, instructor assignments, and system settings
 
 ### What you need
@@ -1084,8 +1086,9 @@ Expected output:
     role     | count
 -------------+-------
  ADMIN       |     1
- INSTRUCTOR  |     4
- PARTICIPANT |  1130
+ GROUP_ADMIN |    27
+ INSTRUCTOR  |    55
+ PARTICIPANT |  1129
 ```
 
 Also verify groups:
@@ -1244,4 +1247,4 @@ Then continue from Step 4 above.
 
 ---
 
-*Documentation version: 1.1 | Updated: 2026-06-07 | Source: Rutvik5o/EMS main branch*
+*Documentation version: 1.2 | Updated: 2026-06-17 | Source: Rutvik5o/EMS main branch*

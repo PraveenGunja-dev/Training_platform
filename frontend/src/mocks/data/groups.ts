@@ -8,22 +8,22 @@ export const groupsData: ClassGroup[] = [
   {
     id: 'g-batch-a', name: 'Safety Induction Batch A',
     description: 'First batch for safety induction training — May 2026.',
-    participants_count: 10, is_archived: false, created_at: '2026-01-20T00:00:00Z',
+    participants_count: 10, is_archived: false, created_at: '2026-01-20T00:00:00Z', instructors: [],
   },
   {
     id: 'g-batch-b', name: 'Safety Induction Batch B',
     description: 'Second batch for safety induction training — May 2026.',
-    participants_count: 10, is_archived: false, created_at: '2026-01-22T00:00:00Z',
+    participants_count: 10, is_archived: false, created_at: '2026-01-22T00:00:00Z', instructors: [],
   },
   {
     id: 'g-batch-c', name: 'Advanced Operations Group',
     description: 'Advanced operations training for senior staff.',
-    participants_count: 10, is_archived: false, created_at: '2026-02-01T00:00:00Z',
+    participants_count: 10, is_archived: false, created_at: '2026-02-01T00:00:00Z', instructors: [],
   },
   {
     id: 'g-batch-d', name: 'Management Training Cohort',
     description: 'Cross-functional management training cohort.',
-    participants_count: 5, is_archived: false, created_at: '2026-02-10T00:00:00Z',
+    participants_count: 5, is_archived: false, created_at: '2026-02-10T00:00:00Z', instructors: [],
   },
 ];
 

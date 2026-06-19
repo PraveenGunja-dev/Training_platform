@@ -13,6 +13,7 @@ class Notification(models.Model):
         ("CLASS_STARTING_SOON", "Class Starting Soon"),
         ("CLASS_RESCHEDULED", "Class Rescheduled"),
         ("CLASS_DOCUMENT_ADDED", "Class Document Added"),
+        ("GROUP_DOCUMENT_ADDED", "Group Document Added"),
         ("CLASS_TASK_ASSIGNED", "Task Assigned to Class"),
         ("ATTENDANCE_SESSION_STARTED", "Attendance Session Started"),
         ("ATTENDANCE_SESSION_ENDED", "Attendance Session Ended"),
@@ -35,7 +36,6 @@ class Notification(models.Model):
         ("PARTICIPANTS_REMOVED_FROM_GROUP", "Participants Removed from Group"),
         ("SHARED_UPLOAD_PENDING", "Shared Upload Pending"),
         ("SUBMISSION_REVIEWED", "Submission Reviewed"),
-        ("LATE_ATTENDANCE_QR_SHARED", "Late Attendance QR Shared"),
     ]
     CHANNEL_CHOICES = [("IN_APP", "In-App")]
     STATUS_CHOICES = [("SENT", "Sent")]

@@ -27,7 +27,10 @@ const editSchema = z.object({
     (v) => (typeof v === 'string' ? v.trim() : v) || undefined,
     z.string().url('Must be a valid URL (e.g. https://meet.google.com/...)').optional(),
   ),
-  date: z.date({ required_error: 'Date is required' }),
+  date: z.date({ required_error: 'Date is required' })
+    .refine(d => d >= new Date(new Date().setHours(0, 0, 0, 0)), {
+      message: 'Class date cannot be in the past',
+    }),
   start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   allow_late_attendance: z.boolean().default(false),
@@ -148,6 +151,9 @@ export function EditClassDialog({ cls, open, onClose }: Props) {
                       mode="single"
                       selected={field.value}
                       onSelect={(d) => field.onChange(d ?? new Date())}
+                      disabled={(date) =>
+                        date < new Date(new Date().setHours(0, 0, 0, 0))
+                      }
                     />
                   </PopoverContent>
                 </Popover>

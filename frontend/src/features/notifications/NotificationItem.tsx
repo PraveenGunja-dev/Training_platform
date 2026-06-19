@@ -13,7 +13,6 @@ import {
   RefreshCw,
   UserMinus,
   Upload,
-  QrCode,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatRelative } from '@/lib/dates';
@@ -50,7 +49,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   PARTICIPANTS_REMOVED_FROM_GROUP: UserMinus,
   SHARED_UPLOAD_PENDING:          Upload,
   SUBMISSION_REVIEWED:            CheckCircle,
-  LATE_ATTENDANCE_QR_SHARED:      QrCode,
+  GROUP_ADMIN_ASSIGNED:           Users,
 };
 
 interface NotificationItemProps {

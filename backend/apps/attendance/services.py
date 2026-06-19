@@ -125,7 +125,7 @@ def end_session(*, session: AttendanceSession, actor) -> AttendanceSession:
         action="attendance.session_ended",
         target_type="AttendanceSession",
         target_id=session.id,
-        metadata={},
+        metadata={"class_id": str(session.class_obj_id)},
     )
     from apps.notifications.services import create_inapp
     for membership in GroupMembership.objects.filter(group=session.class_obj.group).select_related("user"):

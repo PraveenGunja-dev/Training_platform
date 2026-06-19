@@ -108,9 +108,6 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Redis cache (django-redis)
@@ -142,8 +139,10 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ],
     "DEFAULT_THROTTLE_RATES": {
+        "login": "5/minute",
         "refresh_token": "30/minute",
-        "change_password": "10/hour",
+        "change_password": "20/hour",
+        "invite": "30/hour",
     },
 }
 

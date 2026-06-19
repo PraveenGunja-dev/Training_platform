@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api-client';
-import type { ApiEnvelope, ClassSession } from '@/lib/types';
+import type { ApiEnvelope, AuditEntry, ClassSession } from '@/lib/types';
 
 export const classesApi = {
   list: (params?: { group_id?: string; from?: string; to?: string; status?: string }) =>
@@ -11,6 +11,7 @@ export const classesApi = {
     starts_at: string; ends_at: string;
     attendance_open_at?: string; attendance_close_at?: string;
     allow_late_attendance?: boolean;
+    sub_group_id?: string | null;
   }) => apiClient.post<ApiEnvelope<ClassSession>>('/classes', body).then(r => r.data),
   update: (id: string, body: Partial<ClassSession>) =>
     apiClient.patch<ApiEnvelope<ClassSession>>(`/classes/${id}`, body).then(r => r.data),
@@ -21,6 +22,20 @@ export const classesApi = {
     apiClient.get<ApiEnvelope<{ id: string; full_name: string; email: string }[]>>(
       `/classes/${classId}/participants`,
     ).then(r => r.data),
-  shareQR: (classId: string, userIds: string[]) =>
-    apiClient.post<ApiEnvelope<{ sent: number }>>(`/classes/${classId}/share-qr`, { user_ids: userIds }).then(r => r.data),
+  getActivity: (classId: string) =>
+    apiClient.get<ApiEnvelope<AuditEntry[]>>(`/classes/${classId}/activity`).then(r => r.data),
+  createRecurring: (body: {
+    group_id: string;
+    title: string;
+    description?: string;
+    meeting_link?: string;
+    allow_late_attendance?: boolean;
+    sub_group_id?: string | null;
+    start_date: string;
+    end_date: string;
+    days_of_week: number[];
+    start_time: string;
+    end_time: string;
+  }) =>
+    apiClient.post<ApiEnvelope<{ created: number; dates: string[] }>>('/classes/recurring', body).then(r => r.data),
 };

@@ -17,7 +17,7 @@ from apps.common.scoping import instructor_class_qs, instructor_owns_group
 from apps.common.visibility import instructor_can_view_all
 
 from .models import Class
-from .serializers import ClassSerializer, ClassWriteSerializer
+from .serializers import ClassSerializer, ClassWriteSerializer, RecurringClassSerializer
 from .services import apply_class_filters
 
 
@@ -45,7 +45,24 @@ class ClassViewSet(ViewSet):
         return [IsAuthenticated()]
 
     def _base_queryset(self) -> object:
-        return Class.objects.select_related("group", "created_by").prefetch_related("tasks")
+        from django.db.models import Prefetch  # noqa: PLC0415
+        from apps.assignments.models import AssignmentTask  # noqa: PLC0415
+        from apps.groups.models import GroupInstructor  # noqa: PLC0415
+        return (
+            Class.objects
+            .select_related("group", "created_by")
+            .prefetch_related(
+                Prefetch(
+                    "group__instructors",
+                    queryset=GroupInstructor.objects.select_related("instructor"),
+                ),
+                Prefetch(
+                    "tasks",
+                    queryset=AssignmentTask.objects.order_by("upload_open_at"),
+                    to_attr="prefetched_tasks",
+                ),
+            )
+        )
 
     def _scoped_queryset(self, request: Request) -> object:
         qs = self._base_queryset()
@@ -55,7 +72,24 @@ class ClassViewSet(ViewSet):
             if instructor_can_view_all(request.user):
                 pass  # full superset; read_only flag computed per-row in serializer
             else:
-                qs = instructor_class_qs(request.user).select_related("group", "created_by").prefetch_related("tasks")
+                from django.db.models import Prefetch  # noqa: PLC0415
+                from apps.assignments.models import AssignmentTask  # noqa: PLC0415
+                from apps.groups.models import GroupInstructor  # noqa: PLC0415
+                qs = (
+                    instructor_class_qs(request.user)
+                    .select_related("group", "created_by")
+                    .prefetch_related(
+                        Prefetch(
+                            "group__instructors",
+                            queryset=GroupInstructor.objects.select_related("instructor"),
+                        ),
+                        Prefetch(
+                            "tasks",
+                            queryset=AssignmentTask.objects.order_by("upload_open_at"),
+                            to_attr="prefetched_tasks",
+                        ),
+                    )
+                )
         return qs
 
     def list(self, request: Request) -> Response:
@@ -64,7 +98,18 @@ class ClassViewSet(ViewSet):
         context: dict = {"request": request}
         if request.user.role == "INSTRUCTOR":
             context["assigned_group_ids"] = _instructor_assigned_ids(request.user)
-        return Response({"data": ClassSerializer(qs, many=True, context=context).data})
+        try:
+            page_size = min(int(request.query_params.get("page_size", 50)), 200)
+            page = max(int(request.query_params.get("page", 1)), 1)
+        except (ValueError, TypeError):
+            page_size, page = 50, 1
+        offset = (page - 1) * page_size
+        total = qs.count()
+        items = qs[offset:offset + page_size]
+        return Response({
+            "data": ClassSerializer(items, many=True, context=context).data,
+            "meta": {"total": total, "page": page, "page_size": page_size},
+        })
 
     def create(self, request: Request) -> Response:
         if request.user.role == "INSTRUCTOR":
@@ -73,6 +118,16 @@ class ClassViewSet(ViewSet):
                 return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
         serializer = ClassWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Belt-and-suspenders: run model-level clean() before the DB write.
+        from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
+        from rest_framework.exceptions import ValidationError as DRFValidationError  # noqa: PLC0415
+        _attrs = {k: v for k, v in serializer.validated_data.items()}
+        _attrs["created_by"] = request.user
+        _tmp = Class(**_attrs)
+        try:
+            _tmp.full_clean(exclude=["id", "status_cached"])
+        except DjangoValidationError as exc:
+            raise DRFValidationError(detail=exc.message_dict)
         cls = serializer.save(created_by=request.user)
         log_action(
             actor=request.user,
@@ -130,6 +185,17 @@ class ClassViewSet(ViewSet):
             and cls.status_cached == Class.STATUS_COMPLETED
         ):
             serializer.validated_data["status_cached"] = Class.STATUS_UPCOMING
+
+        # Belt-and-suspenders: apply pending changes to a scratch copy and run
+        # model-level clean() before committing the DB write.
+        from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
+        from rest_framework.exceptions import ValidationError as DRFValidationError  # noqa: PLC0415
+        for _field, _val in serializer.validated_data.items():
+            setattr(cls, _field, _val)
+        try:
+            cls.full_clean(exclude=["id"])
+        except DjangoValidationError as exc:
+            raise DRFValidationError(detail=exc.message_dict)
 
         cls = serializer.save()
         log_action(
@@ -275,58 +341,165 @@ class ClassParticipantsView(APIView):
         return Response({"data": data})
 
 
+
 @extend_schema(exclude=True)
-class ShareQRView(APIView):
-    """POST /classes/{pk}/share-qr — send late-attendance QR notification to participants."""
+class RecurringClassView(APIView):
+    """POST /classes/recurring — bulk-create classes for repeating weekdays in a date range."""
 
     permission_classes = [IsAdminOrInstructor]
 
-    def post(self, request: Request, pk: str) -> Response:
-        from django.utils import timezone  # noqa: PLC0415
-        from apps.notifications.models import Notification  # noqa: PLC0415
+    def post(self, request: Request) -> Response:
+        from datetime import datetime, timedelta  # noqa: PLC0415
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # noqa: PLC0415
+        from django.utils import timezone as _tz  # noqa: PLC0415
 
-        cls = get_object_or_404(Class.objects.select_related("group"), pk=pk)
+        if request.user.role == "INSTRUCTOR":
+            group_id = request.data.get("group_id")
+            if not group_id or not instructor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
-        now = timezone.now()
-        ends_at = cls.ends_at
-        window_end = ends_at + timedelta(minutes=5)
+        ser = RecurringClassSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
 
-        if now < ends_at:
+        group     = d["group_id"]
+        sub_group = d.get("sub_group_id")
+        days_set  = set(d["days_of_week"])
+
+        # Resolve timezone: use system setting, fall back to UTC
+        try:
+            from apps.common.models import SystemSettings  # noqa: PLC0415
+            tz = ZoneInfo(SystemSettings.get_solo().timezone)
+        except (ZoneInfoNotFoundError, Exception):
+            tz = ZoneInfo("UTC")
+
+        # Collect all matching dates in the range
+        matching: list[datetime] = []
+        cur = d["start_date"]
+        while cur <= d["end_date"]:
+            if cur.weekday() in days_set:
+                matching.append(cur)
+            cur += timedelta(days=1)
+
+        if not matching:
             return Response(
-                {"errors": [{"code": "qr.class_not_ended", "message": "Class has not ended yet."}]},
+                {"errors": [{"code": "recurring.no_dates", "message": "No matching dates found in the selected range."}]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if now > window_end:
+        if len(matching) > 100:
             return Response(
-                {"errors": [{"code": "qr.window_expired", "message": "The 5-minute QR sharing window has expired."}]},
+                {"errors": [{"code": "recurring.too_many", "message": f"This would create {len(matching)} classes. Maximum allowed is 100 per request."}]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user_ids = request.data.get("user_ids", [])
-        if not user_ids or not isinstance(user_ids, list):
+        classes_to_create = []
+        for day in matching:
+            from django.utils.timezone import AmbiguousTimeError, NonExistentTimeError  # noqa: PLC0415
+            try:
+                starts_at = _tz.make_aware(datetime.combine(day, d["start_time"]), tz)
+            except (AmbiguousTimeError, NonExistentTimeError):
+                starts_at = _tz.make_aware(
+                    datetime.combine(day, d["start_time"]) + timedelta(hours=1), tz
+                )
+            try:
+                ends_at = _tz.make_aware(datetime.combine(day, d["end_time"]), tz)
+            except (AmbiguousTimeError, NonExistentTimeError):
+                ends_at = _tz.make_aware(
+                    datetime.combine(day, d["end_time"]) + timedelta(hours=1), tz
+                )
+            classes_to_create.append(
+                Class(
+                    group=group,
+                    sub_group=sub_group,
+                    title=d["title"],
+                    description=d.get("description", ""),
+                    meeting_link=d.get("meeting_link", ""),
+                    allow_late_attendance=d["allow_late_attendance"],
+                    starts_at=starts_at,
+                    ends_at=ends_at,
+                    created_by=request.user,
+                )
+            )
+
+        created = Class.objects.bulk_create(classes_to_create)
+
+        log_action(
+            actor=request.user,
+            action="class.recurring_created",
+            target_type="ClassGroup",
+            target_id=group.id,
+            metadata={
+                "title": d["title"],
+                "group_id": str(group.id),
+                "count": len(created),
+                "days_of_week": list(days_set),
+                "start_date": d["start_date"].isoformat(),
+                "end_date": d["end_date"].isoformat(),
+            },
+        )
+
+        return Response(
+            {"data": {"created": len(created), "dates": [c.starts_at.date().isoformat() for c in created]}},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema(exclude=True)
+class ClassActivityView(APIView):
+    """GET /classes/{pk}/activity — audit trail for a class (admin + instructor)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, pk: str) -> Response:
+        from django.db.models import Q  # noqa: PLC0415
+        from apps.audit.models import AuditLog  # noqa: PLC0415
+        from apps.audit.serializers import AuditLogSerializer  # noqa: PLC0415
+        from apps.attendance.models import AttendanceSession  # noqa: PLC0415
+        from apps.assignments.models import AssignmentTask  # noqa: PLC0415
+
+        if request.user.role not in ("ADMIN", "INSTRUCTOR"):
             return Response(
-                {"errors": [{"code": "qr.no_participants", "message": "Select at least one participant."}]},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"errors": [{"code": "perm.denied", "message": "Access denied."}]},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
-        role_label = "Super Admin" if request.user.role == "ADMIN" else "Instructor"
-        sender_name = request.user.full_name or request.user.email
-        sent_at = timezone.now()
-        minute_key = sent_at.strftime("%Y%m%d%H%M")
+        cls = get_object_or_404(Class, pk=pk)
 
-        notifications = [
-            Notification(
-                user_id=uid,
-                type="LATE_ATTENDANCE_QR_SHARED",
-                title=f"Late attendance QR for {cls.title}",
-                body=f"Late attendance QR has been sent by {role_label} - {sender_name}",
-                link=f"/me/qr/{cls.id}",
-                dedupe_key=f"late_qr:{cls.id}:{uid}:{minute_key}",
-                sent_at=sent_at,
-                payload={"class_id": str(cls.id), "class_title": cls.title},
-            )
-            for uid in user_ids
-        ]
-        Notification.objects.bulk_create(notifications, ignore_conflicts=True, batch_size=500)
+        if request.user.role == "INSTRUCTOR":
+            from apps.common.visibility import instructor_can_view_all  # noqa: PLC0415
+            if not instructor_owns_group(request.user, cls.group_id) and not instructor_can_view_all(request.user):
+                return Response(
+                    {"errors": [{"code": "perm.not_instructor_of_group", "message": "Not your group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
-        return Response({"data": {"sent": len(notifications)}})
+        class_id_str = str(cls.id)
+
+        session_ids = list(
+            AttendanceSession.objects.filter(class_obj_id=cls.id).values_list("id", flat=True)
+        )
+        session_id_strs = [str(s) for s in session_ids]
+
+        task_ids = list(
+            AssignmentTask.objects.filter(class_obj_id=cls.id).values_list("id", flat=True)
+        )
+        task_id_strs = [str(t) for t in task_ids]
+
+        q = Q(target_type="Class", target_id=class_id_str)
+        if session_id_strs:
+            q |= Q(target_type="AttendanceSession", target_id__in=session_id_strs)
+            q |= Q(target_type="AttendanceRecord", metadata__session_id__in=session_id_strs)
+        if task_id_strs:
+            q |= Q(target_type="AssignmentTask", target_id__in=task_id_strs)
+        q |= Q(target_type="SubmissionReview", metadata__class_id=class_id_str)
+
+        entries = (
+            AuditLog.objects.filter(q)
+            .select_related("actor")
+            .order_by("-created_at")[:100]
+        )
+
+        return Response({"data": AuditLogSerializer(entries, many=True).data})

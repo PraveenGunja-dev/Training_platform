@@ -202,6 +202,11 @@ class AdminRecordOverrideView(APIView):
                 {"errors": [{"code": "invalid", "message": "Invalid status", "field": "status"}], "data": None},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if record.session.status == "ENDED":
+            return Response(
+                {"errors": [{"code": "session.already_ended", "message": "Cannot override attendance on an ended session."}], "data": None},
+                status=status.HTTP_409_CONFLICT,
+            )
         old_status = record.status
         record.status = new_status
         record.save(update_fields=["status"])

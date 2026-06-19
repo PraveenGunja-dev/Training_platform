@@ -59,7 +59,7 @@ class Document(TimestampedModel):
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=100)
     file_size = models.PositiveBigIntegerField()
-    doc_type = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES, default=GUIDE)
+    doc_type = models.CharField(max_length=100, default=GUIDE)
     visibility = models.CharField(
         max_length=20, choices=VISIBILITY_CHOICES, default=VIS_GROUP
     )

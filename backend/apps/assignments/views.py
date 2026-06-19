@@ -145,7 +145,11 @@ class AssignmentTaskViewSet(ViewSet):
             action="assignment.task_created",
             target_type="AssignmentTask",
             target_id=task.id,
-            metadata={"title": task.title, "group_id": str(task.group_id)},
+            metadata={
+                "title": task.title,
+                "group_id": str(task.group_id),
+                "class_id": str(task.class_obj_id) if task.class_obj_id else None,
+            },
         )
         # Notify co-instructors (excluding the creator) about new assignment
         from apps.notifications.services import notify_instructors as _ni_assign  # noqa: PLC0415
@@ -281,6 +285,11 @@ class AssignmentTaskViewSet(ViewSet):
     # POST /assignments/:id/submissions
     def submit(self, request: Request, pk: str | None = None) -> Response:
         task = get_object_or_404(AssignmentTask.objects.select_related("group"), pk=pk)
+
+        # Instructors may only submit to tasks in groups they own
+        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, task.group_id):
+            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+
         ser = SubmissionWriteSerializer(data=request.data)
         if not ser.is_valid():
             return Response(
@@ -295,6 +304,11 @@ class AssignmentTaskViewSet(ViewSet):
             target_user = get_object_or_404(User, pk=target_user_id)
         else:
             target_user = request.user
+
+        try:
+            validate_file(d["file_name"], d["file_size"], d["file_type"])
+        except FileValidationError as exc:
+            return _error_response(exc)
 
         try:
             submission = create_submission(
@@ -575,6 +589,20 @@ class SubmissionReviewView(APIView):
             )
         validated = ser.validated_data
 
+        from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
+        try:
+            _tmp_review = SubmissionReview(
+                submission=submission,
+                reviewer=request.user,
+                **validated,
+            )
+            _tmp_review.full_clean(exclude=["submission", "reviewer"])
+        except DjangoValidationError as e:
+            return Response(
+                {"errors": [{"code": "validation_error", "message": str(e)}], "data": None},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if is_new:
             review = SubmissionReview.objects.create(
                 submission=submission,
@@ -587,6 +615,21 @@ class SubmissionReviewView(APIView):
             existing_review.reviewer = request.user
             existing_review.save()
             review = existing_review
+
+        from apps.audit.services import log_action as _log_review  # noqa: PLC0415
+        _log_review(
+            actor=request.user,
+            action="assignment.submission_reviewed",
+            target_type="SubmissionReview",
+            target_id=review.id,
+            metadata={
+                "task_id": str(submission.task_id),
+                "class_id": str(submission.task.class_obj_id) if submission.task.class_obj_id else None,
+                "user_id": str(submission.user_id),
+                "grade_letter": review.grade_letter or "",
+                "is_new": is_new,
+            },
+        )
 
         # Notify the participant that their submission has been reviewed
         from apps.notifications.services import create_inapp as _ci_reviewed  # noqa: PLC0415

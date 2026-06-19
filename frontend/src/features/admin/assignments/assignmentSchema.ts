@@ -4,13 +4,14 @@ const isFutureString = (s: string) => new Date(s) > new Date();
 
 export const assignmentSchema = z.object({
   group_id: z.string().min(1, 'Group is required'),
+  sub_group_id: z.string().optional(),
   class_id: z.string().optional(),
   title: z.string().min(2, 'Title must be at least 2 characters').max(200),
   question: z.string().min(2, 'Question is required'),
   description: z.string().optional(),
   instructions: z.string().optional(),
   upload_open_at: z.string().min(1, 'Open time is required').refine(isFutureString, 'Must be a future date/time'),
-  deadline_at: z.string().min(1, 'Deadline is required'),
+  deadline_at: z.string().min(1, 'Deadline is required').refine(isFutureString, 'Deadline must be in the future'),
   late_policy: z.enum(['STRICT', 'LATE_ALLOWED', 'ADMIN_ONLY']),
   reminder_offsets: z.array(z.number().int().positive()).min(1, 'At least one reminder offset is required'),
 }).refine(d => d.deadline_at > d.upload_open_at, {

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, UserPlus, Trash2, GraduationCap, Loader2 } from 'lucide-react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, UserPlus, Trash2, GraduationCap, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -16,6 +17,70 @@ import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/dates';
 import type { GroupInstructor, User } from '@/lib/types';
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Admin',
+  INSTRUCTOR: 'Instructor',
+  PARTICIPANT: 'Participant',
+  GROUP_ADMIN: 'Group Admin',
+};
+
+// ---------------------------------------------------------------------------
+// ConfirmParticipantsDialog — shown when selected users include participants
+// ---------------------------------------------------------------------------
+
+interface ConfirmParticipantsDialogProps {
+  participants: User[];
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}
+
+function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPending }: ConfirmParticipantsDialogProps) {
+  return (
+    <Dialog open onOpenChange={v => { if (!v) onCancel(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 shrink-0">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            </div>
+            <DialogTitle className="text-left">Role Change Warning</DialogTitle>
+          </div>
+          <DialogDescription className="text-left space-y-2">
+            <span className="block">
+              The following {participants.length === 1 ? 'user is' : 'users are'} currently a{' '}
+              <strong>Participant</strong>. Assigning them as instructors will:
+            </span>
+            <ul className="list-disc list-inside text-sm space-y-0.5 text-slate-600 bg-amber-50 rounded-lg p-3">
+              {participants.map(p => (
+                <li key={p.id} className="font-medium text-amber-800">{p.full_name} ({p.email})</li>
+              ))}
+            </ul>
+            <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
+              <li>Change their role from Participant to Instructor</li>
+              <li>Remove access to participant features (assignments, submissions)</li>
+              <li>Existing attendance records and submissions will be retained but inaccessible</li>
+            </ul>
+            <span className="block font-medium text-slate-700">
+              Are you sure you want to proceed?
+            </span>
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={onConfirm}
+            disabled={isPending}
+          >
+            {isPending ? 'Assigning...' : 'Yes, Proceed'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // AddInstructorsDialog
@@ -31,20 +96,33 @@ interface AddInstructorsDialogProps {
 function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstructorsDialogProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<User[]>([]);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['instructors', 'search', query],
-    queryFn: () => usersApi.listInstructors(query || undefined),
+    queryKey: ['users', 'all-search', debouncedQuery],
+    queryFn: () => usersApi.list({ search: debouncedQuery || undefined, page_size: 50 }),
     enabled: open,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 
-  const results = (data?.data ?? []).filter(u => !existingIds.includes(u.id));
+  const results = (data?.data ?? []).filter(u => !existingIds.includes(u.id) && u.is_active);
 
   const mutation = useMutation({
-    mutationFn: (users: User[]) =>
-      groupsApi.assignInstructors(groupId, users.map(u => u.id)),
+    mutationFn: async (users: User[]) => {
+      await groupsApi.assignInstructors(groupId, users.map(u => u.id));
+      const participants = users.filter(u => u.role === 'PARTICIPANT');
+      await Promise.all(
+        participants.map(u => usersApi.update(u.id, { role: 'INSTRUCTOR' }))
+      );
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
       toast.success(
@@ -52,6 +130,7 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
       );
       setSelected([]);
       setQuery('');
+      setShowConfirm(false);
       onClose();
     },
     onError: () => toast.error('Failed to assign instructors.'),
@@ -68,81 +147,120 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
   function handleClose() {
     setSelected([]);
     setQuery('');
+    setDebouncedQuery('');
+    setShowConfirm(false);
     onClose();
   }
 
+  function handleSubmit() {
+    const participants = selected.filter(u => u.role === 'PARTICIPANT');
+    if (participants.length > 0) {
+      setShowConfirm(true);
+    } else {
+      mutation.mutate(selected);
+    }
+  }
+
   const selectedIds = new Set(selected.map(u => u.id));
+  const participantsInSelection = selected.filter(u => u.role === 'PARTICIPANT');
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add Instructors</DialogTitle>
-          <DialogDescription>
-            Search by name or email to find and assign instructors to this group.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open && !showConfirm} onOpenChange={v => { if (!v) handleClose(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Instructors</DialogTitle>
+            <DialogDescription>
+              Search all users to find and assign instructors to this group.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
-          <Input
-            className="pl-8"
-            placeholder="Search by name or email..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            autoFocus
-          />
-          {isFetching && (
-            <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground/60" />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input
+              className="pl-8"
+              placeholder="Search by name or email..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              autoFocus
+            />
+            {isFetching && (
+              <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground/60" />
+            )}
+          </div>
+
+          <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
+            {results.length === 0 && !isFetching ? (
+              <p className="text-sm text-muted-foreground/70 p-4 text-center">
+                {query ? 'No matching users found.' : 'No available users.'}
+              </p>
+            ) : (
+              results.map(user => (
+                <label
+                  key={user.id}
+                  className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary shrink-0"
+                    checked={selectedIds.has(user.id)}
+                    onChange={() => toggle(user)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{user.full_name}</p>
+                      <Badge
+                        variant={user.role === 'PARTICIPANT' ? 'secondary' : user.role === 'INSTRUCTOR' ? 'teal' : 'info'}
+                        className="text-[10px] px-1.5 py-0 shrink-0"
+                      >
+                        {ROLE_LABEL[user.role] ?? user.role}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                </label>
+              ))
+            )}
+          </div>
+
+          {selected.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                {selected.length} user{selected.length !== 1 ? 's' : ''} selected:{' '}
+                {selected.map(u => u.full_name).join(', ')}
+              </p>
+              {participantsInSelection.length > 0 && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {participantsInSelection.length} participant{participantsInSelection.length !== 1 ? 's' : ''} will have their role changed
+                </p>
+              )}
+            </div>
           )}
-        </div>
 
-        <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
-          {results.length === 0 && !isFetching ? (
-            <p className="text-sm text-muted-foreground/70 p-4 text-center">
-              {query ? 'No matching instructors found.' : 'No available instructors.'}
-            </p>
-          ) : (
-            results.map(user => (
-              <label
-                key={user.id}
-                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5"
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-primary shrink-0"
-                  checked={selectedIds.has(user.id)}
-                  onChange={() => toggle(user)}
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{user.full_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                </div>
-              </label>
-            ))
-          )}
-        </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={selected.length === 0 || mutation.isPending}
+            >
+              {mutation.isPending
+                ? 'Assigning...'
+                : `Add${selected.length > 0 ? ` ${selected.length}` : ''} Selected`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {selected.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {selected.length} instructor{selected.length !== 1 ? 's' : ''} selected:{' '}
-            {selected.map(u => u.full_name).join(', ')}
-          </p>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button
-            onClick={() => mutation.mutate(selected)}
-            disabled={selected.length === 0 || mutation.isPending}
-          >
-            {mutation.isPending
-              ? 'Assigning...'
-              : `Add${selected.length > 0 ? ` ${selected.length}` : ''} Selected`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {showConfirm && (
+        <ConfirmParticipantsDialog
+          participants={participantsInSelection}
+          onConfirm={() => mutation.mutate(selected)}
+          onCancel={() => setShowConfirm(false)}
+          isPending={mutation.isPending}
+        />
+      )}
+    </>
   );
 }
 

@@ -18,6 +18,7 @@ export const assignmentsApi = {
     deadline_at: string; late_policy: LatePolicy; reminder_offsets?: number[];
     question_file_url?: string; question_file_name?: string;
     question_file_type?: string; question_file_size?: number;
+    sub_group_id?: string | null;
   }) => apiClient.post<ApiEnvelope<AssignmentTask>>('/assignments', body).then(r => r.data),
   update: (id: string, body: Partial<AssignmentTask>) =>
     apiClient.patch<ApiEnvelope<AssignmentTask>>(`/assignments/${id}`, body).then(r => r.data),

@@ -48,10 +48,10 @@ export function useCan(
     if (!myGroupIds) return false;
 
     // For create: instructor can create if they have at least one assigned group
-    if (action === 'create') return myGroupIds.size > 0;
+    if (action === 'create') return (myGroupIds?.length ?? 0) > 0;
 
     const inGroup = resourceData?.group_id
-      ? myGroupIds.has(resourceData.group_id)
+      ? myGroupIds?.includes(resourceData.group_id) ?? false
       : false;
     if (!inGroup) return false;
 
@@ -60,6 +60,14 @@ export function useCan(
       return resourceData?.uploaded_by_id === user.id;
     }
     return true;
+  }
+
+  // GROUP_ADMIN can manage participants, instructors, and sub-groups within their assigned group
+  if (user?.admin_of_group_ids && user.admin_of_group_ids.length > 0) {
+    const adminGroupIds = new Set(user.admin_of_group_ids);
+    if (action === 'create') return true;
+    if (!resourceData?.group_id) return false;
+    return adminGroupIds.has(resourceData.group_id);
   }
 
   return false;

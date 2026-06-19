@@ -7,10 +7,10 @@ interface AuthState {
   accessToken: string | null;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
-  mockLogin: (role: Role) => void;
+  mockLogin: (role: Role | 'GROUP_ADMIN') => void;
 }
 
-const VALID_ROLES: Role[] = ['ADMIN', 'INSTRUCTOR', 'PARTICIPANT'];
+const VALID_ROLES: (Role | 'GROUP_ADMIN')[] = ['ADMIN', 'INSTRUCTOR', 'PARTICIPANT', 'GROUP_ADMIN'];
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -21,7 +21,7 @@ export const useAuthStore = create<AuthState>()(
       logout: () => set({ user: null, accessToken: null }),
       mockLogin: (role) => {
         if (import.meta.env.DEV) {
-          const mockUsers: Record<Role, User> = {
+          const mockUsers: Record<Role | 'GROUP_ADMIN', User> = {
             ADMIN: {
               id: 'u-admin',
               email: 'kiran.kr@adani.com',
@@ -61,6 +61,20 @@ export const useAuthStore = create<AuthState>()(
               grade_code: 'E2',
               employee_code: 'AEL-ENG-1197',
             },
+            GROUP_ADMIN: {
+              id: 'u-group-admin',
+              email: 'group-admin@example.com',
+              full_name: 'Dev Group Admin',
+              role: 'INSTRUCTOR' as Role,
+              admin_of_group_ids: ['g-00000000-0000-0000-0000-000000000001'],
+              photo_url: null,
+              is_active: true,
+              created_at: '2026-01-15T00:00:00Z',
+              business_unit: 'Adani Green Energy',
+              department: 'Learning & Development',
+              grade_code: 'L3',
+              employee_code: 'AGEL-INS-0099',
+            },
           };
           set({ user: mockUsers[role], accessToken: 'mock-access-token' });
         }
@@ -68,21 +82,24 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ems-auth',
-      version: 2,
+      version: 3,
       // v0→v1: MANAGER role removed, converted to ADMIN.
       // v1→v2: INSTRUCTOR role added; unknown roles force re-login.
+      // v2→v3: accessToken removed from persisted state; refreshed on page load.
       migrate: (persisted: unknown) => {
-        const s = persisted as { user?: { role?: string } | null; accessToken?: string | null } | null;
+        const s = persisted as { user?: { role?: string } | null; accessToken?: unknown } | null;
         if (!s) return {};
         if (s.user?.role === 'MANAGER') {
-          return { ...s, user: { ...s.user, role: 'ADMIN' as Role } };
+          return { user: { ...s.user, role: 'ADMIN' as Role } };
         }
         if (s.user?.role && !(VALID_ROLES as string[]).includes(s.user.role)) {
-          return { user: null, accessToken: null };
+          return { user: null };
         }
-        return s;
+        // Drop accessToken from persisted state (v2 → v3)
+        const { accessToken: _dropped, ...rest } = s as { accessToken?: unknown; user?: unknown };
+        return rest;
       },
-      partialize: (state) => ({ user: state.user, accessToken: state.accessToken }),
+      partialize: (state) => ({ user: state.user }),
     }
   )
 );

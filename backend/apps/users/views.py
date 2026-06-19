@@ -13,6 +13,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import User
 from apps.accounts.services import invite_user
+from apps.accounts.throttles import InviteRateThrottle
+from apps.groups.models import GroupAdmin
 from apps.audit.actions import INSTRUCTOR_VISIBILITY_CHANGED
 from apps.audit.services import log_action
 from apps.common.pagination import EnvelopePageNumberPagination
@@ -50,6 +52,11 @@ class UserViewSet(
         if self.action in ("update", "partial_update"):
             return UserWriteSerializer
         return UserDetailSerializer
+
+    def get_throttles(self):
+        if self.action in ("invite", "bulk_invite"):
+            return [InviteRateThrottle()]
+        return super().get_throttles()
 
     # ------------------------------------------------------------------ #
     # Override mixin methods to add {data: ...} envelope                   #
@@ -110,6 +117,15 @@ class UserViewSet(
     # Custom actions                                                        #
     # ------------------------------------------------------------------ #
 
+    @action(detail=False, methods=["get"], url_path="check-email", permission_classes=[IsAuthenticated, IsAdmin])
+    def check_email(self, request: Request) -> Response:
+        """GET /users/check-email?email=... — returns whether an email already exists (admin only)."""
+        email = request.query_params.get("email", "").strip().lower()
+        if not email:
+            return Response({"data": {"exists": False}})
+        exists = User.objects.filter(email=email).exists()
+        return Response({"data": {"exists": exists}})
+
     @action(detail=False, methods=["get"], url_path="business-units")
     def business_units(self, request: Request) -> Response:
         """GET /users/business-units — distinct non-empty business unit values."""
@@ -125,7 +141,7 @@ class UserViewSet(
     def stats(self, request: Request) -> Response:
         """GET /users/stats — aggregate counts, always reflects full DB."""
         qs = User.objects.values("role", "is_active").annotate(n=Count("id"))
-        totals: dict[str, int] = {"ADMIN": 0, "INSTRUCTOR": 0, "PARTICIPANT": 0}
+        totals: dict[str, int] = {"ADMIN": 0, "INSTRUCTOR": 0, "PARTICIPANT": 0, "GROUP_ADMIN": 0}
         active = blocked = 0
         for row in qs:
             totals[row["role"]] = totals.get(row["role"], 0) + row["n"]
@@ -140,6 +156,7 @@ class UserViewSet(
                     "admins": totals["ADMIN"],
                     "instructors": totals["INSTRUCTOR"],
                     "participants": totals["PARTICIPANT"],
+                    "group_admins": totals["GROUP_ADMIN"],
                     "active": active,
                     "blocked": blocked,
                 }
@@ -152,7 +169,7 @@ class UserViewSet(
         s = InviteSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         d = s.validated_data
-        if User.objects.filter(email=d["email"]).exists():
+        if User.objects.filter(email__iexact=d["email"]).exists():
             return Response(
                 {
                     "errors": [
@@ -188,7 +205,7 @@ class UserViewSet(
 
         results = []
         for row in rows:
-            if User.objects.filter(email=row["email"]).exists():
+            if User.objects.filter(email__iexact=row["email"]).exists():
                 results.append(
                     {"email": row["email"], "status": "skipped", "reason": "already_exists"}
                 )

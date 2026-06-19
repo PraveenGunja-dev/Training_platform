@@ -17,6 +17,7 @@ import {
 import { DocumentVisibilityPicker } from './DocumentVisibilityPicker';
 import { DOC_TYPES, documentSchema, type DocumentFormValues } from './documentSchema';
 import { documentsApi } from '@/api/documents';
+import { validateFile } from '@/lib/fileValidation';
 import { classesApi } from '@/api/classes';
 import { apiClient } from '@/lib/api-client';
 import type { ApiEnvelope, ClassGroup, GroupDetail, DocVisibility } from '@/lib/types';
@@ -39,6 +40,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'saving'>('idle');
+  const [customDocType, setCustomDocType] = useState('');
 
   const { register, handleSubmit, watch, setValue, control, reset, formState: { errors } } = useForm<DocumentFormValues>({
     resolver: zodResolver(documentSchema),
@@ -93,12 +95,28 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
     reset();
     setPendingFile(null);
     setUploadProgress('idle');
+    setCustomDocType('');
     onClose();
   };
+
+  const selectedDocType = watch('doc_type');
 
   const onSubmit = async (vals: DocumentFormValues) => {
     if (!pendingFile) {
       toast.error('Please select a file to upload.');
+      return;
+    }
+    if (vals.doc_type === '__custom__') {
+      if (!customDocType.trim()) {
+        toast.error('Please enter a custom document type name.');
+        return;
+      }
+      vals = { ...vals, doc_type: customDocType.trim().toUpperCase() };
+    }
+    // Validate file type and size before consuming a presigned URL slot
+    const validation = validateFile(pendingFile);
+    if (!validation.ok) {
+      toast.error(validation.error);
       return;
     }
     setUploading(true);
@@ -294,7 +312,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
               control={control}
               name="doc_type"
               render={({ field }) => (
-                <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                <Select value={field.value ?? ''} onValueChange={v => { field.onChange(v); if (v !== '__custom__') setCustomDocType(''); }}>
                   <SelectTrigger className="bg-white border-slate-200">
                     <SelectValue placeholder="Select type…" />
                   </SelectTrigger>
@@ -306,6 +324,15 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
                 </Select>
               )}
             />
+            {selectedDocType === '__custom__' && (
+              <Input
+                placeholder="Enter type name (e.g. MOM, Minutes, Circular…)"
+                value={customDocType}
+                onChange={e => setCustomDocType(e.target.value)}
+                className="bg-white border-slate-200"
+                autoFocus
+              />
+            )}
             {errors.doc_type && <p className="text-xs text-rose-600">{errors.doc_type.message}</p>}
           </div>
 

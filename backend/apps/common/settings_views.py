@@ -53,6 +53,13 @@ class ForceLogoutView(APIView):
         cleared = qs.count()
         for token in qs:
             BlacklistedToken.objects.get_or_create(token=token)
+        log_action(
+            actor=request.user,
+            action="system.force_logout_all",
+            target_type="SystemSettings",
+            target_id=None,
+            metadata={"cleared_sessions": cleared},
+        )
         return Response(
             {"data": {"cleared": cleared}},
             status=status.HTTP_200_OK,

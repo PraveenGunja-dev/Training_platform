@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'INSTRUCTOR' | 'PARTICIPANT';
+export type Role = 'ADMIN' | 'INSTRUCTOR' | 'PARTICIPANT' | 'GROUP_ADMIN';
 export type ClassStatus = 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'MANUAL_PRESENT';
 export type AttendanceSessionStatus = 'ACTIVE' | 'ENDED';
@@ -37,7 +37,7 @@ export type NotificationType =
   | 'PARTICIPANTS_REMOVED_FROM_GROUP'
   | 'SHARED_UPLOAD_PENDING'
   | 'SUBMISSION_REVIEWED'
-  | 'LATE_ATTENDANCE_QR_SHARED';
+  | 'GROUP_ADMIN_ASSIGNED';
 
 export interface NotificationPreference {
   in_app_enabled: boolean;
@@ -60,6 +60,12 @@ export interface User {
   grade_code?: string;
   department?: string;
   employee_code?: string;
+  admin_of_group_ids?: string[];
+  admin_of_group?: { id: string; name: string } | null;
+}
+
+export function isGroupAdmin(user: User | null): boolean {
+  return (user?.admin_of_group_ids?.length ?? 0) > 0;
 }
 
 export interface SystemSettings {
@@ -98,12 +104,29 @@ export interface GroupParticipant extends User {
 
 export interface GroupDetail extends ClassGroup {
   participants: GroupParticipant[];
+  group_admin?: GroupAdminData | null;
 }
 
 export interface GroupAnalytics {
   attendance_trend: Array<{ week: string; rate: number }>;
   submission_completion: { completed: number; total: number };
   top_participants: Array<{ id: string; name: string; attendance_rate: number; submissions: number }>;
+}
+
+export interface SubGroup {
+  id: string;
+  name: string;
+  parent_group: string;
+  participants: Array<{ id: string; full_name: string; email: string }>;
+  participants_count: number;
+  created_at: string;
+}
+
+export interface GroupAdminData {
+  admin_id: string;
+  full_name: string;
+  email: string;
+  assigned_at: string;
 }
 
 // --- Attendance (session-based, v2) ---
@@ -189,8 +212,11 @@ export interface ClassSession {
   participants_count?: number;
   related_tasks?: RelatedTask[];
   meeting_link?: string;
+  sub_group_id?: string | null;
   // Cross-visibility flag: true when instructor sees a non-assigned class
   read_only?: boolean;
+  instructors?: Array<{ id: string; full_name: string; email: string }>;
+  group_admin?: { id: string; full_name: string; email: string } | null;
 }
 
 export interface AssignmentTask {
@@ -214,6 +240,7 @@ export interface AssignmentTask {
   question_file_type: string;
   question_file_size: number | null;
   created_at: string;
+  sub_group_id?: string | null;
 }
 
 export interface SubmissionReview {
@@ -261,6 +288,7 @@ export interface Document {
   title: string;
   description: string;
   file_url: string;
+  file_name: string;
   file_type: string;
   file_size: number;
   doc_type: string;

@@ -2,7 +2,7 @@ import hashlib
 import logging
 import secrets
 import string
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -42,10 +42,11 @@ def _generate_temp_password(length: int = 12) -> str:
 def invite_user(
     *, email: str, role: str, full_name: str, invited_by: User, resend: bool = False
 ) -> User:
+    email = email.strip().lower()
     temp_password = _generate_temp_password()
 
     if resend:
-        user = User.objects.get(email=email)
+        user = User.objects.get(email__iexact=email)
     else:
         user, created = User.objects.get_or_create(
             email=email,
@@ -60,27 +61,42 @@ def invite_user(
     user.must_change_password = True
     user.save(update_fields=["password", "is_active", "must_change_password"])
 
+    # Create a setup token so the user can set their own password via the invite link.
+    signer = TimestampSigner()
+    raw_token = signer.sign(str(user.id))
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    PasswordSetupToken.objects.update_or_create(
+        user=user,
+        defaults={
+            "token_hash": token_hash,
+            "consumed_at": None,
+            "expires_at": timezone.now() + timedelta(hours=72),
+        },
+    )
+
     logger.info("User registered: %s (role=%s) by %s", email, role, invited_by.email)
     return user
 
 
 def consume_setup_token(*, token: str, password: str) -> User:
-    signer = TimestampSigner()
-    try:
-        user_id_str = signer.unsign(token, max_age=INVITE_TOKEN_MAX_AGE)
-    except SignatureExpired as exc:
-        raise ValueError("invite_token_expired") from exc
-    except BadSignature as exc:
-        raise ValueError("invite_token_invalid") from exc
-
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     try:
         setup_token = PasswordSetupToken.objects.get(
-            user_id=user_id_str,
             token_hash=token_hash,
             consumed_at__isnull=True,
         )
     except PasswordSetupToken.DoesNotExist as exc:
+        raise ValueError("invite_token_invalid") from exc
+
+    if setup_token.expires_at and setup_token.expires_at < timezone.now():
+        raise ValueError("invite_token_expired")
+
+    signer = TimestampSigner()
+    try:
+        signer.unsign(token, max_age=INVITE_TOKEN_MAX_AGE)
+    except SignatureExpired as exc:
+        raise ValueError("invite_token_expired") from exc
+    except BadSignature as exc:
         raise ValueError("invite_token_invalid") from exc
 
     user = setup_token.user

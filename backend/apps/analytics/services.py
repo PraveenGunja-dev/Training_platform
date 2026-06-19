@@ -39,8 +39,8 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     total_participants = User.objects.filter(role="PARTICIPANT", is_active=True).count()
     total_groups = ClassGroup.objects.filter(is_archived=False, **_group_q).count()
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
-    classes_upcoming = Class.objects.filter(status_cached="UPCOMING", **_class_q).count()
-    classes_completed = Class.objects.filter(status_cached="COMPLETED", **_class_q).count()
+    classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
+    classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     submitted = Submission.objects.filter(status="SUBMITTED").count()
     late = Submission.objects.filter(status="LATE_SUBMITTED").count()
     pending_approvals = ParticipantSharedDoc.objects.filter(status="PENDING").count()
@@ -117,9 +117,9 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
 
     # --- Class status distribution ---
     class_status = [
-        {"label": "Upcoming",  "value": Class.objects.filter(status_cached="UPCOMING", **_class_q).count()},
-        {"label": "Ongoing",   "value": Class.objects.filter(status_cached="ONGOING", **_class_q).count()},
-        {"label": "Completed", "value": Class.objects.filter(status_cached="COMPLETED", **_class_q).count()},
+        {"label": "Upcoming",  "value": Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()},
+        {"label": "Ongoing",   "value": Class.objects.filter(starts_at__lte=now, ends_at__gte=now, **_class_q).exclude(status_cached="CANCELLED").count()},
+        {"label": "Completed", "value": Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()},
         {"label": "Cancelled", "value": Class.objects.filter(status_cached="CANCELLED", **_class_q).count()},
     ]
 
@@ -312,8 +312,8 @@ def compute_instructor_payload(user) -> dict:
     )
     total_groups = groups.count()
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
-    classes_upcoming = Class.objects.filter(status_cached="UPCOMING", **_class_q).count()
-    classes_completed = Class.objects.filter(status_cached="COMPLETED", **_class_q).count()
+    classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
+    classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     submitted = Submission.objects.filter(task__group_id__in=assigned_group_ids, status="SUBMITTED").count()
     late = Submission.objects.filter(task__group_id__in=assigned_group_ids, status="LATE_SUBMITTED").count()
     pending_approvals = ParticipantSharedDoc.objects.filter(
@@ -332,15 +332,23 @@ def compute_instructor_payload(user) -> dict:
         ).count()
         trend_days.append({"date": day.isoformat(), "count": count})
 
-    # Attendance pie (last 30 days)
+    # Attendance pie (last 30 days) — proper absent calculation
     thirty_days_ago = now - timedelta(days=30)
     recent_sessions = AttendanceSession.objects.filter(
         class_obj__group_id__in=assigned_group_ids, started_at__gte=thirty_days_ago
     )
     present_count = AttendanceRecord.objects.filter(session__in=recent_sessions).count()
+    _sess_group_ids = list(recent_sessions.values_list("class_obj__group_id", flat=True))
+    _grp_member_counts = {
+        row["group_id"]: row["cnt"]
+        for row in GroupMembership.objects.filter(group_id__in=set(_sess_group_ids))
+        .values("group_id").annotate(cnt=Count("id"))
+    } if _sess_group_ids else {}
+    total_possible = sum(_grp_member_counts.get(gid, 0) for gid in _sess_group_ids)
+    absent_count = max(0, total_possible - present_count)
     attendance_pie = [
         {"label": "Present", "value": present_count},
-        {"label": "Absent", "value": 0},
+        {"label": "Absent", "value": absent_count},
     ]
 
     # Submission bar (per group)
@@ -357,6 +365,72 @@ def compute_instructor_payload(user) -> dict:
             "submitted": grp_submitted,
             "pending": grp_pending,
             "late": grp_late,
+        })
+
+    # Group comparison (attendance % vs submission %) per assigned group
+    group_comparison = []
+    for group in groups:
+        g_members = GroupMembership.objects.filter(group=group).count()
+        g_sessions = AttendanceSession.objects.filter(class_obj__group=group).count()
+        g_records = AttendanceRecord.objects.filter(session__class_obj__group=group).count()
+        att_rate = round(
+            (g_records / (g_sessions * g_members) * 100) if g_sessions and g_members else 0, 1
+        )
+        g_open = AssignmentTask.objects.filter(group=group, is_open=True).count()
+        g_submitted = (
+            Submission.objects.filter(task__group=group)
+            .values("user_id").distinct().count()
+        )
+        sub_rate = round(
+            (g_submitted / (g_open * g_members) * 100) if g_open and g_members else 0, 1
+        )
+        group_comparison.append({
+            "group_name": group.name,
+            "attendance_rate": min(100.0, att_rate),
+            "submission_rate": min(100.0, sub_rate),
+        })
+
+    # 4-week attendance & submission trend (scoped to instructor's groups)
+    weekly_trend = []
+    for week in range(3, -1, -1):
+        w_end   = now - timedelta(weeks=week)
+        w_start = w_end - timedelta(weeks=1)
+        w_sessions = AttendanceSession.objects.filter(
+            class_obj__group_id__in=assigned_group_ids,
+            started_at__gte=w_start, started_at__lt=w_end,
+        )
+        _w_group_ids = list(w_sessions.values_list("class_obj__group_id", flat=True))
+        _w_group_counts = {
+            row["group_id"]: row["cnt"]
+            for row in GroupMembership.objects.filter(group_id__in=set(_w_group_ids))
+            .values("group_id").annotate(cnt=Count("id"))
+        } if _w_group_ids else {}
+        w_possible = sum(_w_group_counts.get(gid, 0) for gid in _w_group_ids)
+        w_records = AttendanceRecord.objects.filter(
+            session__class_obj__group_id__in=assigned_group_ids,
+            session__started_at__gte=w_start, session__started_at__lt=w_end,
+        ).count()
+        att_rate = round((w_records / w_possible * 100) if w_possible else 0, 1)
+
+        w_submitted = Submission.objects.filter(
+            task__group_id__in=assigned_group_ids,
+            submitted_at__gte=w_start, submitted_at__lt=w_end,
+        ).count()
+        w_open = AssignmentTask.objects.filter(
+            group_id__in=assigned_group_ids,
+            upload_open_at__lte=w_end, is_open=True,
+        ).count()
+        w_members = (
+            GroupMembership.objects.filter(group_id__in=assigned_group_ids)
+            .values("user_id").distinct().count()
+        )
+        sub_rate = round(
+            (w_submitted / (w_open * w_members) * 100) if w_open and w_members else 0, 1
+        )
+        weekly_trend.append({
+            "week": f"W{4 - week}",
+            "attendance_rate": min(100.0, att_rate),
+            "submission_rate": min(100.0, sub_rate),
         })
 
     # Deadline tracking (next 5 open deadlines in assigned groups)
@@ -381,11 +455,36 @@ def compute_instructor_payload(user) -> dict:
 
     # Class status distribution
     class_status = [
-        {"label": "Upcoming",  "value": Class.objects.filter(status_cached="UPCOMING", **_class_q).count()},
-        {"label": "Ongoing",   "value": Class.objects.filter(status_cached="ONGOING", **_class_q).count()},
-        {"label": "Completed", "value": Class.objects.filter(status_cached="COMPLETED", **_class_q).count()},
+        {"label": "Upcoming",  "value": Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()},
+        {"label": "Ongoing",   "value": Class.objects.filter(starts_at__lte=now, ends_at__gte=now, **_class_q).exclude(status_cached="CANCELLED").count()},
+        {"label": "Completed", "value": Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()},
         {"label": "Cancelled", "value": Class.objects.filter(status_cached="CANCELLED", **_class_q).count()},
     ]
+
+    # Recent activity scoped to instructor's groups (class + attendance + assignment events)
+    from apps.audit.models import AuditLog  # noqa: PLC0415
+    class_ids = list(Class.objects.filter(**_class_q).values_list("id", flat=True))
+    class_id_strs = [str(c) for c in class_ids]
+    from django.db.models import Q as _Q  # noqa: PLC0415
+    recent_activity = []
+    activity_qs = (
+        AuditLog.objects.filter(
+            _Q(target_type="Class", target_id__in=class_id_strs) |
+            _Q(target_type="AttendanceSession", metadata__class_id__in=class_id_strs) |
+            _Q(target_type="AssignmentTask", metadata__group_id__in=[str(g) for g in assigned_group_ids])
+        )
+        .select_related("actor")
+        .order_by("-created_at")[:10]
+    )
+    for log in activity_qs:
+        recent_activity.append({
+            "id": str(log.id),
+            "actor_name": log.actor.full_name if log.actor else "System",
+            "action": log.action,
+            "target_type": log.target_type,
+            "target_id": str(log.target_id),
+            "created_at": log.created_at.isoformat(),
+        })
 
     # --- Participant activity scoped to instructor's groups ---
     _sessions_per_group = {
@@ -476,14 +575,14 @@ def compute_instructor_payload(user) -> dict:
         "charts": {
             "attendance_pie": attendance_pie,
             "submission_bar": submission_bar,
-            "group_comparison": [],
+            "group_comparison": group_comparison,
             "daily_upload_trend": trend_days,
             "deadline_tracking": deadline_tracking,
             "class_status": class_status,
-            "weekly_trend": [],
+            "weekly_trend": weekly_trend,
         },
         "recent_documents": [],
-        "recent_activity": [],
+        "recent_activity": recent_activity,
         "participant_activity": participant_activity,
     }
 
@@ -622,4 +721,165 @@ def compute_participant_payload(user) -> dict:
         "pending_tasks": pending_tasks,
         "recent_submissions": recent_submissions,
         "recent_documents": recent_documents,
+    }
+
+
+def compute_group_admin_payload(group_id: str) -> dict:
+    from apps.accounts.models import User
+    from apps.assignments.models import AssignmentTask, Submission
+    from apps.attendance.models import AttendanceRecord, AttendanceSession
+    from apps.groups.models import ClassGroup, GroupAdmin, GroupInstructor, GroupMembership, SubGroup
+    from apps.scheduling.models import Class
+
+    now = timezone.now()
+    today = now.date()
+
+    group = ClassGroup.objects.filter(pk=group_id).first()
+    group_name = group.name if group else ""
+
+    # KPIs
+    total_participants = GroupMembership.objects.filter(group_id=group_id).values("user_id").distinct().count()
+    total_instructors = GroupInstructor.objects.filter(group_id=group_id).count()
+    total_sub_groups = SubGroup.objects.filter(parent_group_id=group_id).count()
+    total_assignments = AssignmentTask.objects.filter(group_id=group_id).count()
+    classes_today = Class.objects.filter(group_id=group_id, starts_at__date=today).count()
+    classes_upcoming = Class.objects.filter(group_id=group_id, starts_at__gt=now).exclude(status_cached="CANCELLED").count()
+    classes_completed = Class.objects.filter(group_id=group_id, ends_at__lt=now).exclude(status_cached="CANCELLED").count()
+    submitted = Submission.objects.filter(task__group_id=group_id, status="SUBMITTED").count()
+    late = Submission.objects.filter(task__group_id=group_id, status="LATE_SUBMITTED").count()
+    pending = AssignmentTask.objects.filter(group_id=group_id, is_open=True, is_closed=False).count()
+
+    # Attendance pie (last 30 days)
+    thirty_days_ago = now - timedelta(days=30)
+    recent_sessions = AttendanceSession.objects.filter(
+        class_obj__group_id=group_id, started_at__gte=thirty_days_ago
+    )
+    present_count = AttendanceRecord.objects.filter(session__in=recent_sessions).count()
+    total_possible = total_participants * recent_sessions.count()
+    absent_count = max(0, total_possible - present_count)
+    attendance_pie = [
+        {"label": "Present", "value": present_count},
+        {"label": "Absent", "value": absent_count},
+    ]
+
+    # Class status
+    class_status = [
+        {"label": "Upcoming",  "value": Class.objects.filter(group_id=group_id, starts_at__gt=now).exclude(status_cached="CANCELLED").count()},
+        {"label": "Ongoing",   "value": Class.objects.filter(group_id=group_id, starts_at__lte=now, ends_at__gte=now).exclude(status_cached="CANCELLED").count()},
+        {"label": "Completed", "value": Class.objects.filter(group_id=group_id, ends_at__lt=now).exclude(status_cached="CANCELLED").count()},
+        {"label": "Cancelled", "value": Class.objects.filter(group_id=group_id, status_cached="CANCELLED").count()},
+    ]
+
+    # 4-week attendance & submission trend
+    weekly_trend = []
+    member_count = total_participants
+    for week in range(3, -1, -1):
+        w_end   = now - timedelta(weeks=week)
+        w_start = w_end - timedelta(weeks=1)
+        w_sessions = AttendanceSession.objects.filter(
+            class_obj__group_id=group_id, started_at__gte=w_start, started_at__lt=w_end
+        )
+        w_possible = member_count * w_sessions.count()
+        w_records = AttendanceRecord.objects.filter(session__in=w_sessions).count()
+        att_rate = round((w_records / w_possible * 100) if w_possible else 0, 1)
+
+        w_open = AssignmentTask.objects.filter(
+            group_id=group_id, upload_open_at__lte=w_end, is_open=True
+        ).count()
+        w_submitted = Submission.objects.filter(
+            task__group_id=group_id, submitted_at__gte=w_start, submitted_at__lt=w_end
+        ).count()
+        sub_rate = round((w_submitted / (w_open * member_count) * 100) if w_open and member_count else 0, 1)
+        weekly_trend.append({
+            "week": f"W{4 - week}",
+            "attendance_rate": min(100.0, att_rate),
+            "submission_rate": min(100.0, sub_rate),
+        })
+
+    # Deadline tracking (next 5 open deadlines)
+    upcoming_tasks = (
+        AssignmentTask.objects.filter(group_id=group_id, is_open=True, deadline_at__gt=now)
+        .order_by("deadline_at")[:5]
+    )
+    deadline_tracking = []
+    for task in upcoming_tasks:
+        submitted_count = Submission.objects.filter(task=task).values("user_id").distinct().count()
+        deadline_tracking.append({
+            "task_title": task.title,
+            "deadline_at": task.deadline_at.isoformat(),
+            "pending_count": max(0, total_participants - submitted_count),
+        })
+
+    # Participant activity
+    _sessions_count = AttendanceSession.objects.filter(class_obj__group_id=group_id).count()
+    _open_tasks_count = AssignmentTask.objects.filter(group_id=group_id, is_open=True).count()
+
+    participants = list(
+        User.objects.filter(
+            role="PARTICIPANT",
+            is_active=True,
+            group_memberships__group_id=group_id,
+        ).distinct()[:100]
+    )
+    participant_ids = [p.id for p in participants]
+
+    _attended_per_user = {
+        row["user_id"]: row["cnt"]
+        for row in AttendanceRecord.objects.filter(
+            user_id__in=participant_ids,
+            session__class_obj__group_id=group_id,
+        ).values("user_id").annotate(cnt=Count("id"))
+    }
+    _submitted_per_user = {
+        row["user_id"]: row["cnt"]
+        for row in Submission.objects.filter(
+            user_id__in=participant_ids,
+            task__group_id=group_id,
+        ).values("user_id").annotate(cnt=Count("task_id", distinct=True))
+    }
+    _last_submission_per_user = {
+        row["user_id"]: row["latest"]
+        for row in Submission.objects.filter(
+            user_id__in=participant_ids,
+            task__group_id=group_id,
+        ).values("user_id").annotate(latest=Max("submitted_at"))
+    }
+
+    participant_activity = []
+    for p in participants:
+        p_attended = _attended_per_user.get(p.id, 0)
+        att_rate = round((p_attended / _sessions_count * 100) if _sessions_count else 0, 1)
+        p_submitted = _submitted_per_user.get(p.id, 0)
+        sub_rate = round((p_submitted / _open_tasks_count * 100) if _open_tasks_count else 0, 1)
+        latest = _last_submission_per_user.get(p.id)
+        participant_activity.append({
+            "id": str(p.id),
+            "name": p.full_name,
+            "group_name": group_name,
+            "attendance_rate": min(100.0, att_rate),
+            "submission_rate": min(100.0, sub_rate),
+            "last_activity": latest.isoformat() if latest else None,
+        })
+
+    return {
+        "group_name": group_name,
+        "kpis": {
+            "total_participants": total_participants,
+            "total_instructors": total_instructors,
+            "total_sub_groups": total_sub_groups,
+            "total_assignments": total_assignments,
+            "classes_today": classes_today,
+            "classes_upcoming": classes_upcoming,
+            "classes_completed": classes_completed,
+            "submitted": submitted,
+            "pending": pending,
+            "late": late,
+        },
+        "charts": {
+            "attendance_pie": attendance_pie,
+            "class_status": class_status,
+            "weekly_trend": weekly_trend,
+            "deadline_tracking": deadline_tracking,
+        },
+        "participant_activity": participant_activity,
     }

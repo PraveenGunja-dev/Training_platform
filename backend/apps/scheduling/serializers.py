@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.groups.models import ClassGroup
+from apps.groups.models import ClassGroup, SubGroup
 
 from .models import Class
 
@@ -21,6 +21,8 @@ class ClassSerializer(serializers.ModelSerializer):
     my_record = serializers.SerializerMethodField()
     last_session = serializers.SerializerMethodField()
     related_tasks = serializers.SerializerMethodField()
+    instructors = serializers.SerializerMethodField()
+    group_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = Class
@@ -31,6 +33,7 @@ class ClassSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "meeting_link",
+            "sub_group_id",
             "starts_at",
             "ends_at",
             "status",
@@ -43,6 +46,8 @@ class ClassSerializer(serializers.ModelSerializer):
             "my_record",
             "last_session",
             "related_tasks",
+            "instructors",
+            "group_admin",
         ]
 
     def get_participants_count(self, obj: Class) -> int:
@@ -115,16 +120,18 @@ class ClassSerializer(serializers.ModelSerializer):
         }
 
     def get_related_tasks(self, obj: Class) -> list:
-        from apps.assignments.models import AssignmentTask  # noqa: PLC0415
-        tasks = AssignmentTask.objects.filter(class_obj=obj).order_by("upload_open_at")
+        tasks = getattr(obj, "prefetched_tasks", None)
+        if tasks is None:
+            from apps.assignments.models import AssignmentTask  # noqa: PLC0415
+            tasks = AssignmentTask.objects.filter(class_obj=obj).order_by("upload_open_at")
         return [
             {
                 "id": str(t.id),
                 "title": t.title,
                 "is_open": t.is_open,
                 "is_closed": t.is_closed,
-                "upload_open_at": t.upload_open_at.isoformat(),
-                "deadline_at": t.deadline_at.isoformat(),
+                "upload_open_at": t.upload_open_at.isoformat() if t.upload_open_at else None,
+                "deadline_at": t.deadline_at.isoformat() if t.deadline_at else None,
             }
             for t in tasks
         ]
@@ -151,6 +158,27 @@ class ClassSerializer(serializers.ModelSerializer):
             "scheduled_end_at": session.scheduled_end_at.isoformat() if session.scheduled_end_at else None,
         }
 
+    def get_instructors(self, obj: Class) -> list:
+        return [
+            {
+                "id": str(gi.instructor_id),
+                "full_name": gi.instructor.full_name,
+                "email": gi.instructor.email,
+            }
+            for gi in obj.group.instructors.all()
+        ]
+
+    def get_group_admin(self, obj: Class) -> dict | None:
+        from apps.groups.models import GroupAdmin  # noqa: PLC0415
+        ga = GroupAdmin.objects.filter(group=obj.group).select_related("admin").first()
+        if ga is None:
+            return None
+        return {
+            "id": str(ga.admin_id),
+            "full_name": ga.admin.full_name,
+            "email": ga.admin.email,
+        }
+
     def to_representation(self, instance: Class) -> dict:
         data = super().to_representation(instance)
         # Cross-visibility: inject read_only flag computed from context.
@@ -175,11 +203,18 @@ class ClassWriteSerializer(serializers.ModelSerializer):
     )
 
     meeting_link = serializers.URLField(allow_blank=True, required=False, default="")
+    sub_group_id = serializers.PrimaryKeyRelatedField(
+        source='sub_group',
+        queryset=SubGroup.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         model = Class
         fields = [
-            "group_id", "title", "description", "meeting_link",
+            "group_id", "title", "description", "meeting_link", "sub_group_id",
             "starts_at", "ends_at", "status",
             "attendance_open_at", "attendance_close_at", "allow_late_attendance",
         ]
@@ -202,4 +237,46 @@ class ClassWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"attendance_close_at": "Must be after class start time."}
             )
+        sub_group = attrs.get('sub_group')
+        group = attrs.get('group')
+        if sub_group is not None and group is not None:
+            if str(sub_group.parent_group_id) != str(group.id):
+                raise serializers.ValidationError(
+                    {'sub_group_id': 'Sub-group does not belong to the selected group.'}
+                )
         return attrs
+
+
+class RecurringClassSerializer(serializers.Serializer):
+    """Validates a bulk recurring-class creation request."""
+
+    group_id = serializers.PrimaryKeyRelatedField(queryset=ClassGroup.objects.all())
+    sub_group_id = serializers.PrimaryKeyRelatedField(
+        queryset=SubGroup.objects.all(), required=False, allow_null=True, default=None,
+    )
+    title = serializers.CharField(max_length=300)
+    description = serializers.CharField(default="", allow_blank=True, required=False)
+    meeting_link = serializers.URLField(required=False, allow_blank=True, default="")
+    allow_late_attendance = serializers.BooleanField(default=False)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    # 0=Monday … 6=Sunday (Python weekday())
+    days_of_week = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, max_value=6),
+        min_length=1,
+        max_length=7,
+    )
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+
+    def validate(self, data: dict) -> dict:
+        if data["end_date"] < data["start_date"]:
+            raise serializers.ValidationError({"end_date": "End date must be on or after start date."})
+        if data["end_time"] <= data["start_time"]:
+            raise serializers.ValidationError({"end_time": "End time must be after start time."})
+        if (data["end_date"] - data["start_date"]).days > 365:
+            raise serializers.ValidationError("Date range cannot exceed 1 year.")
+        sub_group = data.get("sub_group_id")
+        if sub_group and str(sub_group.parent_group_id) != str(data["group_id"].id):
+            raise serializers.ValidationError({"sub_group_id": "Sub-group does not belong to the selected group."})
+        return data

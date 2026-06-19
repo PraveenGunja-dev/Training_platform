@@ -80,10 +80,15 @@ class DocumentViewSet(ViewSet):
     # GET /documents
     def list(self, request: Request) -> Response:
         qs = self._base_qs()
+        group_id = request.query_params.get("group_id")
+        if group_id:
+            qs = qs.filter(group_id=group_id)
         if request.user.role == "ADMIN":
             return Response({"data": DocumentSerializer(qs, many=True).data})
         if request.user.role == "INSTRUCTOR":
             qs = instructor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
+            if group_id:
+                qs = qs.filter(group_id=group_id)
             return Response({"data": DocumentSerializer(qs, many=True).data})
         # Participant: filter by visibility rules
         user_group_ids = set(
@@ -138,12 +143,45 @@ class DocumentViewSet(ViewSet):
             metadata={"title": doc.title, "group_id": str(doc.group_id)},
         )
 
-        # Notify group members when a document is added to a specific class
-        if doc.class_obj_id and doc.visibility in (Document.VIS_GROUP, Document.VIS_PUBLIC_TO_CLASS):
-            from apps.notifications.models import Notification
+        # Notify participants when a document is added
+        from apps.notifications.models import Notification
+        from django.utils import timezone as tz
+        now = tz.now()
+        _PRESET_LABELS = {
+            "GUIDE": "Guide", "SLIDES": "Slides", "TEMPLATE": "Template",
+            "REPORT": "Report", "REFERENCE": "Reference", "QUIZ": "Quiz",
+            "SCHEDULE": "Schedule", "CASE_STUDY": "Case Study", "MOM": "MOM",
+        }
+        doc_type_label = _PRESET_LABELS.get(doc.doc_type, doc.doc_type.replace("_", " "))
+
+        if doc.visibility == Document.VIS_STAFF_ONLY:
+            pass  # no notification — hidden from participants
+
+        elif doc.visibility == Document.VIS_SELECTED:
+            # Always notify only the explicitly chosen users, regardless of class linkage
+            recipient_ids = [uid for uid in doc.allowed_user_ids if uid]
+            if recipient_ids:
+                Notification.objects.bulk_create(
+                    [
+                        Notification(
+                            user_id=uid,
+                            type="GROUP_DOCUMENT_ADDED",
+                            title=f"New document: {doc.title}",
+                            body=f'"{doc.title}" ({doc_type_label}) has been shared with you in {doc.group.name}.',
+                            link=f"/me/groups/{doc.group_id}/documents",
+                            dedupe_key=f"group_doc_added:{doc.id}:{uid}",
+                            sent_at=now,
+                            payload={"group_id": str(doc.group_id), "document_id": str(doc.id)},
+                        )
+                        for uid in recipient_ids
+                    ],
+                    ignore_conflicts=True,
+                    batch_size=500,
+                )
+
+        elif doc.class_obj_id:
+            # Class-linked document (GROUP or PUBLIC_TO_CLASS) — notify all group members
             from apps.scheduling.models import Class as ClassModel
-            from django.utils import timezone as tz
-            now = tz.now()
             try:
                 cls_obj = ClassModel.objects.select_related("group").get(pk=doc.class_obj_id)
                 member_ids = list(
@@ -156,7 +194,7 @@ class DocumentViewSet(ViewSet):
                             user_id=uid,
                             type="CLASS_DOCUMENT_ADDED",
                             title=f"New document: {doc.title}",
-                            body=f'"{doc.title}" has been added to {cls_obj.title}.',
+                            body=f'"{doc.title}" ({doc_type_label}) has been added to {cls_obj.title}.',
                             link=f"/me/classes/{cls_obj.id}",
                             dedupe_key=f"class_doc_added:{doc.id}:{uid}",
                             sent_at=now,
@@ -169,6 +207,30 @@ class DocumentViewSet(ViewSet):
                 )
             except ClassModel.DoesNotExist:
                 pass
+
+        else:
+            # Group-level document (GROUP or PUBLIC_TO_CLASS, no class) — notify all group members
+            recipient_ids = list(
+                GroupMembership.objects.filter(group=doc.group)
+                .values_list("user_id", flat=True)
+            )
+            Notification.objects.bulk_create(
+                [
+                    Notification(
+                        user_id=uid,
+                        type="GROUP_DOCUMENT_ADDED",
+                        title=f"New document: {doc.title}",
+                        body=f'"{doc.title}" ({doc_type_label}) has been added to {doc.group.name}.',
+                        link=f"/me/groups/{doc.group_id}/documents",
+                        dedupe_key=f"group_doc_added:{doc.id}:{uid}",
+                        sent_at=now,
+                        payload={"group_id": str(doc.group_id), "document_id": str(doc.id)},
+                    )
+                    for uid in recipient_ids
+                ],
+                ignore_conflicts=True,
+                batch_size=500,
+            )
 
         return Response({"data": DocumentSerializer(doc).data}, status=status.HTTP_201_CREATED)
 
@@ -343,6 +405,12 @@ class ParticipantSharedUploadUrlView(APIView):
 
     def post(self, request: Request, group_id: str) -> Response:
         group = get_object_or_404(ClassGroup, pk=group_id)
+        is_member = GroupMembership.objects.filter(user=request.user, group=group).exists()
+        if not is_member:
+            return Response(
+                {"errors": [{"code": "perm.not_in_group", "message": "You are not a member of this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         has_perm = ParticipantUploadPermission.objects.filter(
             user=request.user, group=group
         ).exists()
@@ -367,7 +435,15 @@ class GroupSharedUploadView(APIView):
     def post(self, request: Request, group_id: str) -> Response:
         group = get_object_or_404(ClassGroup, pk=group_id)
 
-        # Verify upload permission
+        # Verify live group membership first
+        is_member = GroupMembership.objects.filter(user=request.user, group=group).exists()
+        if not is_member:
+            return Response(
+                {"errors": [{"code": "perm.not_in_group", "message": "You are not a member of this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Verify upload permission grant
         has_perm = ParticipantUploadPermission.objects.filter(
             user=request.user, group=group
         ).exists()
@@ -375,6 +451,22 @@ class GroupSharedUploadView(APIView):
             return Response(
                 {"errors": [{"code": "perm.upload_not_permitted", "message": "You do not have upload permission for this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Cooldown: prevent re-flooding the approval queue after rejection
+        from django.utils import timezone as _tz  # noqa: PLC0415
+        from datetime import timedelta  # noqa: PLC0415
+        cooldown_cutoff = _tz.now() - timedelta(hours=1)
+        recent_rejection = ParticipantSharedDoc.objects.filter(
+            uploaded_by=request.user,
+            group=group,
+            status=ParticipantSharedDoc.STATUS_REJECTED,
+            updated_at__gte=cooldown_cutoff,
+        ).exists()
+        if recent_rejection:
+            return Response(
+                {"errors": [{"code": "shared_doc.cooldown", "message": "Please wait 1 hour after a rejection before re-submitting."}], "data": None},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
         ser = SharedDocWriteSerializer(data=request.data)
@@ -455,6 +547,11 @@ class AdminSharedUploadApproveView(APIView):
         )
         if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, shared.group_id):
             return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if shared.uploaded_by_id == request.user.id:
+            return Response(
+                {"errors": [{"code": "shared_doc.self_approval", "message": "You cannot approve your own shared upload."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if shared.status != ParticipantSharedDoc.STATUS_PENDING:
             return Response(
                 {"errors": [{"code": "shared_doc.not_pending", "message": "Only PENDING uploads can be approved."}], "data": None},
@@ -517,6 +614,11 @@ class AdminSharedUploadRejectView(APIView):
         )
         if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, shared.group_id):
             return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if shared.uploaded_by_id == request.user.id:
+            return Response(
+                {"errors": [{"code": "shared_doc.self_reject", "message": "You cannot reject your own shared upload."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if shared.status != ParticipantSharedDoc.STATUS_PENDING:
             return Response(
                 {"errors": [{"code": "shared_doc.not_pending", "message": "Only PENDING uploads can be rejected."}], "data": None},

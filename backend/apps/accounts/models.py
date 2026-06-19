@@ -11,6 +11,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ("ADMIN", "Admin"),
         ("INSTRUCTOR", "Instructor"),
         ("PARTICIPANT", "Participant"),
+        ("GROUP_ADMIN", "Group Admin"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -52,9 +53,13 @@ class PasswordSetupToken(models.Model):
     token_hash = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     consumed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "accounts_password_setup_token"
+        indexes = [
+            models.Index(fields=["expires_at"], name="pst_expires_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"SetupToken({self.user.email})"

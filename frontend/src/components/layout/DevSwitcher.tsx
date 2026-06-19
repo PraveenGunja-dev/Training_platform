@@ -5,6 +5,8 @@ import { router } from '@/router';
 import { simulateStartAttendance, simulateEndAttendance } from '@/mocks/data/attendance';
 import type { Role } from '@/lib/types';
 
+type DevRole = Role | 'GROUP_ADMIN';
+
 export function DevSwitcher() {
   const [hidden, setHidden] = useState(false);
   const user = useAuthStore((s) => s.user);
@@ -21,7 +23,7 @@ export function DevSwitcher() {
     >⚠️</button>
   );
 
-  const handleLogin = (role: Role) => {
+  const handleLogin = (role: DevRole) => {
     mockLogin(role);
     void router.navigate('/');
   };
@@ -71,6 +73,12 @@ export function DevSwitcher() {
           className="px-2 py-1 rounded bg-card border border-amber-200 hover:bg-amber-50"
         >
           Participant
+        </button>
+        <button
+          onClick={() => handleLogin('GROUP_ADMIN')}
+          className="px-2 py-1 rounded bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100"
+        >
+          Group Admin
         </button>
         {user && (
           <button

@@ -45,6 +45,12 @@ const ROLE_CONFIG: Record<Role, {
     gradient: 'linear-gradient(135deg, #0D7E5B 0%, #059669 100%)',
     icon: <UserCircle className="h-3 w-3" />,
   },
+  GROUP_ADMIN: {
+    label: 'Group Admin',
+    variant: 'secondary',
+    gradient: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+    icon: <ShieldCheck className="h-3 w-3" />,
+  },
 };
 
 export default function AdminUserDetailPage() {
@@ -214,6 +220,7 @@ export default function AdminUserDetailPage() {
                     <SelectItem value="ADMIN">Super Admin</SelectItem>
                     <SelectItem value="INSTRUCTOR">Instructor</SelectItem>
                     <SelectItem value="PARTICIPANT">Participant</SelectItem>
+                    <SelectItem value="GROUP_ADMIN">Group Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -313,6 +320,39 @@ export default function AdminUserDetailPage() {
               label="Department"
               value={user.department}
             />
+          </div>
+        </div>
+      )}
+
+      {/* ── Group Admin — Assigned Batch ───────────────────────────────── */}
+      {user.role === 'GROUP_ADMIN' && (
+        <div className="rounded-2xl overflow-hidden shadow-sm border border-[#C5D8EC] bg-white">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-[#EBF3FB]">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0f766e, #0d9488)' }}>
+              <ShieldCheck className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-[#00285A] tracking-tight">Group Admin Assignment</h2>
+              <p className="text-[11px] text-[#5A7A9A]">The batch this user administers</p>
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            {user.admin_of_group ? (
+              <Link
+                to={`/admin/groups/${user.admin_of_group.id}`}
+                className="inline-flex items-center gap-2.5 px-4 py-3 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 hover:border-teal-300 transition-colors group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-teal-100 group-hover:bg-teal-200 flex items-center justify-center flex-shrink-0 transition-colors">
+                  <ShieldCheck className="h-4 w-4 text-teal-700" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-teal-800">{user.admin_of_group.name}</p>
+                  <p className="text-[11px] text-teal-600">Click to view group →</p>
+                </div>
+              </Link>
+            ) : (
+              <p className="text-sm text-slate-400 italic">No group assigned yet.</p>
+            )}
           </div>
         </div>
       )}

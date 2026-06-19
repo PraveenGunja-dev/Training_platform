@@ -306,7 +306,7 @@ def upload_payload():
 
 @pytest.mark.django_db
 def test_participant_with_permission_can_shared_upload(
-    part_client, group, participant, upload_payload
+    part_client, group, participant, membership, upload_payload
 ):
     ParticipantUploadPermission.objects.create(user=participant, group=group)
     resp = part_client.post(

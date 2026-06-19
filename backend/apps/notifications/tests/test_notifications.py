@@ -247,9 +247,8 @@ def test_mark_read_all_only_affects_own_notifications(client, user, other_user):
 @pytest.mark.django_db
 def test_other_user_cannot_read_my_notification(client, other_client, user, other_user):
     notif = make_notification(user, dedupe_key="cross:1")
-    # other_client tries to mark user's notification as read
+    # other_client tries to mark user's notification as read — must get 404
     resp = other_client.post(f"/api/v1/notifications/{notif.id}/read")
-    # Returns 204 (idempotent) but notification should NOT be updated
-    assert resp.status_code == 204
+    assert resp.status_code == 404
     notif.refresh_from_db()
     assert notif.read_at is None

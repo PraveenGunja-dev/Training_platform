@@ -15,9 +15,9 @@ export const instructorApi = {
   myGroups: (): Promise<MyGroupsResponse> =>
     apiClient.get<MyGroupsResponse>('/me/groups').then(r => r.data),
 
-  /** Convenience: returns the set of group IDs assigned to the instructor. */
-  myGroupIds: async (): Promise<Set<string>> => {
+  /** Convenience: returns the array of group IDs assigned to the instructor. */
+  myGroupIds: async (): Promise<string[]> => {
     const res = await apiClient.get<MyGroupsResponse>('/me/groups');
-    return new Set(res.data.data.map(g => g.id));
+    return res.data.data.map(g => g.id);
   },
 };

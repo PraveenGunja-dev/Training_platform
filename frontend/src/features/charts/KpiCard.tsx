@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react';
 
-type Accent = 'default' | 'indigo' | 'amber' | 'emerald' | 'rose' | 'cyan';
+type Accent = 'default' | 'indigo' | 'amber' | 'emerald' | 'rose' | 'cyan' | 'teal' | 'violet';
 
 const MAP: Record<Accent, { badge: string; icon: string; border: string; num: string }> = {
-  default: { badge: 'bg-blue-50',  icon: 'text-[#0066BB]',  border: 'border-l-blue-300', num: 'text-[#00285A]'   },
-  indigo:  { badge: 'bg-blue-100', icon: 'text-[#0052A5]',  border: 'border-l-indigo-500', num: 'text-[#0052A5]'  },
-  amber:   { badge: 'bg-amber-50',   icon: 'text-amber-500',   border: 'border-l-amber-400',  num: 'text-amber-700'   },
-  emerald: { badge: 'bg-emerald-50', icon: 'text-emerald-600', border: 'border-l-emerald-500',num: 'text-emerald-700' },
-  rose:    { badge: 'bg-rose-50',    icon: 'text-rose-500',    border: 'border-l-rose-400',   num: 'text-rose-700'    },
-  cyan:    { badge: 'bg-cyan-50',    icon: 'text-cyan-600',    border: 'border-l-cyan-500',   num: 'text-cyan-700'    },
+  default: { badge: 'bg-blue-50',    icon: 'text-[#0066BB]',    border: 'border-l-blue-300',   num: 'text-[#00285A]'    },
+  indigo:  { badge: 'bg-blue-100',   icon: 'text-[#0052A5]',    border: 'border-l-indigo-500', num: 'text-[#0052A5]'   },
+  amber:   { badge: 'bg-amber-50',   icon: 'text-amber-500',    border: 'border-l-amber-400',  num: 'text-amber-700'   },
+  emerald: { badge: 'bg-emerald-50', icon: 'text-emerald-600',  border: 'border-l-emerald-500',num: 'text-emerald-700' },
+  rose:    { badge: 'bg-rose-50',    icon: 'text-rose-500',     border: 'border-l-rose-400',   num: 'text-rose-700'    },
+  cyan:    { badge: 'bg-cyan-50',    icon: 'text-cyan-600',     border: 'border-l-cyan-500',   num: 'text-cyan-700'    },
+  teal:    { badge: 'bg-teal-50',    icon: 'text-teal-600',     border: 'border-l-teal-500',   num: 'text-teal-700'    },
+  violet:  { badge: 'bg-violet-50',  icon: 'text-violet-600',   border: 'border-l-violet-500', num: 'text-violet-700'  },
 };
 
 interface KpiCardProps {

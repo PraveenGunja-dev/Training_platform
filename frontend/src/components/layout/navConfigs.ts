@@ -14,6 +14,9 @@ import {
   Bell,
   CheckSquare,
   Network,
+  GraduationCap,
+  Layers,
+  BarChart2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -60,4 +63,13 @@ export const instructorNav: NavItem[] = [
   { to: '/instructor/shared-uploads', label: 'Shared Uploads',icon: Upload                                },
   { to: '/instructor/notifications',  label: 'Notifications', icon: Bell,            section: 'Account'   },
   { to: '/instructor/profile',        label: 'Profile',       icon: User                                  },
+];
+
+export const groupAdminNav: NavItem[] = [
+  { to: '/group-admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
+  { to: '/group-admin/participants', label: 'Participants', icon: Users,           section: 'People'   },
+  { to: '/group-admin/instructors',  label: 'Instructors',  icon: GraduationCap                        },
+  { to: '/group-admin/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },
+  { to: '/group-admin/analytics',    label: 'Analytics',    icon: BarChart2,       section: 'Reports'  },
+  { to: '/group-admin/profile',      label: 'Profile',      icon: User,            section: 'Account'  },
 ];

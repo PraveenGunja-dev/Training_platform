@@ -72,9 +72,34 @@ export interface ParticipantDashboardData {
   quick_stats: { attendance_rate: number; submitted_count: number; pending_count: number };
 }
 
+export interface GroupAdminDashboardData {
+  group_name: string;
+  kpis: {
+    total_participants: number;
+    total_instructors: number;
+    total_sub_groups: number;
+    total_assignments: number;
+    classes_today: number;
+    classes_upcoming: number;
+    classes_completed: number;
+    submitted: number;
+    pending: number;
+    late: number;
+  };
+  charts: {
+    attendance_pie: Array<{ label: string; value: number }>;
+    class_status: Array<{ label: string; value: number }>;
+    weekly_trend: Array<{ week: string; attendance_rate: number; submission_rate: number }>;
+    deadline_tracking: Array<{ task_title: string; deadline_at: string; pending_count: number }>;
+  };
+  participant_activity: ParticipantActivityItem[];
+}
+
 export const dashboardApi = {
   admin: (params?: { group_id?: string }) =>
     apiClient.get<ApiEnvelope<AdminDashboardData>>('/dashboard/admin', { params }).then(r => r.data),
   participant: () =>
     apiClient.get<ApiEnvelope<ParticipantDashboardData>>('/dashboard/participant').then(r => r.data),
+  groupAdmin: () =>
+    apiClient.get<ApiEnvelope<GroupAdminDashboardData>>('/dashboard/group-admin').then(r => r.data),
 };

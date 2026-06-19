@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import re
+
 from apps.accounts.models import User
-from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+from apps.groups.models import ClassGroup, GroupAdmin, GroupInstructor, GroupMembership, SubGroup
 
 
 def _user_dict(user: User) -> dict:
     return {"id": str(user.id), "name": user.full_name, "email": user.email}
+
+
+def _natural_key(s: str) -> list:
+    """Split string into text/number segments so 'Batch 2' < 'Batch 10'."""
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
 
 
 def get_org_chart_data() -> dict:
@@ -16,14 +23,15 @@ def get_org_chart_data() -> dict:
         User.objects.filter(role="ADMIN", is_active=True).only("id", "full_name", "email")
     )
 
-    # All non-archived groups with instructors and memberships prefetched
+    # All non-archived groups with instructors, memberships, and sub-groups prefetched
     groups_qs = (
         ClassGroup.objects.filter(is_archived=False)
         .prefetch_related(
-            "instructors__instructor",  # GroupInstructor → instructor User
-            "memberships__user",        # GroupMembership  → user User
+            "instructors__instructor",       # GroupInstructor → instructor User
+            "memberships__user",             # GroupMembership  → user User
+            "sub_groups__memberships__user", # SubGroup → SubGroupMembership → User
+            "group_admin__admin",            # GroupAdmin → admin User
         )
-        .order_by("name")
     )
 
     groups_data = []
@@ -35,7 +43,27 @@ def get_org_chart_data() -> dict:
             group_instructors.append(_user_dict(gi.instructor))
             assigned_instructor_ids.add(gi.instructor_id)
 
-        group_participants = [_user_dict(gm.user) for gm in group.memberships.all()]
+        memberships_list = list(group.memberships.all())
+        if len(memberships_list) > 200:
+            group_participants = []  # too large — caller uses participants_count instead
+        else:
+            group_participants = [_user_dict(gm.user) for gm in memberships_list]
+
+        sub_groups = [
+            {
+                "id": str(sg.id),
+                "name": sg.name,
+                "participants": [_user_dict(m.user) for m in sg.memberships.all()],
+                "participants_count": sg.memberships.count(),
+            }
+            for sg in group.sub_groups.all()
+        ]
+
+        try:
+            ga = group.group_admin
+            group_admin_data = _user_dict(ga.admin)
+        except GroupAdmin.DoesNotExist:
+            group_admin_data = None
 
         groups_data.append(
             {
@@ -44,8 +72,13 @@ def get_org_chart_data() -> dict:
                 "is_archived": group.is_archived,
                 "instructors": group_instructors,
                 "participants": group_participants,
+                "participants_count": len(memberships_list),
+                "sub_groups": sub_groups,
+                "group_admin": group_admin_data,
             }
         )
+
+    groups_data.sort(key=lambda g: _natural_key(g["name"]))
 
     # Unassigned instructors: active instructors not in any GroupInstructor row
     all_instructors = User.objects.filter(role="INSTRUCTOR", is_active=True).only(
@@ -59,6 +92,8 @@ def get_org_chart_data() -> dict:
         "stats": {
             "total_admins": len(admins),
             "total_groups": len(groups_data),
+            "total_group_admins": GroupAdmin.objects.count(),
+            "total_sub_groups": SubGroup.objects.count(),
             "total_instructors": User.objects.filter(
                 role="INSTRUCTOR", is_active=True
             ).count(),

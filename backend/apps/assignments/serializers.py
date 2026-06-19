@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from apps.groups.models import ClassGroup
+from apps.groups.models import ClassGroup, SubGroup
 from apps.scheduling.models import Class
 
 from .models import AssignmentTask, Submission, SubmissionReview
@@ -30,6 +30,7 @@ class AssignmentTaskSerializer(serializers.ModelSerializer):
             "group_name",
             "class_id",
             "class_title",
+            "sub_group_id",
             "title",
             "question",
             "description",
@@ -73,6 +74,13 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    sub_group_id = serializers.PrimaryKeyRelatedField(
+        source='sub_group',
+        queryset=SubGroup.objects.all(),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
     title = serializers.CharField(max_length=255)
     question = serializers.CharField()
     description = serializers.CharField(required=False, default="")
@@ -102,6 +110,13 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"deadline_at": "deadline_at must be after upload_open_at."}
             )
+        sub_group = attrs.get('sub_group')
+        group = attrs.get('group')
+        if sub_group is not None and group is not None:
+            if str(sub_group.parent_group_id) != str(group.id):
+                raise serializers.ValidationError(
+                    {'sub_group_id': 'Sub-group does not belong to the selected group.'}
+                )
         return attrs
 
 

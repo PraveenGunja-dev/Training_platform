@@ -19,6 +19,7 @@ import { SessionTimer } from '@/features/admin/attendance/SessionTimer';
 import { CreateAssignmentDialog } from '@/features/admin/assignments/CreateAssignmentDialog';
 import { useCan } from '@/hooks/useCan';
 import { ClassAttendanceHistory } from '@/features/admin/attendance/ClassAttendanceHistory';
+import { ClassActivityLog } from '@/features/admin/class/ClassActivityLog';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   UPCOMING:  { label: 'Upcoming',  className: 'bg-blue-50 text-[#0052A5] border border-blue-200'   },
@@ -284,7 +285,7 @@ export default function InstructorClassDetailPage() {
       <CreateAssignmentDialog
         open={allocateOpen}
         onClose={() => setAllocateOpen(false)}
-        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '' }]}
+        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '', instructors: [] }]}
         defaultGroupId={cls.group_id}
         defaultClassId={cls.id}
       />
@@ -346,6 +347,9 @@ export default function InstructorClassDetailPage() {
 
       {/* Assignment Submissions */}
       <ClassSubmissionsPanel classId={cls.id} groupId={cls.group_id} />
+
+      {/* Activity Log */}
+      <ClassActivityLog classId={cls.id} />
     </div>
   );
 }

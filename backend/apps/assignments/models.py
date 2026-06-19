@@ -30,6 +30,13 @@ class AssignmentTask(TimestampedModel):
         related_name="tasks",
         db_column="class_id",
     )
+    sub_group = models.ForeignKey(
+        'groups.SubGroup',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assignment_tasks',
+    )
     title = models.CharField(max_length=255)
     question = models.TextField()
     description = models.TextField(blank=True, default="")

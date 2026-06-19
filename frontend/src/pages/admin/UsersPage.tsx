@@ -24,21 +24,21 @@ import {
 } from '@/components/ui/dialog';
 import { InviteUserDialog } from '@/features/admin/users/InviteUserDialog';
 import { BulkInviteDialog } from '@/features/admin/users/BulkInviteDialog';
-import { ResendInviteButton } from '@/features/admin/users/ResendInviteButton';
 import { ErrorState } from '@/components/states/ErrorState';
 import type { Role } from '@/lib/types';
 
 /* ── Role styling ────────────────────────────────────────────────────── */
 const ROLE_CONFIG: Record<Role, {
   label: string;
-  badgeVariant: 'success' | 'warning' | 'info' | 'secondary';
+  badgeVariant: 'success' | 'warning' | 'info' | 'secondary' | 'teal';
   avatarBg: string;
   avatarText: string;
   icon: typeof User;
 }> = {
-  ADMIN:       { label: 'Super Admin',  badgeVariant: 'info',      avatarBg: 'bg-blue-100',  avatarText: 'text-[#0052A5]',  icon: ShieldCheck },
-  INSTRUCTOR:  { label: 'Instructor',  badgeVariant: 'warning',   avatarBg: 'bg-amber-100',   avatarText: 'text-amber-700',   icon: User        },
-  PARTICIPANT: { label: 'Participant', badgeVariant: 'success',   avatarBg: 'bg-emerald-100', avatarText: 'text-emerald-700', icon: User        },
+  ADMIN:       { label: 'Super Admin',  badgeVariant: 'info',      avatarBg: 'bg-blue-100',    avatarText: 'text-[#0052A5]',  icon: ShieldCheck },
+  INSTRUCTOR:  { label: 'Instructor',   badgeVariant: 'warning',   avatarBg: 'bg-amber-100',   avatarText: 'text-amber-700',  icon: User        },
+  PARTICIPANT: { label: 'Participant',  badgeVariant: 'success',   avatarBg: 'bg-emerald-100', avatarText: 'text-emerald-700', icon: User       },
+  GROUP_ADMIN: { label: 'Group Admin',  badgeVariant: 'teal',      avatarBg: 'bg-teal-100',    avatarText: 'text-teal-700',   icon: ShieldCheck },
 };
 
 /* ── Stat pill ───────────────────────────────────────────────────────── */
@@ -56,7 +56,8 @@ export default function AdminUsersPage() {
   const qc = useQueryClient();
   const [search, setSearch]               = useState('');
   const [roleFilter, setRoleFilter]       = useState('ALL');
-  const [statusFilter, setStatusFilter]   = useState('ALL');
+  const [accessFilter, setAccessFilter]   = useState('ALL');
+  const [setupFilter, setSetupFilter]     = useState('ALL');
   const [buFilter, setBuFilter]           = useState('ALL');
   const [page, setPage]                   = useState(1);
   const [showInvite, setShowInvite]   = useState(false);
@@ -66,13 +67,14 @@ export default function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['users', { search, role: roleFilter, status: statusFilter, bu: buFilter, page }],
+    queryKey: ['users', { search, role: roleFilter, access: accessFilter, setup: setupFilter, bu: buFilter, page }],
     queryFn: () =>
       usersApi.list({
-        search:        search || undefined,
-        role:          roleFilter   !== 'ALL' ? roleFilter   : undefined,
-        status:        statusFilter !== 'ALL' ? statusFilter : undefined,
-        business_unit: buFilter     !== 'ALL' ? buFilter     : undefined,
+        search:        search        || undefined,
+        role:          roleFilter    !== 'ALL' ? roleFilter    : undefined,
+        status:        accessFilter  !== 'ALL' ? accessFilter  : undefined,
+        setup:         setupFilter   !== 'ALL' ? setupFilter   : undefined,
+        business_unit: buFilter      !== 'ALL' ? buFilter      : undefined,
         page,
         page_size: 20,
       }),
@@ -151,9 +153,10 @@ export default function AdminUsersPage() {
       {stats && (
         <div className="flex gap-3 flex-wrap">
           <StatPill label="Total"        count={stats.total}        color="bg-slate-50 text-slate-600 border-slate-200"       />
-          <StatPill label="Super Admins" count={stats.admins}       color="bg-blue-50 text-[#0052A5] border-blue-200"    />
+          <StatPill label="Super Admins" count={stats.admins}       color="bg-blue-50 text-[#0052A5] border-blue-200"         />
           <StatPill label="Instructors"  count={stats.instructors}  color="bg-amber-50 text-amber-700 border-amber-200"       />
           <StatPill label="Participants" count={stats.participants} color="bg-emerald-50 text-emerald-700 border-emerald-200" />
+          <StatPill label="Group Admins" count={stats.group_admins} color="bg-purple-50 text-purple-700 border-purple-200"   />
           <StatPill label="Active"       count={stats.active}       color="bg-teal-50 text-teal-700 border-teal-200"          />
         </div>
       )}
@@ -179,17 +182,29 @@ export default function AdminUsersPage() {
             <SelectItem value="ADMIN">Super Admin</SelectItem>
             <SelectItem value="INSTRUCTOR">Instructor</SelectItem>
             <SelectItem value="PARTICIPANT">Participant</SelectItem>
+            <SelectItem value="GROUP_ADMIN">Group Admin</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All Status" />
+        <Select value={accessFilter} onValueChange={v => { setAccessFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="All Access" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="deactivated">Deactivated</SelectItem>
+            <SelectItem value="ALL">All Access</SelectItem>
+            <SelectItem value="allowed">Allowed Access</SelectItem>
+            <SelectItem value="blocked">Blocked Access</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={setupFilter} onValueChange={v => { setSetupFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="All Setup" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Setup</SelectItem>
+            <SelectItem value="pending">Pending Setup</SelectItem>
+            <SelectItem value="complete">Active</SelectItem>
           </SelectContent>
         </Select>
 

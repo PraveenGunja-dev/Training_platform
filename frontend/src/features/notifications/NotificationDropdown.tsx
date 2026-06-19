@@ -11,7 +11,7 @@ interface NotificationDropdownProps {
 export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
-  const rolePrefix = user?.role === 'ADMIN' ? '/admin' : user?.role === 'INSTRUCTOR' ? '/instructor' : '/me';
+  const rolePrefix = user?.role === 'ADMIN' ? '/admin' : user?.role === 'INSTRUCTOR' ? '/instructor' : user?.role === 'GROUP_ADMIN' ? '/group-admin' : '/me';
 
   const { data, isPending, isError } = useNotifications({ limit: 20 });
   const markRead = useMarkRead();

@@ -50,6 +50,8 @@ export function useUploadSubmission(task: AssignmentTask) {
       void queryClient.invalidateQueries({ queryKey: ['my-submission', task.id] });
       void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard', 'participant'] });
+      void queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tasks', task.id] });
       toast.success('Assignment submitted successfully!');
     },
     onError: (err: unknown) => {

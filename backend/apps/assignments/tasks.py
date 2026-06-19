@@ -31,6 +31,9 @@ def _notify_task_opened(task, now) -> None:
     Notification.objects.bulk_create(notifications, ignore_conflicts=True)
 
 
+OPEN_TASKS_BATCH_SIZE = 200
+
+
 @shared_task(name="apps.assignments.tasks.open_due_tasks")
 def open_due_tasks() -> int:
     from apps.assignments.models import AssignmentTask
@@ -41,7 +44,7 @@ def open_due_tasks() -> int:
             upload_open_at__lte=now,
             is_open=False,
             is_closed=False,
-        ).select_related("group")
+        ).select_related("group")[:OPEN_TASKS_BATCH_SIZE]
     )
     if not tasks_to_open:
         return 0

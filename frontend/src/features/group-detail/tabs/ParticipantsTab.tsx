@@ -162,14 +162,27 @@ export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps)
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [subGroupFilter, setSubGroupFilter] = useState<string>('');
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const filtered = participants.filter(p =>
-    search === '' ||
-    p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase()),
-  );
+  const { data: subGroupsData } = useQuery({
+    queryKey: ['sub-groups', groupId],
+    queryFn: () => groupsApi.listSubGroups(groupId),
+    staleTime: 30_000,
+  });
+  const subGroups = subGroupsData?.data ?? [];
+
+  const subGroupMemberIds = subGroupFilter
+    ? new Set(subGroups.find(sg => sg.id === subGroupFilter)?.participants.map(p => p.id) ?? [])
+    : null;
+
+  const filtered = participants.filter(p => {
+    if (subGroupMemberIds && !subGroupMemberIds.has(p.id)) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+  });
 
   const removeMutation = useMutation({
     mutationFn: (userId: string) => groupsApi.removeParticipant(groupId, userId),
@@ -195,6 +208,20 @@ export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps)
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          {subGroups.length > 0 && (
+            <select
+              value={subGroupFilter}
+              onChange={e => setSubGroupFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">All participants</option>
+              {subGroups.map(sg => (
+                <option key={sg.id} value={sg.id}>
+                  {sg.name} ({sg.participants_count})
+                </option>
+              ))}
+            </select>
+          )}
           {isAdmin && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4 mr-1.5" />

@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import ClassGroup, GroupInstructor
+from .models import ClassGroup, GroupAdmin, GroupInstructor, SubGroup, SubGroupMembership
 
 User = get_user_model()
 
@@ -42,19 +42,28 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
 
 class ClassGroupDetailSerializer(ClassGroupListSerializer):
     participants = serializers.SerializerMethodField()
+    group_admin = serializers.SerializerMethodField()
 
     class Meta(ClassGroupListSerializer.Meta):
-        fields = ClassGroupListSerializer.Meta.fields + ["participants"]
+        fields = ClassGroupListSerializer.Meta.fields + ["participants", "group_admin"]
 
     def get_participants(self, obj: ClassGroup) -> list:
         return [
             {
-                "id": str(m.user.id),
+                "id": str(m.user_id),
                 "full_name": m.user.full_name,
                 "email": m.user.email,
+                "role": m.user.role,
+                "is_active": m.user.is_active,
             }
             for m in obj.memberships.all()
         ]
+
+    def get_group_admin(self, obj: ClassGroup):
+        try:
+            return GroupAdminSerializer(obj.group_admin).data
+        except GroupAdmin.DoesNotExist:
+            return None
 
 
 class ClassGroupWriteSerializer(serializers.ModelSerializer):
@@ -100,4 +109,62 @@ class GroupInstructorAssignSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"The following users do not have the INSTRUCTOR role: {', '.join(emails)}."
             )
+        return value
+
+
+class SubGroupSerializer(serializers.ModelSerializer):
+    participants = serializers.SerializerMethodField()
+    participants_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubGroup
+        fields = ['id', 'name', 'parent_group', 'participants', 'participants_count', 'created_at']
+        read_only_fields = ['id', 'parent_group', 'created_at']
+
+    def get_participants(self, obj: SubGroup) -> list:
+        return [
+            {
+                'id': str(m.user.id),
+                'full_name': m.user.full_name,
+                'email': m.user.email,
+            }
+            for m in obj.memberships.select_related('user').all()
+        ]
+
+    def get_participants_count(self, obj: SubGroup) -> int:
+        return obj.memberships.count()
+
+
+class SubGroupWriteSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    user_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+
+    def validate_name(self, value: str) -> str:
+        return value.strip()
+
+
+class GroupAdminSerializer(serializers.ModelSerializer):
+    """Read serializer — returns admin user details."""
+    admin_id = serializers.UUIDField(source="admin.id", read_only=True)
+    full_name = serializers.CharField(source="admin.full_name", read_only=True)
+    email = serializers.EmailField(source="admin.email", read_only=True)
+    assigned_at = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = GroupAdmin
+        fields = ["admin_id", "full_name", "email", "assigned_at"]
+
+
+class GroupAdminWriteSerializer(serializers.Serializer):
+    """Write serializer for assigning a group admin."""
+    user_id = serializers.UUIDField()
+
+    def validate_user_id(self, value):
+        User = get_user_model()
+        if not User.objects.filter(id=value, is_active=True).exists():
+            raise serializers.ValidationError("No active user with this ID.")
         return value

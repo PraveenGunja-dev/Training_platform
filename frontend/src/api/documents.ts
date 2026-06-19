@@ -13,6 +13,8 @@ export const documentsApi = {
   update: (id: string, body: Partial<Document>) =>
     apiClient.patch<ApiEnvelope<Document>>(`/documents/${id}`, body).then(r => r.data),
   delete: (id: string) => apiClient.delete(`/documents/${id}`),
+  download: (id: string) =>
+    apiClient.get<ApiEnvelope<{ download_url: string }>>(`/documents/${id}/download`).then(r => r.data),
   // Participant shared upload
   uploadPermissions: () =>
     apiClient.get<ApiEnvelope<UploadPermission[]>>('/me/upload-permissions').then(r => r.data),

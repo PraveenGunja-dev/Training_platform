@@ -3,11 +3,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Upload, FileText, X, ClipboardList } from 'lucide-react';
+import { Upload, FileText, X, ClipboardList, Users } from 'lucide-react';
 import { assignmentSchema, type AssignmentFormValues } from './assignmentSchema';
+import { validateFile } from '@/lib/fileValidation';
 import { ReminderOffsetsInput } from './ReminderOffsetsInput';
 import { assignmentsApi } from '@/api/assignments';
 import { classesApi } from '@/api/classes';
+import { groupsApi } from '@/api/groups';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,6 +66,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
       deadline_at:     toDatetimeLocal(new Date(Date.now() + 7 * 60 * 60 * 1000)),
       late_policy:     'STRICT',
       reminder_offsets:[60, 30, 10],
+      sub_group_id:    '',
     },
   });
 
@@ -75,6 +78,14 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
     enabled:  !!selectedGroupId,
   });
   const groupClasses = classesData?.data ?? [];
+
+  const { data: subGroupsData } = useQuery({
+    queryKey: ['sub-groups', selectedGroupId],
+    queryFn: () => groupsApi.listSubGroups(selectedGroupId),
+    enabled: !!selectedGroupId,
+    staleTime: 30_000,
+  });
+  const subGroups = subGroupsData?.data ?? [];
 
   useEffect(() => {
     if (!open) {
@@ -89,6 +100,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
         deadline_at:     toDatetimeLocal(new Date(Date.now() + 7 * 60 * 60 * 1000)),
         late_policy:     'STRICT',
         reminder_offsets:[60, 30, 10],
+      sub_group_id:    '',
       });
       setPendingFile(null);
       setUploadProgress('idle');
@@ -97,6 +109,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
 
   useEffect(() => {
     if (!defaultClassId) form.setValue('class_id', '');
+    form.setValue('sub_group_id', '');
   }, [selectedGroupId, defaultClassId, form]);
 
   const pickFile = useCallback((file: File) => {
@@ -118,6 +131,13 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
       let questionFileSize: number | undefined;
 
       if (pendingFile) {
+        // Validate file type and size before consuming a presigned URL slot
+        const validation = validateFile(pendingFile);
+        if (!validation.ok) {
+          toast.error(validation.error);
+          setUploadProgress('idle');
+          return;
+        }
         setUploadProgress('uploading');
         const urlRes = await assignmentsApi.getQuestionUploadUrl(
           pendingFile.name,
@@ -148,6 +168,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
         deadline_at:      new Date(values.deadline_at).toISOString(),
         late_policy:      values.late_policy,
         reminder_offsets: values.reminder_offsets,
+        sub_group_id: values.sub_group_id || null,
         ...(questionFileUrl ? {
           question_file_url:  questionFileUrl,
           question_file_name: questionFileName,
@@ -243,6 +264,42 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
               />
             </div>
           </div>
+
+          {/* Sub-Group selector — only shown when group is selected and sub-groups exist */}
+          {selectedGroupId && subGroups.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-slate-700 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-violet-500" />
+                Sub-Group
+                <span className="text-xs font-normal text-slate-400">(optional)</span>
+              </Label>
+              <Controller
+                name="sub_group_id"
+                control={form.control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || '__all__'}
+                    onValueChange={(v) => field.onChange(v === '__all__' ? '' : v)}
+                  >
+                    <SelectTrigger className="bg-white border-slate-200">
+                      <SelectValue placeholder="All participants" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All participants</SelectItem>
+                      {subGroups.map(sg => (
+                        <SelectItem key={sg.id} value={sg.id}>
+                          {sg.name} ({sg.participants_count} members)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="text-xs text-slate-400">
+                Scope this assignment to a specific sub-batch, or leave as "All participants".
+              </p>
+            </div>
+          )}
 
           {/* ── Title ───────────────────────────────────────────────── */}
           <div className="space-y-1.5">

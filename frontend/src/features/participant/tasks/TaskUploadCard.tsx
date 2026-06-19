@@ -42,6 +42,7 @@ export function TaskUploadCard({ task }: TaskUploadCardProps) {
   const isStrictClosed = deadlinePassed && task.late_policy === 'STRICT' && !latestSub;
   const isAdminOnly = deadlinePassed && task.late_policy === 'ADMIN_ONLY' && !latestSub;
   const isLateOpen = deadlinePassed && task.late_policy === 'LATE_ALLOWED' && !latestSub;
+  const isClosed = task.is_closed;
 
   const countdownToOpen = useCountdown(isLocked ? task.upload_open_at : null);
 
@@ -218,23 +219,29 @@ export function TaskUploadCard({ task }: TaskUploadCardProps) {
           </div>
         )}
 
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive
-              ? 'border-primary bg-primary/10'
-              : 'border-white/15 hover:border-white/15 hover:bg-white/5'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <Upload className="h-8 w-8 text-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {isDragActive ? 'Drop the file here…' : 'Drag & drop a file, or click to choose'}
-          </p>
-          <p className="text-xs text-muted-foreground/70 mt-2">
-            PDF/DOC/DOCX, JPG/PNG, MP4/MOV/AVI/MKV · Max 500 MB
-          </p>
-        </div>
+        {isClosed ? (
+          <div className="text-center text-sm text-muted-foreground py-4">
+            This task is closed for submissions.
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              isDragActive
+                ? 'border-primary bg-primary/10'
+                : 'border-white/15 hover:border-white/15 hover:bg-white/5'
+            }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="h-8 w-8 text-foreground/40 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              {isDragActive ? 'Drop the file here…' : 'Drag & drop a file, or click to choose'}
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-2">
+              PDF/DOC/DOCX, JPG/PNG, MP4/MOV/AVI/MKV · Max 500 MB
+            </p>
+          </div>
+        )}
 
         {reuploadMode && (
           <Button variant="ghost" size="sm" onClick={() => setReuploadMode(false)}>

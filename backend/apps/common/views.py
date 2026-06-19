@@ -18,17 +18,23 @@ class HealthzView(APIView):
     authentication_classes = []
 
     def get(self, request: Request) -> Response:
-        db_status = _check_db()
-        redis_status = _check_redis()
-        scheduler_status = _check_scheduler()
+        db_ok = _check_db() == "ok"
+        http_status = 200 if db_ok else 503
 
-        http_status = 200 if db_status == "ok" else 503
+        # Unauthenticated callers (load balancers, uptime monitors) get minimal response
+        if not request.user or not request.user.is_authenticated:
+            return Response({"status": "ok" if db_ok else "degraded"}, status=http_status)
+
+        # Non-admin authenticated users also get the minimal response
+        if getattr(request.user, "role", None) != "ADMIN":
+            return Response({"status": "ok" if db_ok else "degraded"}, status=http_status)
+
         return Response(
             {
                 "data": {
-                    "db": db_status,
-                    "redis": redis_status,
-                    "scheduler": scheduler_status,
+                    "db": _check_db(),
+                    "redis": _check_redis(),
+                    "scheduler": _check_scheduler(),
                     "version": "v0.1.0",
                 }
             },

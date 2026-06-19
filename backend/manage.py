@@ -12,10 +12,6 @@ def main() -> None:
             "Couldn't import Django. Make sure it's installed and available on "
             "your PYTHONPATH, or activate your virtual environment."
         ) from exc
-    # Override default port for runserver
-    from django.core.management.commands.runserver import Command as runserver
-    runserver.default_port = "3422"
-
     execute_from_command_line(sys.argv)
 
 

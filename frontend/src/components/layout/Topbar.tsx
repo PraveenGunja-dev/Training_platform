@@ -31,7 +31,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           </Button>
         )}
         <Link to="/" aria-label="ACLP Training Management System home" className="flex items-center gap-3">
-          <img src="/training/adani-logo.svg" alt="Adani Group" className="h-7 w-auto" draggable={false} />
+          <img src="/adani-logo.svg" alt="Adani Group" className="h-7 w-auto" draggable={false} />
           <span className="hidden sm:block w-0.5 h-7 rounded-full bg-[#0052A5]/40" aria-hidden="true" />
           <span className="text-[#00285A] text-[13px] font-semibold hidden sm:block leading-tight">
             ACLP Training Management System

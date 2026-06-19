@@ -138,7 +138,7 @@ export const groupsHandlers = [
       id: 'g-' + Math.random().toString(36).slice(2, 8),
       name: body.name, description: body.description ?? '',
       participants_count: 0,
-      is_archived: false, created_at: new Date().toISOString(),
+      is_archived: false, created_at: new Date().toISOString(), instructors: [],
     };
     groupsData.push(newGroup);
     groupMemberships[newGroup.id] = { participant_ids: [] };

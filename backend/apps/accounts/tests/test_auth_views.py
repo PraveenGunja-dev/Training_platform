@@ -58,7 +58,10 @@ class TestLoginView:
             {"email": "inactive@test.com", "password": "password123"},
             content_type="application/json",
         )
-        assert resp.status_code == 403
+        # H-01 fix: inactive accounts now return 401 with the same generic message
+        # as wrong-password to prevent user enumeration via status-code differences.
+        assert resp.status_code == 401
+        assert resp.json()["errors"][0]["code"] == "auth.invalid_credentials"
 
 
 @pytest.mark.django_db

@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { notificationsApi } from '@/api/notifications';
 import { NotificationDropdown } from '@/features/notifications/NotificationDropdown';
+import { useAuthStore } from '@/store/auth';
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const user = useAuthStore(s => s.user);
 
   const { data } = useQuery({
     queryKey: ['notifications', 'unread-count'],
@@ -17,6 +19,7 @@ export function NotificationBell() {
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    enabled: !!user,
   });
 
   const count = data?.data.unread_count ?? 0;
@@ -34,11 +37,8 @@ export function NotificationBell() {
   const prevCountRef = useRef<number | null>(null);
   useEffect(() => {
     if (prevCountRef.current !== null && count > prevCountRef.current) {
-      void queryClient.invalidateQueries({ queryKey: ['groups'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'calendar'] });
-      void queryClient.invalidateQueries({ queryKey: ['my-shared-uploads'] });
-      void queryClient.invalidateQueries({ queryKey: ['documents'] });
     }
     prevCountRef.current = count;
   }, [count, queryClient]);

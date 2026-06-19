@@ -5,9 +5,15 @@ from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    admin_of_group_ids = serializers.SerializerMethodField()
+
+    def get_admin_of_group_ids(self, obj):
+        from apps.groups.models import GroupAdmin  # noqa: PLC0415
+        return [str(ga.group_id) for ga in GroupAdmin.objects.filter(admin=obj).only("group_id")]
+
     class Meta:
         model = User
-        fields = ("id", "email", "full_name", "role", "photo_url", "is_active", "created_at", "last_login", "must_change_password", "business_unit", "grade_code", "department", "employee_code")
+        fields = ("id", "email", "full_name", "role", "photo_url", "is_active", "created_at", "last_login", "must_change_password", "business_unit", "grade_code", "department", "employee_code", "admin_of_group_ids")
         read_only_fields = ("id", "email", "role", "created_at", "last_login")
 
 

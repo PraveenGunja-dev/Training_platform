@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
+import { queryClient } from '@/lib/query-client';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/training/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -53,10 +54,23 @@ apiClient.interceptors.response.use(
         refreshQueue.forEach(({ reject }) => reject(e));
         refreshQueue = [];
         useAuthStore.getState().logout();
-        window.location.href = '/training/login';
+        queryClient.clear();
+        window.location.href = '/login';
         throw e;
       } finally {
         isRefreshing = false;
+      }
+    }
+    // 403 on GET requests only: user was demoted or lost access — redirect to forbidden page.
+    // Do NOT redirect for mutations (POST/PATCH/PUT/DELETE) — let onError handlers deal with those.
+    if (error.response?.status === 403) {
+      const reqUrl = error.config?.url ?? '';
+      const method = (error.config?.method ?? 'get').toLowerCase();
+      if (method === 'get' && !reqUrl.includes('/auth/')) {
+        if (window.location.pathname !== '/403') {
+          queryClient.clear();
+          window.location.href = '/403';
+        }
       }
     }
     throw error;

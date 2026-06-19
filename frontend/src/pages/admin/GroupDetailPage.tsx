@@ -17,6 +17,8 @@ import { GroupTabs } from '@/features/group-detail/GroupTabs';
 import { groupsApi } from '@/api/groups';
 import axios from 'axios';
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function AdminGroupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

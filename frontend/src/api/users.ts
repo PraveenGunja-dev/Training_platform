@@ -5,8 +5,10 @@ export const usersApi = {
   list: (params?: {
     role?: string;
     status?: string;
+    setup?: string;
     search?: string;
     business_unit?: string;
+    group_admin?: boolean;
     page?: number;
     page_size?: number;
   }) => apiClient.get<ApiEnvelope<User[]>>('/users', { params }).then(r => r.data),
@@ -27,5 +29,7 @@ export const usersApi = {
   setVisibility: (id: string, can_view_all_classes: boolean | null) =>
     apiClient.patch<ApiEnvelope<User>>(`/users/${id}/visibility`, { can_view_all_classes }).then(r => r.data),
   stats: () =>
-    apiClient.get<ApiEnvelope<{ total: number; admins: number; instructors: number; participants: number; active: number; blocked: number }>>('/users/stats').then(r => r.data),
+    apiClient.get<ApiEnvelope<{ total: number; admins: number; instructors: number; participants: number; group_admins: number; active: number; blocked: number }>>('/users/stats').then(r => r.data),
+  checkEmailExists: (email: string) =>
+    apiClient.get<ApiEnvelope<{ exists: boolean }>>(`/users/check-email?email=${encodeURIComponent(email)}`).then(r => r.data),
 };

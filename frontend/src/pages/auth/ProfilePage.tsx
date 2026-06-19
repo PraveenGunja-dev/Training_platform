@@ -73,6 +73,7 @@ export function ProfilePage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = user?.role === 'ADMIN';
   const isInstructor = user?.role === 'INSTRUCTOR';
+  const isGroupAdmin = user?.role === 'GROUP_ADMIN' || (user?.admin_of_group_ids?.length ?? 0) > 0;
 
   // Photo
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,13 +122,15 @@ export function ProfilePage() {
     ? 'from-indigo-600 via-indigo-700 to-indigo-800'
     : isInstructor
       ? 'from-emerald-600 via-emerald-700 to-teal-800'
-      : 'from-violet-600 via-purple-700 to-purple-800';
+      : isGroupAdmin
+        ? 'from-teal-600 via-teal-700 to-teal-800'
+        : 'from-violet-600 via-purple-700 to-purple-800';
 
-  const accentBg   = isAdmin ? 'bg-[#0052A5]' : isInstructor ? 'bg-emerald-600' : 'bg-[#E31837]';
-  const accentText = isAdmin ? 'text-[#0052A5]' : isInstructor ? 'text-emerald-700' : 'text-[#E31837]';
-  const accentBorder = isAdmin ? 'border-blue-200' : isInstructor ? 'border-emerald-200' : 'border-violet-200';
-  const accentRing   = isAdmin ? 'ring-[#0052A5]' : isInstructor ? 'ring-emerald-500' : 'ring-violet-500';
-  const roleLabel    = isAdmin ? 'Super Admin' : isInstructor ? 'Instructor' : 'Participant';
+  const accentBg   = isAdmin ? 'bg-[#0052A5]' : isInstructor ? 'bg-emerald-600' : isGroupAdmin ? 'bg-teal-600' : 'bg-[#E31837]';
+  const accentText = isAdmin ? 'text-[#0052A5]' : isInstructor ? 'text-emerald-700' : isGroupAdmin ? 'text-teal-700' : 'text-[#E31837]';
+  const accentBorder = isAdmin ? 'border-blue-200' : isInstructor ? 'border-emerald-200' : isGroupAdmin ? 'border-teal-200' : 'border-violet-200';
+  const accentRing   = isAdmin ? 'ring-[#0052A5]' : isInstructor ? 'ring-emerald-500' : isGroupAdmin ? 'ring-teal-500' : 'ring-violet-500';
+  const roleLabel    = isAdmin ? 'Super Admin' : isInstructor ? 'Instructor' : isGroupAdmin ? 'Group Admin' : 'Participant';
 
   const photoSrc = preview ?? user?.photo_url ?? undefined;
   const userInitials = user ? initials(user.full_name) : '?';

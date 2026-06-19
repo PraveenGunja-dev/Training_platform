@@ -27,7 +27,8 @@ ALLOWED_IMAGE_TYPES: Final[frozenset[str]] = frozenset(
         "image/png",
         "image/gif",
         "image/webp",
-        "image/svg+xml",
+        # image/svg+xml removed — SVGs can embed JavaScript and are an XSS vector
+        # when served from the same origin or as inline images.
     ]
 )
 

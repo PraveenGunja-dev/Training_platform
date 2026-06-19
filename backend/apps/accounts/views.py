@@ -23,8 +23,25 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
 )
+from apps.audit.services import log_action
 from .services import authenticate_user, consume_setup_token
-from .throttles import ChangePasswordThrottle, RefreshTokenThrottle
+from .throttles import ChangePasswordThrottle, LoginRateThrottle, RefreshTokenThrottle
+
+
+_MAGIC_BYTES = [
+    b'\xff\xd8\xff',   # JPEG
+    b'\x89PNG\r\n',    # PNG
+    b'GIF87a',         # GIF
+    b'GIF89a',         # GIF
+    b'RIFF',           # WebP (starts with RIFF....WEBP)
+]
+
+
+def _check_magic_bytes(file_obj) -> bool:
+    """Return True if the file header matches a known safe image type."""
+    header = file_obj.read(12)
+    file_obj.seek(0)
+    return any(header.startswith(magic) for magic in _MAGIC_BYTES)
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
@@ -44,6 +61,7 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 @extend_schema(exclude=True)
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data)
@@ -51,25 +69,43 @@ class LoginView(APIView):
 
         email = serializer.validated_data["email"]
 
-        # Check if account is blocked before attempting auth, so we can give a
-        # specific message rather than a generic "invalid credentials".
-        try:
-            existing = User.objects.get(email=email)
-            if not existing.is_active:
-                return Response(
-                    {"errors": [{"code": "auth.account_blocked", "message": "Your account access has been blocked by the administrator. Please contact support."}], "data": None},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        except User.DoesNotExist:
-            pass
-
         user = authenticate_user(
             email=email,
             password=serializer.validated_data["password"],
         )
         if user is None:
+            log_action(
+                actor=None,
+                action="auth.login_failed",
+                target_type="User",
+                target_id=None,
+                metadata={
+                    "email": email,
+                    "ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "unknown")),
+                    "reason": "invalid_credentials",
+                },
+            )
             return Response(
-                {"errors": [{"code": "auth.invalid_credentials", "message": "Invalid email or password"}], "data": None},
+                {"errors": [{"code": "auth.invalid_credentials", "message": "Invalid email or password."}], "data": None},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # After confirming credentials are correct, check if account is blocked.
+        # This ordering avoids user enumeration via status-code differences.
+        if not user.is_active:
+            log_action(
+                actor=None,
+                action="auth.login_failed",
+                target_type="User",
+                target_id=user.id,
+                metadata={
+                    "email": email,
+                    "ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "unknown")),
+                    "reason": "account_inactive",
+                },
+            )
+            return Response(
+                {"errors": [{"code": "auth.invalid_credentials", "message": "Invalid email or password."}], "data": None},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -270,6 +306,11 @@ class MePhotoView(APIView):
         if photo.size > self._MAX_BYTES:
             return Response(
                 {"errors": [{"code": "photo.too_large", "message": "Photo must be under 5 MB"}], "data": None},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not _check_magic_bytes(photo):
+            return Response(
+                {"errors": [{"code": "file.invalid_signature", "message": "Uploaded file is not a valid image."}], "data": None},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

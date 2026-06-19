@@ -43,9 +43,11 @@ class NotificationViewSet(ViewSet):
 
     @action(detail=True, methods=["post"], url_path="read")
     def mark_read(self, request: Request, pk=None) -> Response:
-        Notification.objects.filter(id=pk, user=request.user, read_at__isnull=True).update(
-            read_at=timezone.now()
-        )
+        from django.shortcuts import get_object_or_404  # noqa: PLC0415
+        notification = get_object_or_404(Notification, id=pk, user=request.user)
+        if notification.read_at is None:
+            notification.read_at = timezone.now()
+            notification.save(update_fields=["read_at"])
         return Response(status=204)
 
     @action(detail=False, methods=["post"], url_path="read-all")
