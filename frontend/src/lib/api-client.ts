@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 import { queryClient } from '@/lib/query-client';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/training/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
