@@ -15,7 +15,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/training/api": {
-        target: "http://localhost:8000",
+        target: "http://localhost:3422",
         changeOrigin: true,
       },
     },
