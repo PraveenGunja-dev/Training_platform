@@ -211,17 +211,16 @@ export default function AdminClassDetailPage() {
             <div>
               <p className="text-xs text-[#5A7A9A]">Instructors</p>
               {cls.instructors && cls.instructors.length > 0 ? (
-                <div className="flex flex-wrap gap-1 mt-0.5">
-                  {cls.instructors.map(inst => (
-                    <Link
-                      key={inst.id}
-                      to={`/admin/users/${inst.id}`}
-                      className="font-semibold text-[#00285A] hover:underline text-sm"
-                    >
-                      {inst.full_name}
-                    </Link>
+                <p className="font-semibold text-sm text-[#00285A] mt-0.5 leading-snug">
+                  {cls.instructors.map((inst, i) => (
+                    <span key={inst.id}>
+                      <Link to={`/admin/users/${inst.id}`} className="hover:underline">
+                        {inst.full_name}
+                      </Link>
+                      {i < cls.instructors!.length - 1 && <span className="text-slate-400">, </span>}
+                    </span>
                   ))}
-                </div>
+                </p>
               ) : (
                 <p className="font-semibold text-slate-400 italic">None assigned</p>
               )}

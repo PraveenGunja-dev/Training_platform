@@ -55,7 +55,7 @@ class Document(TimestampedModel):
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
-    file_url = models.CharField(max_length=1000)
+    file_data = models.BinaryField(null=True, blank=True)
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=100)
     file_size = models.PositiveBigIntegerField()
@@ -140,7 +140,7 @@ class ParticipantSharedDoc(TimestampedModel):
         related_name="shared_docs",
     )
     title = models.CharField(max_length=255)
-    file_url = models.CharField(max_length=1000)
+    file_data = models.BinaryField(null=True, blank=True)
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=100)
     file_size = models.PositiveBigIntegerField()

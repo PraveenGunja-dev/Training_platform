@@ -18,11 +18,12 @@ type SortKey = 'name' | 'attendance_rate' | 'submission_rate';
 
 interface ParticipantActivityTableProps {
   data: ParticipantActivity[];
+  totalParticipants?: number;
 }
 
 const PAGE_SIZE = 10;
 
-export function ParticipantActivityTable({ data }: ParticipantActivityTableProps) {
+export function ParticipantActivityTable({ data, totalParticipants }: ParticipantActivityTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
@@ -138,7 +139,10 @@ export function ParticipantActivityTable({ data }: ParticipantActivityTableProps
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
           <span>
-            Page {page + 1} of {totalPages} · {data.length} participants
+            Page {page + 1} of {totalPages}
+            {totalParticipants !== undefined && totalParticipants > data.length
+              ? ` · Showing ${data.length} of ${totalParticipants} participants`
+              : ` · ${data.length} participants`}
           </span>
           <div className="flex gap-2">
             <Button

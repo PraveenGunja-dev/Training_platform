@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -449,6 +449,10 @@ function InstructorVisibilityCard({
   const [selected, setSelected] = useState<VisibilityOption>(
     visibilityToOption(currentValue),
   );
+
+  useEffect(() => {
+    setSelected(visibilityToOption(currentValue));
+  }, [currentValue]);
 
   const mutation = useMutation({
     mutationFn: (opt: VisibilityOption) =>

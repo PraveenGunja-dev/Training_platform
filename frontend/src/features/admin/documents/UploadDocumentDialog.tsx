@@ -39,7 +39,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
   const [dragging, setDragging] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'saving'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'saving'>('idle');
   const [customDocType, setCustomDocType] = useState('');
 
   const { register, handleSubmit, watch, setValue, control, reset, formState: { errors } } = useForm<DocumentFormValues>({
@@ -121,34 +121,19 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
     }
     setUploading(true);
     try {
-      setUploadProgress('uploading');
-      const urlRes = await documentsApi.getUploadUrl(
-        pendingFile.name,
-        pendingFile.type || 'application/octet-stream',
-      );
-      const { upload_url, blob_name } = urlRes.data;
-
-      const uploadRes = await fetch(upload_url, {
-        method: 'PUT',
-        body: pendingFile,
-        headers: { 'Content-Type': pendingFile.type || 'application/octet-stream' },
-      });
-      if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`);
-
       setUploadProgress('saving');
-      await documentsApi.create({
-        group_id:         vals.group_id,
-        class_id:         vals.class_id || undefined,
-        title:            vals.title,
-        description:      vals.description || '',
-        file_url:         blob_name,
-        file_name:        pendingFile.name,
-        file_type:        pendingFile.type || 'application/octet-stream',
-        file_size:        pendingFile.size,
-        doc_type:         vals.doc_type,
-        visibility:       vals.visibility,
-        allowed_user_ids: vals.visibility === 'SELECTED' ? (vals.allowed_user_ids ?? []) : [],
-      });
+      const fd = new FormData();
+      fd.append('file', pendingFile);
+      fd.append('group_id', vals.group_id);
+      if (vals.class_id) fd.append('class_id', vals.class_id);
+      fd.append('title', vals.title);
+      fd.append('description', vals.description || '');
+      fd.append('doc_type', vals.doc_type);
+      fd.append('visibility', vals.visibility);
+      const allowedIds = vals.visibility === 'SELECTED' ? (vals.allowed_user_ids ?? []) : [];
+      fd.append('allowed_user_ids', JSON.stringify(allowedIds));
+
+      await documentsApi.create(fd);
 
       qc.invalidateQueries({ queryKey: ['documents'] });
       toast.success('Document uploaded successfully.');
@@ -162,8 +147,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
   };
 
   const progressLabel =
-    uploadProgress === 'uploading' ? 'Uploading file…' :
-    uploadProgress === 'saving'    ? 'Saving record…'  : '';
+    uploadProgress === 'saving' ? 'Uploading document…' : '';
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>

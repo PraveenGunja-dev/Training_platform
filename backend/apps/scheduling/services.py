@@ -10,6 +10,7 @@ def apply_class_filters(qs: QuerySet[Class], params: dict) -> QuerySet[Class]:
     from_date = params.get("from")
     to_date = params.get("to")
     status = params.get("status")
+    search = params.get("search", "").strip()
 
     if group_id:
         qs = qs.filter(group_id=group_id)
@@ -19,4 +20,6 @@ def apply_class_filters(qs: QuerySet[Class], params: dict) -> QuerySet[Class]:
         qs = qs.filter(ends_at__lte=to_date)
     if status:
         qs = qs.filter(status_cached=status)
+    if search:
+        qs = qs.filter(title__icontains=search)
     return qs

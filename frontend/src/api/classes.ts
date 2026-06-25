@@ -1,9 +1,13 @@
 import { apiClient } from '@/lib/api-client';
-import type { ApiEnvelope, AuditEntry, ClassSession } from '@/lib/types';
+import type { ApiEnvelope, AuditEntry, ClassSession, PageMeta } from '@/lib/types';
+
+export interface ClassCounts { UPCOMING: number; ONGOING: number; COMPLETED: number; CANCELLED: number; past_upcoming: number; }
 
 export const classesApi = {
-  list: (params?: { group_id?: string; from?: string; to?: string; status?: string }) =>
-    apiClient.get<ApiEnvelope<ClassSession[]>>('/classes', { params }).then(r => r.data),
+  list: (params?: { group_id?: string; from?: string; to?: string; status?: string; search?: string; page?: number; page_size?: number }) =>
+    apiClient.get<{ data: ClassSession[]; meta: PageMeta }>('/classes', { params }).then(r => r.data),
+  counts: (params?: { group_id?: string }) =>
+    apiClient.get<ApiEnvelope<ClassCounts>>('/classes/counts', { params }).then(r => r.data),
   get: (id: string) =>
     apiClient.get<ApiEnvelope<ClassSession>>(`/classes/${id}`).then(r => r.data),
   create: (body: {
@@ -38,4 +42,6 @@ export const classesApi = {
     end_time: string;
   }) =>
     apiClient.post<ApiEnvelope<{ created: number; dates: string[] }>>('/classes/recurring', body).then(r => r.data),
+  markPastCompleted: () =>
+    apiClient.post<ApiEnvelope<{ updated: number }>>('/admin/classes/mark-past-completed').then(r => r.data),
 };

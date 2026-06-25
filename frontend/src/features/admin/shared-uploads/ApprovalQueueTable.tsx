@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { CheckCircle2, XCircle, Eye } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, XCircle, Eye, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { formatDate } from '@/lib/dates';
+import { documentsApi } from '@/api/documents';
 import { ApproveDialog } from './ApproveDialog';
 import { RejectDialog } from './RejectDialog';
 import { SubmissionPreviewDialog } from '../submissions/SubmissionPreviewDialog';
@@ -52,9 +58,21 @@ interface Props {
 }
 
 export function ApprovalQueueTable({ uploads, groupNames }: Props) {
+  const queryClient = useQueryClient();
   const [approveTarget, setApproveTarget] = useState<ParticipantSharedDoc | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ParticipantSharedDoc | null>(null);
   const [previewTarget, setPreviewTarget] = useState<SubmissionWithUser | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ParticipantSharedDoc | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => documentsApi.deleteSharedUpload(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['shared-uploads-pending'] });
+      toast.success('Upload deleted.');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error('Failed to delete upload.'),
+  });
 
   if (uploads.length === 0) {
     return (
@@ -136,6 +154,14 @@ export function ApprovalQueueTable({ uploads, groupNames }: Props) {
                     >
                       <XCircle className="h-4 w-4" />
                     </Button>
+                    <Button
+                      size="sm" variant="ghost"
+                      className="text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => setDeleteTarget(upload)}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -159,6 +185,30 @@ export function ApprovalQueueTable({ uploads, groupNames }: Props) {
         open={!!previewTarget}
         onClose={() => setPreviewTarget(null)}
       />
+
+      <Dialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Shared Upload</DialogTitle>
+            <DialogDescription>
+              Delete <strong>{deleteTarget?.title || deleteTarget?.file_name}</strong>? This upload
+              will be permanently removed and the participant will not be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

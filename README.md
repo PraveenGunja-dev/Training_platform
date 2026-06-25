@@ -336,7 +336,7 @@ Copy-Item .env.example .env
 # 5. Migrate database
 python manage.py migrate
 
-# 6. Import real participant data (1130 participants, 25 batches, 4 instructors)
+# 6. Import real participant data (1129 participants, 25 batches, 55 instructors, 27 group admins)
 python manage.py import_detu --xlsx path/to/detu.xlsx
 
 # 7. Start development server
@@ -348,17 +348,16 @@ python manage.py runserver
 
 **Current credentials** (live data from `import_detu`):
 
-| Role        | Email                        | Password    | Notes                        |
-| ----------- | ---------------------------- | ----------- | ---------------------------- |
-| Super Admin | super.admin@adani.com        | password123 | Only admin account           |
-| Instructor  | divyansh.jha@adani.com       | admin123    | Batches assigned             |
-| Instructor  | vineet.jain1@adani.com       | admin123    | Batches assigned             |
-| Instructor  | shubham.tomar@adani.com      | admin123    | Batches assigned             |
-| Instructor  | disha.gadhvi@adani.com       | admin123    | Batches assigned             |
-| Participant | aagam.dosaliya@adani.com     | admin123    | Example — 1130 total         |
-| Participant | (any adani.com participant)  | admin123    | All 1130 from detu.xlsx      |
+| Role         | Email                        | Password    | Notes                          |
+| ------------ | ---------------------------- | ----------- | ------------------------------ |
+| Super Admin  | super.admin@adani.com        | password123 | Only admin account             |
+| Instructor   | divyansh.jha@adani.com       | admin123    | Example — 55 instructors total |
+| Instructor   | vineet.jain1@adani.com       | admin123    | Batches assigned               |
+| Group Admin  | (any group admin account)    | admin123    | 27 group admins total          |
+| Participant  | aagam.dosaliya@adani.com     | admin123    | Example — 1129 total           |
+| Participant  | (any adani.com participant)  | admin123    | All 1129 from detu.xlsx        |
 
-**Data summary:** 1 Super Admin · 4 Instructors · 1130 Participants across 25 Batches (Batch-1 to Batch-25)
+**Data summary:** 1 Super Admin · 55 Instructors · 27 Group Admins · 1129 Participants across 25 Batches (Batch-1 to Batch-25)
 
 > All accounts except Super Admin have `must_change_password = True` — a non-dismissible dialog prompts users to set a new password on first login.
 

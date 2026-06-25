@@ -21,6 +21,7 @@ class AssignmentTaskSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
     class_id = serializers.SerializerMethodField()
     class_title = serializers.SerializerMethodField()
+    question_file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = AssignmentTask
@@ -56,6 +57,11 @@ class AssignmentTaskSerializer(serializers.ModelSerializer):
 
     def get_class_title(self, obj: AssignmentTask) -> str | None:
         return obj.class_obj.title if obj.class_obj_id and obj.class_obj else None
+
+    def get_question_file_url(self, obj: AssignmentTask) -> str:
+        if obj.question_file_data:
+            return f"/api/v1/assignments/{obj.id}/question-file"
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +104,6 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
         default=list,
     )
     is_open = serializers.BooleanField(required=False, default=False)
-    question_file_url = serializers.CharField(max_length=1000, required=False, default="", allow_blank=True)
-    question_file_name = serializers.CharField(max_length=255, required=False, default="", allow_blank=True)
-    question_file_type = serializers.CharField(max_length=100, required=False, default="", allow_blank=True)
-    question_file_size = serializers.IntegerField(required=False, allow_null=True, default=None)
 
     def validate(self, attrs: dict) -> dict:
         upload_open = attrs.get("upload_open_at")
@@ -165,6 +167,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
     user = SubmissionUserSerializer(read_only=True)
     submitted_by = serializers.SerializerMethodField()
     review = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -194,27 +197,5 @@ class SubmissionSerializer(serializers.ModelSerializer):
         except SubmissionReview.DoesNotExist:
             return None
 
-
-# ---------------------------------------------------------------------------
-# Submission — write (submit)
-# ---------------------------------------------------------------------------
-
-
-class SubmissionWriteSerializer(serializers.Serializer):
-    file_url = serializers.CharField(max_length=1000)
-    file_name = serializers.CharField(max_length=255)
-    file_type = serializers.CharField(max_length=100)
-    file_size = serializers.IntegerField(min_value=1)
-    note = serializers.CharField(required=False, default="", allow_blank=True)
-    user_id = serializers.UUIDField(required=False, allow_null=True)
-
-
-# ---------------------------------------------------------------------------
-# Upload-URL — write
-# ---------------------------------------------------------------------------
-
-
-class UploadUrlSerializer(serializers.Serializer):
-    file_name = serializers.CharField(max_length=255)
-    file_size = serializers.IntegerField(min_value=1)
-    content_type = serializers.CharField(max_length=100)
+    def get_file_url(self, obj: Submission) -> str:
+        return f"/api/v1/submissions/{obj.id}/file"

@@ -20,7 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("full_name", "photo_url")
+        fields = ("full_name",)
 
 
 class LoginSerializer(serializers.Serializer):

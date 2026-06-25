@@ -3,6 +3,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { assignmentsApi } from '@/api/assignments';
 import type { SubmissionWithUser } from '@/lib/types';
 
 interface Props {
@@ -79,11 +81,19 @@ export function SubmissionPreviewDialog({ submission, open, onClose }: Props) {
           <PreviewContent sub={submission} />
 
           <div className="flex justify-end">
-            <Button size="sm" variant="outline" asChild>
-              <a href={submission.file_url} download={submission.file_name}>
-                <Download className="h-4 w-4 mr-1.5" />
-                Download
-              </a>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await assignmentsApi.downloadSubmission(submission.id, submission.file_name);
+                } catch {
+                  toast.error('Could not download file.');
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              Download
             </Button>
           </div>
         </div>

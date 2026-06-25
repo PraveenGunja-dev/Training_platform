@@ -90,4 +90,42 @@ export const assignmentsHandlers = [
     task.is_open = false;
     return HttpResponse.json({ data: task });
   }),
+
+  // Upload question file (new API)
+  http.post('*/api/v1/assignments/:id/question-file', async ({ params, request }) => {
+    const idx = assignmentsData.findIndex(t => t.id === params.id);
+    if (idx === -1) return HttpResponse.json({ data: null, errors: [{ code: 'not_found', message: 'Assignment not found.' }] }, { status: 404 });
+    try {
+      const formData = await request.formData();
+      const fileField = formData.get('file');
+      if (fileField instanceof File) {
+        assignmentsData[idx] = {
+          ...assignmentsData[idx],
+          question_file_name: fileField.name,
+          question_file_type: fileField.type || 'application/octet-stream',
+          question_file_size: fileField.size,
+          question_file_url: `mock://question-files/${fileField.name}`,
+        };
+      }
+    } catch {
+      // ignore parse errors in mock
+    }
+    return HttpResponse.json({ data: assignmentsData[idx] });
+  }),
+
+  // Download question file — returns a stub blob in mock mode
+  http.get('*/api/v1/assignments/:id/question-file', ({ params }) => {
+    const task = assignmentsData.find(t => t.id === params.id);
+    if (!task) return HttpResponse.json({ data: null, errors: [{ code: 'not_found', message: 'Assignment not found.' }] }, { status: 404 });
+    return new HttpResponse(new Blob(['mock question file content'], { type: 'application/octet-stream' }), {
+      headers: { 'Content-Disposition': `attachment; filename="${task.question_file_name || 'question-file'}"` },
+    });
+  }),
+
+  // Download submission file — returns a stub blob in mock mode
+  http.get('*/api/v1/submissions/:id/file', () => {
+    return new HttpResponse(new Blob(['mock submission file content'], { type: 'application/octet-stream' }), {
+      headers: { 'Content-Disposition': 'attachment; filename="submission.pdf"' },
+    });
+  }),
 ];

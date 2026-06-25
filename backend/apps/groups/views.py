@@ -149,7 +149,8 @@ class ClassGroupViewSet(ViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
         elif request.user.role == "INSTRUCTOR":
-            if not instructor_owns_group(request.user, group.pk):
+            from apps.common.visibility import instructor_can_view_all  # noqa: PLC0415
+            if not instructor_owns_group(request.user, group.pk) and not instructor_can_view_all(request.user):
                 return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
         return Response({"data": ClassGroupDetailSerializer(group).data})
 
@@ -268,13 +269,22 @@ class ClassGroupViewSet(ViewSet):
         from django.db import transaction  # noqa: PLC0415
         ser = GroupInstructorAssignSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        promote = ser.validated_data.get("promote_participants", False)
         assigned_count = 0
         with transaction.atomic():
             for uid in ser.validated_data["user_ids"]:
-                # Only users with INSTRUCTOR role can be assigned
                 try:
-                    User.objects.select_for_update().get(pk=uid, role="INSTRUCTOR")
+                    user_obj = User.objects.select_for_update().get(pk=uid)
                 except User.DoesNotExist:
+                    continue
+                if user_obj.role == "INSTRUCTOR":
+                    pass
+                elif user_obj.role == "PARTICIPANT" and promote:
+                    GroupMembership.objects.filter(user=user_obj).delete()
+                    SubGroupMembership.objects.filter(user=user_obj).delete()
+                    user_obj.role = "INSTRUCTOR"
+                    user_obj.save(update_fields=["role"])
+                else:
                     continue
                 gi, created = GroupInstructor.objects.get_or_create(
                     group=group,
@@ -292,7 +302,6 @@ class ClassGroupViewSet(ViewSet):
                     )
                     new_instructor = gi.instructor
                     from apps.notifications.services import create_inapp, notify_instructors  # noqa: PLC0415
-                    # Notify the newly assigned instructor
                     create_inapp(
                         user=new_instructor,
                         type="GROUP_ASSIGNED",
@@ -306,7 +315,6 @@ class ClassGroupViewSet(ViewSet):
                             "assigned_by": str(request.user.id),
                         },
                     )
-                    # Notify existing co-instructors (excluding the newly added one)
                     notify_instructors(
                         group=group,
                         notification_type="CO_INSTRUCTOR_ADDED",

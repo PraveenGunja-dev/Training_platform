@@ -194,7 +194,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
             "created_at": log.created_at.isoformat(),
         })
 
-    # --- Participant activity (up to 100 rows) ---
+    # --- Participant activity (up to 500 rows) ---
     # Precompute group-level aggregates to avoid N+1 (2 queries)
     _sessions_per_group = {
         row["class_obj__group_id"]: row["cnt"]
@@ -210,7 +210,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
         User.objects.filter(role="PARTICIPANT", is_active=True)
         .prefetch_related(
             Prefetch("group_memberships", queryset=GroupMembership.objects.select_related("group"))
-        )[:100]
+        )[:500]
     )
     participant_ids = [p.id for p in participants]
 
@@ -512,7 +512,7 @@ def compute_instructor_payload(user) -> dict:
                     group_id__in=assigned_group_ids
                 ).select_related("group"),
             )
-        )[:100]
+        )[:500]
     )
     participant_ids = [p.id for p in participants]
     _attended_per_user = {
@@ -686,8 +686,10 @@ def compute_participant_payload(user) -> dict:
     total_sessions = AttendanceSession.objects.filter(
         class_obj__group_id__in=group_ids
     ).count()
-    attended = AttendanceRecord.objects.filter(user=user).count()
-    attendance_rate = round((attended / total_sessions * 100) if total_sessions else 0)
+    attended = AttendanceRecord.objects.filter(
+        user=user, session__class_obj__group_id__in=group_ids
+    ).count()
+    attendance_rate = round(min((attended / total_sessions * 100) if total_sessions else 0, 100))
     submitted_count = (
         Submission.objects.filter(user=user).values("task_id").distinct().count()
     )
@@ -819,7 +821,7 @@ def compute_group_admin_payload(group_id: str) -> dict:
             role="PARTICIPANT",
             is_active=True,
             group_memberships__group_id=group_id,
-        ).distinct()[:100]
+        ).distinct()[:500]
     )
     participant_ids = [p.id for p in participants]
 

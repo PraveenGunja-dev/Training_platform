@@ -7,47 +7,6 @@ import { notificationsData } from '../data/notifications';
 import type { Notification, SaveReviewPayload, Submission, SubmissionReview, SubmissionStatus } from '@/lib/types';
 
 export const submissionsHandlers = [
-  http.post('*/api/v1/assignments/:taskId/upload-url', async ({ request, params }) => {
-    const body = await request.json() as { file_name: string; file_size: number; content_type: string };
-    const task = assignmentsData.find(t => t.id === params.taskId);
-    if (!task) {
-      return HttpResponse.json({ data: null, errors: [{ code: 'not_found', message: 'Assignment not found.' }] }, { status: 404 });
-    }
-
-    const now = new Date();
-    const uploadOpen = new Date(task.upload_open_at);
-    const deadline = new Date(task.deadline_at);
-
-    if (now < uploadOpen) {
-      return HttpResponse.json(
-        { data: null, errors: [{ code: 'assignment.not_open', message: 'Assignment is not open for uploads yet.' }] },
-        { status: 422 },
-      );
-    }
-    if (now > deadline) {
-      if (task.late_policy === 'STRICT') {
-        return HttpResponse.json(
-          { data: null, errors: [{ code: 'assignment.deadline_passed_strict', message: 'Deadline has passed (strict policy).' }] },
-          { status: 422 },
-        );
-      }
-      if (task.late_policy === 'ADMIN_ONLY') {
-        return HttpResponse.json(
-          { data: null, errors: [{ code: 'assignment.admin_only', message: 'Only Admin/Manager can submit after deadline.' }] },
-          { status: 422 },
-        );
-      }
-    }
-
-    return HttpResponse.json({
-      data: {
-        upload_url: `https://mock.blob.core.windows.net/uploads/${body.file_name}?sig=mock`,
-        blob_name: `uploads/${Date.now()}-${body.file_name}`,
-        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      },
-    });
-  }),
-
   http.post('*/api/v1/assignments/:taskId/submissions', async ({ request, params }) => {
     const task = assignmentsData.find(t => t.id === params.taskId);
     if (!task) {
@@ -89,12 +48,19 @@ export const submissionsHandlers = [
     let note = '';
 
     const contentType = request.headers.get('content-type') ?? '';
-    if (!contentType.includes('multipart')) {
-      const body = await request.json() as { file_name?: string; file_size?: number; content_type?: string; note?: string };
-      fileName = body.file_name ?? fileName;
-      fileSize = body.file_size ?? fileSize;
-      fileType = body.content_type ?? fileType;
-      note = body.note ?? '';
+    if (contentType.includes('multipart')) {
+      try {
+        const formData = await request.formData();
+        const fileField = formData.get('file');
+        if (fileField instanceof File) {
+          fileName = fileField.name;
+          fileSize = fileField.size;
+          fileType = fileField.type || 'application/octet-stream';
+        }
+        note = (formData.get('note') as string | null) ?? '';
+      } catch {
+        // fall through with defaults
+      }
     }
 
     // Track version for re-uploads

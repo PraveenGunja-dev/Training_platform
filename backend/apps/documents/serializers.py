@@ -20,6 +20,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     group_id = serializers.UUIDField(read_only=True)
     class_id = serializers.SerializerMethodField()
     uploaded_by_id = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
@@ -47,6 +48,9 @@ class DocumentSerializer(serializers.ModelSerializer):
     def get_uploaded_by_id(self, obj: Document) -> str | None:
         return str(obj.uploaded_by_id) if obj.uploaded_by_id else None
 
+    def get_file_url(self, obj: Document) -> str:
+        return f"/api/v1/documents/{obj.id}/file"
+
 
 # ---------------------------------------------------------------------------
 # Document — write (Admin create / partial-update)
@@ -65,10 +69,6 @@ class DocumentWriteSerializer(serializers.Serializer):
     )
     title = serializers.CharField(max_length=255)
     description = serializers.CharField(required=False, default="", allow_blank=True)
-    file_url = serializers.CharField(max_length=1000)
-    file_name = serializers.CharField(max_length=255)
-    file_type = serializers.CharField(max_length=100)
-    file_size = serializers.IntegerField(min_value=1)
     doc_type = serializers.CharField(max_length=100, default=Document.GUIDE)
     visibility = serializers.ChoiceField(
         choices=Document.VISIBILITY_CHOICES, default=Document.VIS_GROUP
@@ -140,6 +140,7 @@ class SharedDocSerializer(serializers.ModelSerializer):
     uploaded_by = SharedDocUploaderSerializer(read_only=True)
     reviewed_by_id = serializers.SerializerMethodField()
     resulting_document_id = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ParticipantSharedDoc
@@ -172,6 +173,9 @@ class SharedDocSerializer(serializers.ModelSerializer):
     def get_resulting_document_id(self, obj: ParticipantSharedDoc) -> str | None:
         return str(obj.resulting_document_id) if obj.resulting_document_id else None
 
+    def get_file_url(self, obj: ParticipantSharedDoc) -> str:
+        return f"/api/v1/shared-uploads/{obj.id}/file"
+
 
 # ---------------------------------------------------------------------------
 # ParticipantSharedDoc — write (Participant upload)
@@ -180,10 +184,6 @@ class SharedDocSerializer(serializers.ModelSerializer):
 
 class SharedDocWriteSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
-    file_url = serializers.CharField(max_length=1000)
-    file_name = serializers.CharField(max_length=255)
-    file_type = serializers.CharField(max_length=100)
-    file_size = serializers.IntegerField(min_value=1)
     suggested_visibility = serializers.ChoiceField(
         choices=Document.VISIBILITY_CHOICES, default=Document.VIS_GROUP
     )

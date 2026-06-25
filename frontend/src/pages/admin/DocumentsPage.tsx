@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, FileText, Trash2, Edit2, Download } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
 import { documentsApi } from '@/api/documents';
 import { groupsApi } from '@/api/groups';
 import { Button } from '@/components/ui/button';
@@ -236,10 +235,9 @@ export default function AdminDocumentsPage() {
                             title="Download"
                             onClick={async () => {
                               try {
-                                const res = await apiClient.get<{ data: { download_url: string } }>(`/documents/${doc.id}/download`);
-                                window.open(res.data.data.download_url, '_blank');
+                                await documentsApi.download(doc.id, doc.file_name);
                               } catch {
-                                toast.error('Could not get download link.');
+                                toast.error('Could not download file.');
                               }
                             }}
                           >

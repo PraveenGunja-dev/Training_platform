@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -17,6 +17,10 @@ import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/store/auth';
 import type { GroupDetail, GroupInstructor, User } from '@/lib/types';
 
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Admin', INSTRUCTOR: 'Instructor', PARTICIPANT: 'Participant', GROUP_ADMIN: 'Group Admin',
+};
+
 // ── Add Instructors dialog ────────────────────────────────────────────────────
 
 function AddInstructorsDialog({
@@ -26,25 +30,39 @@ function AddInstructorsDialog({
 }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<User[]>([]);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['instructors', 'search', query],
-    queryFn: () => usersApi.listInstructors(query || undefined),
+    queryKey: ['users', 'instructor-search', debouncedQuery],
+    queryFn: () => usersApi.list({ search: debouncedQuery || undefined, page_size: 50 }),
     enabled: open,
     staleTime: 10_000,
     placeholderData: keepPreviousData,
   });
 
-  const results = (data?.data ?? []).filter(u => !existingIds.includes(u.id));
+  const results = (data?.data ?? []).filter(
+    u => !existingIds.includes(u.id) && u.is_active && u.role !== 'ADMIN' && u.role !== 'GROUP_ADMIN',
+  );
+
+  const participantsInSelection = selected.filter(u => u.role === 'PARTICIPANT');
 
   const mutation = useMutation({
-    mutationFn: (users: User[]) => groupsApi.assignInstructors(groupId, users.map(u => u.id)),
+    mutationFn: (users: User[]) => {
+      const hasParticipants = users.some(u => u.role === 'PARTICIPANT');
+      return groupsApi.assignInstructors(groupId, users.map(u => u.id), hasParticipants || undefined);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
       toast.success(`${selected.length} instructor${selected.length !== 1 ? 's' : ''} assigned.`);
-      setSelected([]); setQuery(''); onClose();
+      setSelected([]); setQuery(''); setDebouncedQuery(''); setShowConfirm(false); onClose();
     },
     onError: () => toast.error('Failed to assign instructors.'),
   });
@@ -53,56 +71,127 @@ function AddInstructorsDialog({
     setSelected(prev => prev.some(x => x.id === u.id) ? prev.filter(x => x.id !== u.id) : [...prev, u]);
   }
 
-  function handleClose() { setSelected([]); setQuery(''); onClose(); }
+  function handleClose() {
+    setSelected([]); setQuery(''); setDebouncedQuery(''); setShowConfirm(false); onClose();
+  }
+
+  function handleSubmit() {
+    if (participantsInSelection.length > 0) {
+      setShowConfirm(true);
+    } else {
+      mutation.mutate(selected);
+    }
+  }
 
   const selectedIds = new Set(selected.map(u => u.id));
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add Instructors</DialogTitle>
-          <DialogDescription>Search by name or email to assign instructors to this group.</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open && !showConfirm} onOpenChange={v => { if (!v) handleClose(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Instructors</DialogTitle>
+            <DialogDescription>Search all users to find and assign instructors to this group.</DialogDescription>
+          </DialogHeader>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
-          <Input className="pl-8" placeholder="Search by name or email..." value={query}
-            onChange={e => setQuery(e.target.value)} autoFocus />
-          {isFetching && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground/60" />}
-        </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input className="pl-8" placeholder="Search by name or email..." value={query}
+              onChange={e => setQuery(e.target.value)} autoFocus />
+            {isFetching && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground/60" />}
+          </div>
 
-        <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
-          {results.length === 0 && !isFetching ? (
-            <p className="text-sm text-muted-foreground/70 p-4 text-center">
-              {query ? 'No matching instructors found.' : 'No available instructors.'}
-            </p>
-          ) : results.map(u => (
-            <label key={u.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
-              <input type="checkbox" className="h-4 w-4 accent-primary shrink-0"
-                checked={selectedIds.has(u.id)} onChange={() => toggle(u)} />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+          <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
+            {results.length === 0 && !isFetching ? (
+              <p className="text-sm text-muted-foreground/70 p-4 text-center">
+                {query ? 'No matching users found.' : 'No available users.'}
+              </p>
+            ) : results.map(u => (
+              <label key={u.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
+                <input type="checkbox" className="h-4 w-4 accent-primary shrink-0"
+                  checked={selectedIds.has(u.id)} onChange={() => toggle(u)} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${
+                      u.role === 'PARTICIPANT' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                      u.role === 'INSTRUCTOR'  ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                                                  'bg-blue-50 text-blue-700 border-blue-200'
+                    }`}>
+                      {ROLE_LABEL[u.role] ?? u.role}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {selected.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                {selected.length} selected: {selected.map(u => u.full_name).join(', ')}
+              </p>
+              {participantsInSelection.length > 0 && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {participantsInSelection.length} participant{participantsInSelection.length !== 1 ? 's' : ''} will have their role changed
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={selected.length === 0 || mutation.isPending}>
+              {mutation.isPending ? 'Assigning...' : `Add${selected.length > 0 ? ` ${selected.length}` : ''} Selected`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {showConfirm && (
+        <Dialog open onOpenChange={v => { if (!v) setShowConfirm(false); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <DialogTitle className="text-left">Role Change Warning</DialogTitle>
               </div>
-            </label>
-          ))}
-        </div>
-
-        {selected.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {selected.length} selected: {selected.map(u => u.full_name).join(', ')}
-          </p>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={() => mutation.mutate(selected)} disabled={selected.length === 0 || mutation.isPending}>
-            {mutation.isPending ? 'Assigning...' : `Add${selected.length > 0 ? ` ${selected.length}` : ''} Selected`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <DialogDescription className="text-left space-y-2">
+                <span className="block">
+                  The following {participantsInSelection.length === 1 ? 'user is' : 'users are'} currently a{' '}
+                  <strong>Participant</strong>. Assigning them as instructors will:
+                </span>
+                <ul className="list-disc list-inside text-sm space-y-0.5 text-slate-600 bg-amber-50 rounded-lg p-3">
+                  {participantsInSelection.map(p => (
+                    <li key={p.id} className="font-medium text-amber-800">{p.full_name} ({p.email})</li>
+                  ))}
+                </ul>
+                <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
+                  <li>Change their role from Participant to Instructor</li>
+                  <li>Remove their group memberships and sub-group assignments</li>
+                  <li>Existing attendance records and submissions will be retained but inaccessible</li>
+                </ul>
+                <span className="block font-medium text-slate-700">Are you sure you want to proceed?</span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={mutation.isPending}>Cancel</Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => mutation.mutate(selected)}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? 'Assigning...' : 'Yes, Proceed'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 
@@ -134,10 +223,6 @@ function RemoveConfirmDialog({
 }
 
 // ── Assign Group Admin dialog ─────────────────────────────────────────────────
-
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Admin', INSTRUCTOR: 'Instructor', PARTICIPANT: 'Participant', GROUP_ADMIN: 'Group Admin',
-};
 
 function AssignGroupAdminDialog({
   open, onClose, groupId, currentAdminId,

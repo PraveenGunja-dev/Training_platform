@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import uuid
-import uuid as uuid_lib
-
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -27,11 +24,8 @@ from .serializers import (
     AssignmentTaskWriteSerializer,
     SubmissionReviewSerializer,
     SubmissionSerializer,
-    SubmissionWriteSerializer,
-    UploadUrlSerializer,
 )
 from .services import AssignmentError, create_submission
-from .storage import generate_download_sas, generate_upload_sas
 
 User = get_user_model()
 
@@ -54,7 +48,7 @@ def _validation_error(field: str, message: str, code: str = "invalid") -> Respon
 
 
 # ---------------------------------------------------------------------------
-# AssignmentTaskViewSet — CRUD + upload-url + submissions
+# AssignmentTaskViewSet — CRUD + question-file + submissions
 # ---------------------------------------------------------------------------
 
 
@@ -67,7 +61,7 @@ class AssignmentTaskViewSet(ViewSet):
     }
 
     def _base_qs(self):
-        return AssignmentTask.objects.select_related("group", "class_obj", "created_by")
+        return AssignmentTask.objects.defer('question_file_data').select_related("group", "class_obj", "created_by")
 
     # GET /assignments
     def list(self, request: Request) -> Response:
@@ -247,41 +241,6 @@ class AssignmentTaskViewSet(ViewSet):
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # POST /assignments/:id/upload-url
-    def upload_url(self, request: Request, pk: str | None = None) -> Response:
-        task = get_object_or_404(AssignmentTask.objects.select_related("group"), pk=pk)
-        if request.user.role == "ADMIN":
-            pass
-        elif request.user.role == "INSTRUCTOR":
-            if not instructor_owns_group(request.user, task.group_id):
-                return Response(
-                    {"errors": [{"code": "perm.denied", "message": "Not found or not accessible."}], "data": None},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        else:
-            now = timezone.now()
-            in_group = GroupMembership.objects.filter(group=task.group, user=request.user).exists()
-            if not in_group or not task.is_open or task.is_closed or task.deadline_at <= now:
-                return Response(
-                    {"errors": [{"code": "perm.denied", "message": "Not found or not accessible."}], "data": None},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        ser = UploadUrlSerializer(data=request.data)
-        if not ser.is_valid():
-            return Response(
-                {"errors": [{"code": "validation_error", "message": str(ser.errors)}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        d = ser.validated_data
-        try:
-            validate_file(d["file_name"], d["file_size"], d["content_type"])
-        except FileValidationError as exc:
-            return _error_response(exc)
-
-        blob_name = f"submissions/{task.id}/{uuid.uuid4()}/{d['file_name']}"
-        upload_url = generate_upload_sas(blob_name, d["content_type"])
-        return Response({"data": {"upload_url": upload_url, "blob_name": blob_name}})
-
     # POST /assignments/:id/submissions
     def submit(self, request: Request, pk: str | None = None) -> Response:
         task = get_object_or_404(AssignmentTask.objects.select_related("group"), pk=pk)
@@ -290,35 +249,38 @@ class AssignmentTaskViewSet(ViewSet):
         if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, task.group_id):
             return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
 
-        ser = SubmissionWriteSerializer(data=request.data)
-        if not ser.is_valid():
-            return Response(
-                {"errors": [{"code": "validation_error", "message": str(ser.errors)}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        d = ser.validated_data
+        file = request.FILES.get('file')
+        if not file:
+            return _validation_error('file', 'This field is required.')
 
-        # Determine target user: Admin can specify user_id for on-behalf submission
-        target_user_id = d.get("user_id")
-        if target_user_id and request.user.role == "ADMIN":
-            target_user = get_object_or_404(User, pk=target_user_id)
-        else:
-            target_user = request.user
+        file_data = file.read()
+        file_name = file.name
+        file_type = file.content_type
+        file_size = file.size
 
         try:
-            validate_file(d["file_name"], d["file_size"], d["file_type"])
+            validate_file(file_name, file_size, file_type)
         except FileValidationError as exc:
             return _error_response(exc)
+
+        note = request.data.get('note', '')
+        user_id = request.data.get('user_id')
+
+        # Determine target user: Admin can specify user_id for on-behalf submission
+        if user_id and request.user.role == "ADMIN":
+            target_user = get_object_or_404(User, pk=user_id)
+        else:
+            target_user = request.user
 
         try:
             submission = create_submission(
                 task=task,
                 user=target_user,
-                file_url=d["file_url"],
-                file_name=d["file_name"],
-                file_type=d["file_type"],
-                file_size=d["file_size"],
-                note=d.get("note", ""),
+                file_data=file_data,
+                file_name=file_name,
+                file_type=file_type,
+                file_size=file_size,
+                note=note,
                 actor=request.user,
             )
         except AssignmentError as exc:
@@ -384,16 +346,57 @@ class AssignmentTaskViewSet(ViewSet):
         )
         return Response({"data": AssignmentTaskSerializer(task).data})
 
-    # GET /assignments/:id/question-download
-    def question_download(self, request: Request, pk: str | None = None) -> Response:
-        task = get_object_or_404(AssignmentTask, pk=pk)
-        if not task.question_file_url:
+    # POST /assignments/:id/question-file — upload/replace question file
+    def question_file_upload(self, request: Request, pk: str | None = None) -> Response:
+        """POST /assignments/{id}/question-file — upload/replace question file."""
+        if request.user.role not in ("ADMIN", "INSTRUCTOR"):
+            return Response(
+                {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        task = get_object_or_404(self._base_qs(), pk=pk)
+        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, task.group_id):
+            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        file = request.FILES.get('file')
+        if not file:
+            return _validation_error('file', 'This field is required.')
+        file_bytes = file.read()
+        file_name = file.name
+        file_type = file.content_type
+        file_size = file.size
+        try:
+            validate_file(file_name, file_size, file_type)
+        except FileValidationError as exc:
+            return _error_response(exc)
+        task.question_file_data = file_bytes
+        task.question_file_name = file_name
+        task.question_file_type = file_type
+        task.question_file_size = file_size
+        task.save(update_fields=['question_file_data', 'question_file_name', 'question_file_type', 'question_file_size'])
+        return Response({"data": AssignmentTaskSerializer(task).data})
+
+    # GET /assignments/:id/question-file — stream question file binary
+    def question_file_download(self, request: Request, pk: str | None = None) -> Response:
+        """GET /assignments/{id}/question-file — stream question file binary."""
+        task = get_object_or_404(
+            AssignmentTask.objects.only('id', 'question_file_data', 'question_file_name', 'question_file_type', 'group_id'),
+            pk=pk,
+        )
+        # Verify access
+        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, task.group_id):
+            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if not task.question_file_data:
             return Response(
                 {"errors": [{"code": "not_found", "message": "No question file attached."}], "data": None},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        download_url = generate_download_sas(task.question_file_url)
-        return Response({"data": {"download_url": download_url}})
+        from django.http import HttpResponse
+        import urllib.parse
+        response = HttpResponse(bytes(task.question_file_data), content_type=task.question_file_type)
+        safe_name = urllib.parse.quote(task.question_file_name)
+        response['Content-Disposition'] = f'attachment; filename="{task.question_file_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Length'] = len(task.question_file_data)
+        return response
 
     # GET /assignments/:id/submissions (Admin or Instructor on assigned group)
     def list_submissions(self, request: Request, pk: str | None = None) -> Response:
@@ -417,33 +420,6 @@ class AssignmentTaskViewSet(ViewSet):
         if search_param:
             subs = subs.filter(user__full_name__icontains=search_param)
         return Response({"data": SubmissionSerializer(subs, many=True).data})
-
-
-# ---------------------------------------------------------------------------
-# Question file upload URL (Admin only)
-# ---------------------------------------------------------------------------
-
-
-@extend_schema(exclude=True)
-class QuestionUploadUrlView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request: Request) -> Response:
-        if request.user.role not in ("ADMIN", "INSTRUCTOR"):
-            return Response(
-                {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        filename = request.data.get("filename", "").strip()
-        content_type = request.data.get("content_type", "application/octet-stream").strip()
-        if not filename:
-            return Response(
-                {"errors": [{"code": "validation_error", "message": "filename is required"}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        blob_name = f"question-files/{uuid_lib.uuid4()}/{filename}"
-        upload_url = generate_upload_sas(blob_name, content_type)
-        return Response({"data": {"upload_url": upload_url, "blob_name": blob_name}})
 
 
 # ---------------------------------------------------------------------------
@@ -479,18 +455,21 @@ class ParticipantSubmissionsView(APIView):
 
 
 # ---------------------------------------------------------------------------
-# Download: /submissions/:id/download
+# File download: /submissions/:id/file
 # ---------------------------------------------------------------------------
 
 
 @extend_schema(exclude=True)
-class SubmissionDownloadView(APIView):
+class SubmissionFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, pk: str) -> Response:
-        sub = get_object_or_404(Submission.objects.select_related("task__group"), pk=pk)
-
-        # Permission: Admin/Instructor sees all; participant sees only their own
+        sub = get_object_or_404(
+            Submission.objects.select_related("task__group").only(
+                'id', 'file_data', 'file_name', 'file_type', 'user_id', 'task__group_id'
+            ),
+            pk=pk,
+        )
         if request.user.role == "INSTRUCTOR":
             if not instructor_owns_group(request.user, sub.task.group_id):
                 return Response(
@@ -502,9 +481,18 @@ class SubmissionDownloadView(APIView):
                 {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        download_url = generate_download_sas(sub.file_url)
-        return Response({"data": {"download_url": download_url}})
+        if not sub.file_data:
+            return Response(
+                {"errors": [{"code": "not_found", "message": "File not available."}], "data": None},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        from django.http import HttpResponse
+        import urllib.parse
+        response = HttpResponse(bytes(sub.file_data), content_type=sub.file_type)
+        safe_name = urllib.parse.quote(sub.file_name)
+        response['Content-Disposition'] = f'attachment; filename="{sub.file_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Length'] = len(sub.file_data)
+        return response
 
 
 # ---------------------------------------------------------------------------

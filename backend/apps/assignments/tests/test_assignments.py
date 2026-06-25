@@ -1,11 +1,9 @@
-"""Tests for the assignments app (B-06).
+"""Tests for the assignments app (B-06, Option A binary storage).
 
 Covers:
 - AssignmentTask CRUD (Admin only create/update/delete)
 - Participant list scoping (only open tasks in their groups)
-- upload-url: mock SAS returned in dev (no Azure vars)
-- upload-url: file validation errors (too large, bad type)
-- Submit: happy path → SUBMITTED
+- Submit: happy path → SUBMITTED (multipart file upload)
 - Submit: BR-13 — zero AttendanceRecord rows → 201 (no attendance check)
 - Submit: re-upload → version 2, original preserved
 - Submit: STRICT past deadline → 422
@@ -13,13 +11,15 @@ Covers:
 - Submit: ADMIN_ONLY past deadline, participant → 403
 - Submit: Admin on-behalf for ADMIN_ONLY past deadline → 201 OVERRIDE_BY_ADMIN
 - /me/tasks and /me/submissions
-- /submissions/:id/download → mock URL returned
+- /submissions/:id/file → streams binary content
+- /assignments/:id/question-file → upload + download
 - File validation unit tests
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
+from io import BytesIO
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -176,6 +176,14 @@ def admin_only_task(db, group, admin_user):
     )
 
 
+def _pdf_file(name: str = "report.pdf", size: int = 1024) -> BytesIO:
+    """Return a BytesIO that looks like a small PDF file."""
+    buf = BytesIO(b"%PDF-1.4 " + b"x" * max(0, size - 9))
+    buf.name = name
+    buf.seek(0)
+    return buf
+
+
 # ---------------------------------------------------------------------------
 # AssignmentTask CRUD
 # ---------------------------------------------------------------------------
@@ -284,78 +292,75 @@ def test_admin_retrieve_task(admin_client, open_task):
 
 
 # ---------------------------------------------------------------------------
-# upload-url endpoint
+# Question file upload/download endpoint
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_upload_url_returns_mock_sas_in_dev(participant_client, open_task, membership):
-    resp = participant_client.post(
-        f"/api/v1/assignments/{open_task.id}/upload-url",
-        {
-            "file_name": "report.pdf",
-            "file_size": 1024,
-            "content_type": "application/pdf",
-        },
-        format="json",
+def test_admin_upload_question_file(admin_client, open_task):
+    buf = _pdf_file("question.pdf", 512)
+    resp = admin_client.post(
+        f"/api/v1/assignments/{open_task.id}/question-file",
+        {"file": buf},
+        format="multipart",
     )
     assert resp.status_code == 200
     data = resp.json()["data"]
-    assert data["upload_url"].startswith("mock://upload/")
-    assert "blob_name" in data
+    assert data["question_file_name"] == "question.pdf"
+    assert data["question_file_url"] == f"/api/v1/assignments/{open_task.id}/question-file"
 
 
 @pytest.mark.django_db
-def test_upload_url_file_too_large(participant_client, open_task, membership):
-    resp = participant_client.post(
-        f"/api/v1/assignments/{open_task.id}/upload-url",
-        {
-            "file_name": "huge.pdf",
-            "file_size": 30 * 1024 * 1024,  # 30 MB > 25 MB doc limit
-            "content_type": "application/pdf",
-        },
-        format="json",
+def test_question_file_download(admin_client, open_task):
+    # Upload first
+    buf = _pdf_file("question.pdf", 512)
+    admin_client.post(
+        f"/api/v1/assignments/{open_task.id}/question-file",
+        {"file": buf},
+        format="multipart",
     )
-    assert resp.status_code == 422
-    assert resp.json()["errors"][0]["code"] == "file.too_large"
+    # Now download
+    resp = admin_client.get(f"/api/v1/assignments/{open_task.id}/question-file")
+    assert resp.status_code == 200
+    assert resp["Content-Disposition"].startswith('attachment;')
 
 
 @pytest.mark.django_db
-def test_upload_url_type_not_allowed(participant_client, open_task, membership):
+def test_question_file_download_404_when_no_file(admin_client, open_task):
+    resp = admin_client.get(f"/api/v1/assignments/{open_task.id}/question-file")
+    assert resp.status_code == 404
+    assert resp.json()["errors"][0]["code"] == "not_found"
+
+
+@pytest.mark.django_db
+def test_participant_cannot_upload_question_file(participant_client, open_task, membership):
+    buf = _pdf_file()
     resp = participant_client.post(
-        f"/api/v1/assignments/{open_task.id}/upload-url",
-        {
-            "file_name": "script.sh",
-            "file_size": 100,
-            "content_type": "application/x-sh",
-        },
-        format="json",
+        f"/api/v1/assignments/{open_task.id}/question-file",
+        {"file": buf},
+        format="multipart",
     )
-    assert resp.status_code == 422
-    assert resp.json()["errors"][0]["code"] == "file.type_not_allowed"
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# Submission — happy path
+# Submission — happy path (multipart)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
 def test_submit_success(participant_client, open_task, membership):
+    buf = _pdf_file("report.pdf", 1024)
     resp = participant_client.post(
         f"/api/v1/assignments/{open_task.id}/submissions",
-        {
-            "file_url": f"submissions/{open_task.id}/abc/report.pdf",
-            "file_name": "report.pdf",
-            "file_type": "application/pdf",
-            "file_size": 1024,
-        },
-        format="json",
+        {"file": buf, "note": ""},
+        format="multipart",
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["status"] == "SUBMITTED"
     assert data["version"] == 1
+    assert data["file_url"] == f"/api/v1/submissions/{data['id']}/file"
     assert AuditLog.objects.filter(action="assignment.submission_created").exists()
 
 
@@ -370,15 +375,11 @@ def test_submit_no_attendance_records_succeeds(participant_client, open_task, me
     from apps.attendance.models import AttendanceRecord
     assert AttendanceRecord.objects.filter(user__email="part@assign.test").count() == 0
 
+    buf = _pdf_file("blob.pdf", 512)
     resp = participant_client.post(
         f"/api/v1/assignments/{open_task.id}/submissions",
-        {
-            "file_url": "submissions/test/blob.pdf",
-            "file_name": "blob.pdf",
-            "file_type": "application/pdf",
-            "file_size": 512,
-        },
-        format="json",
+        {"file": buf},
+        format="multipart",
     )
     assert resp.status_code == 201
     assert resp.json()["data"]["status"] == "SUBMITTED"
@@ -391,17 +392,19 @@ def test_submit_no_attendance_records_succeeds(participant_client, open_task, me
 
 @pytest.mark.django_db
 def test_reupload_creates_version_2(participant_client, open_task, membership):
-    payload = {
-        "file_url": "submissions/test/v1.pdf",
-        "file_name": "v1.pdf",
-        "file_type": "application/pdf",
-        "file_size": 1024,
-    }
-    participant_client.post(f"/api/v1/assignments/{open_task.id}/submissions", payload, format="json")
+    buf1 = _pdf_file("v1.pdf", 1024)
+    participant_client.post(
+        f"/api/v1/assignments/{open_task.id}/submissions",
+        {"file": buf1},
+        format="multipart",
+    )
 
-    payload["file_url"] = "submissions/test/v2.pdf"
-    payload["file_name"] = "v2.pdf"
-    resp = participant_client.post(f"/api/v1/assignments/{open_task.id}/submissions", payload, format="json")
+    buf2 = _pdf_file("v2.pdf", 1024)
+    resp = participant_client.post(
+        f"/api/v1/assignments/{open_task.id}/submissions",
+        {"file": buf2},
+        format="multipart",
+    )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["version"] == 2
@@ -411,21 +414,33 @@ def test_reupload_creates_version_2(participant_client, open_task, membership):
 
 
 # ---------------------------------------------------------------------------
+# Submit: missing file → 400
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_submit_no_file_returns_400(participant_client, open_task, membership):
+    resp = participant_client.post(
+        f"/api/v1/assignments/{open_task.id}/submissions",
+        {},
+        format="multipart",
+    )
+    assert resp.status_code == 400
+    assert resp.json()["errors"][0]["field"] == "file"
+
+
+# ---------------------------------------------------------------------------
 # Late policy enforcement
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
 def test_strict_past_deadline_422(participant_client, closed_task, membership):
+    buf = _pdf_file("late.pdf", 1024)
     resp = participant_client.post(
         f"/api/v1/assignments/{closed_task.id}/submissions",
-        {
-            "file_url": "submissions/test/late.pdf",
-            "file_name": "late.pdf",
-            "file_type": "application/pdf",
-            "file_size": 1024,
-        },
-        format="json",
+        {"file": buf},
+        format="multipart",
     )
     assert resp.status_code == 422
     assert resp.json()["errors"][0]["code"] == "assignment.deadline_passed_strict"
@@ -433,15 +448,11 @@ def test_strict_past_deadline_422(participant_client, closed_task, membership):
 
 @pytest.mark.django_db
 def test_late_allowed_past_deadline_201(participant_client, late_allowed_task, membership):
+    buf = _pdf_file("late.pdf", 1024)
     resp = participant_client.post(
         f"/api/v1/assignments/{late_allowed_task.id}/submissions",
-        {
-            "file_url": "submissions/test/late.pdf",
-            "file_name": "late.pdf",
-            "file_type": "application/pdf",
-            "file_size": 1024,
-        },
-        format="json",
+        {"file": buf},
+        format="multipart",
     )
     assert resp.status_code == 201
     assert resp.json()["data"]["status"] == "LATE_SUBMITTED"
@@ -449,15 +460,11 @@ def test_late_allowed_past_deadline_201(participant_client, late_allowed_task, m
 
 @pytest.mark.django_db
 def test_admin_only_past_deadline_participant_403(participant_client, admin_only_task, membership):
+    buf = _pdf_file("late.pdf", 1024)
     resp = participant_client.post(
         f"/api/v1/assignments/{admin_only_task.id}/submissions",
-        {
-            "file_url": "submissions/test/late.pdf",
-            "file_name": "late.pdf",
-            "file_type": "application/pdf",
-            "file_size": 1024,
-        },
-        format="json",
+        {"file": buf},
+        format="multipart",
     )
     assert resp.status_code == 403
     assert resp.json()["errors"][0]["code"] == "assignment.deadline_admin_only"
@@ -467,16 +474,11 @@ def test_admin_only_past_deadline_participant_403(participant_client, admin_only
 def test_admin_only_past_deadline_admin_succeeds(
     admin_client, admin_only_task, membership, participant_user
 ):
+    buf = _pdf_file("admin_override.pdf", 1024)
     resp = admin_client.post(
         f"/api/v1/assignments/{admin_only_task.id}/submissions",
-        {
-            "file_url": "submissions/test/admin_override.pdf",
-            "file_name": "admin_override.pdf",
-            "file_type": "application/pdf",
-            "file_size": 1024,
-            "user_id": str(participant_user.id),
-        },
-        format="json",
+        {"file": buf, "user_id": str(participant_user.id)},
+        format="multipart",
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
@@ -495,7 +497,7 @@ def test_admin_list_submissions(admin_client, open_task, participant_user, membe
         task=open_task,
         user=participant_user,
         version=1,
-        file_url="blob1",
+        file_data=b"binary content",
         file_name="f1.pdf",
         file_type="application/pdf",
         file_size=1024,
@@ -534,7 +536,7 @@ def test_me_submissions(participant_client, open_task, participant_user, members
         task=open_task,
         user=participant_user,
         version=1,
-        file_url="blob1",
+        file_data=b"binary content",
         file_name="f1.pdf",
         file_type="application/pdf",
         file_size=1024,
@@ -550,48 +552,48 @@ def test_me_submissions(participant_client, open_task, participant_user, members
 
 
 # ---------------------------------------------------------------------------
-# /submissions/:id/download
+# /submissions/:id/file — binary download
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_download_returns_mock_url(participant_client, open_task, participant_user, membership):
+def test_file_download_streams_binary(participant_client, open_task, participant_user, membership):
+    file_content = b"PDF binary content here"
     sub = Submission.objects.create(
         task=open_task,
         user=participant_user,
         version=1,
-        file_url="submissions/task/uuid/f1.pdf",
+        file_data=file_content,
         file_name="f1.pdf",
         file_type="application/pdf",
-        file_size=1024,
+        file_size=len(file_content),
         submitted_at=NOW,
         submitted_by=participant_user,
         status="SUBMITTED",
     )
-    resp = participant_client.get(f"/api/v1/submissions/{sub.id}/download")
+    resp = participant_client.get(f"/api/v1/submissions/{sub.id}/file")
     assert resp.status_code == 200
-    data = resp.json()["data"]
-    assert "download_url" in data
-    assert "mock://download/" in data["download_url"]
+    assert resp["Content-Disposition"].startswith("attachment;")
+    assert resp.content == file_content
 
 
 @pytest.mark.django_db
-def test_download_other_users_submission_403(
+def test_file_download_other_users_submission_403(
     other_client, open_task, participant_user, other_participant, membership
 ):
     sub = Submission.objects.create(
         task=open_task,
         user=participant_user,
         version=1,
-        file_url="blob",
+        file_data=b"data",
         file_name="f.pdf",
         file_type="application/pdf",
-        file_size=1024,
+        file_size=4,
         submitted_at=NOW,
         submitted_by=participant_user,
         status="SUBMITTED",
     )
-    resp = other_client.get(f"/api/v1/submissions/{sub.id}/download")
+    resp = other_client.get(f"/api/v1/submissions/{sub.id}/file")
     assert resp.status_code == 403
 
 

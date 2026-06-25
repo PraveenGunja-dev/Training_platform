@@ -55,7 +55,7 @@ def submission_factory(db, test_task, test_user):
             task=t,
             user=u,
             version=1,
-            file_url=f"submissions/{t.id}/test.pdf",
+            file_data=b"test file content",
             file_name="test.pdf",
             file_type="application/pdf",
             file_size=1024,

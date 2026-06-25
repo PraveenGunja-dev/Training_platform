@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GraduationCap, Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -104,6 +105,7 @@ function AddInstructorDialog({
 
 export default function GroupAdminInstructorsPage() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const groupIds = user?.admin_of_group_ids ?? [];
   const [selectedGroupId, setSelectedGroupId] = useState<string>(groupIds[0] ?? '');
@@ -199,11 +201,19 @@ export default function GroupAdminInstructorsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {instructors.map(ins => (
-                <TableRow key={ins.id}>
-                  <TableCell className="font-medium text-slate-800">{ins.full_name}</TableCell>
+              {instructors.map(ins => {
+                const groupName = groupData?.data?.name;
+                return (
+                <TableRow
+                  key={ins.id}
+                  className="cursor-pointer hover:bg-slate-50/60"
+                  onClick={() => navigate(`/group-admin/instructors/${ins.id}`, { state: { instructor: ins, groupName } })}
+                >
+                  <TableCell>
+                    <span className="font-medium text-[#0052A5] hover:underline">{ins.full_name}</span>
+                  </TableCell>
                   <TableCell className="text-slate-500">{ins.email}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                     <Button
                       variant="ghost" size="sm"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -215,7 +225,8 @@ export default function GroupAdminInstructorsPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

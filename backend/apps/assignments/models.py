@@ -49,7 +49,7 @@ class AssignmentTask(TimestampedModel):
         default=LATE_STRICT,
     )
     reminder_offsets = models.JSONField(default=list)
-    question_file_url = models.CharField(max_length=1000, blank=True, default="")
+    question_file_data = models.BinaryField(null=True, blank=True)
     question_file_name = models.CharField(max_length=255, blank=True, default="")
     question_file_type = models.CharField(max_length=100, blank=True, default="")
     question_file_size = models.PositiveBigIntegerField(null=True, blank=True)
@@ -97,7 +97,7 @@ class Submission(TimestampedModel):
         related_name="submissions",
     )
     version = models.PositiveIntegerField(default=1)
-    file_url = models.CharField(max_length=1000)
+    file_data = models.BinaryField(null=True, blank=True)
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=100)
     file_size = models.PositiveBigIntegerField()

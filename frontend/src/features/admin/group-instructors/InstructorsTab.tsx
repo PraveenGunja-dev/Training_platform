@@ -116,20 +116,19 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
   const results = (data?.data ?? []).filter(u => !existingIds.includes(u.id) && u.is_active);
 
   const mutation = useMutation({
-    mutationFn: async (users: User[]) => {
-      await groupsApi.assignInstructors(groupId, users.map(u => u.id));
-      const participants = users.filter(u => u.role === 'PARTICIPANT');
-      await Promise.all(
-        participants.map(u => usersApi.update(u.id, { role: 'INSTRUCTOR' }))
-      );
+    mutationFn: (users: User[]) => {
+      const hasParticipants = users.some(u => u.role === 'PARTICIPANT');
+      return groupsApi.assignInstructors(groupId, users.map(u => u.id), hasParticipants || undefined);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
       toast.success(
         `${selected.length} instructor${selected.length !== 1 ? 's' : ''} assigned.`,
       );
       setSelected([]);
       setQuery('');
+      setDebouncedQuery('');
       setShowConfirm(false);
       onClose();
     },

@@ -94,7 +94,7 @@ export interface ClassGroup {
   participants_count: number;
   is_archived: boolean;
   created_at: string;
-  instructors: { id: string; full_name: string; email: string }[];
+  instructors: { id: string; full_name: string; email: string; employee_code?: string; business_unit?: string }[];
 }
 
 export interface GroupParticipant extends User {

@@ -26,7 +26,7 @@ export function ParticipantCalendar() {
     to:   endOfMonth(addMonths(new Date(), 1)).toISOString(),
   }));
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isPending } = useQuery({
     queryKey: ['me', 'calendar', dateRange.from, dateRange.to],
     queryFn:  () => classesApi.myCalendar({ from: dateRange.from, to: dateRange.to }),
     staleTime: 60_000,
@@ -71,7 +71,35 @@ export function ParticipantCalendar() {
       </div>
 
       {/* ── Calendar card ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden relative">
+
+        {/* Beautiful loading overlay — initial fetch only */}
+        {isPending && (
+          <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] flex flex-col items-center justify-center z-20 rounded-2xl">
+            <div className="flex flex-col items-center gap-5">
+              <div className="relative w-20 h-20">
+                <div className="absolute inset-0 rounded-full border-[3px] border-[#EBF3FB]" />
+                <div className="absolute inset-0 rounded-full border-[3px] border-t-[#0052A5] border-r-[#0052A5] border-b-transparent border-l-transparent animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <CalendarDays className="h-7 w-7 text-[#0052A5]" />
+                </div>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-bold text-[#00285A]">Loading Calendar</p>
+                <p className="text-xs text-slate-500">Fetching your schedule…</p>
+              </div>
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map(i => (
+                  <div
+                    key={i}
+                    className="w-1.5 h-1.5 rounded-full bg-[#0052A5] animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Card header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">

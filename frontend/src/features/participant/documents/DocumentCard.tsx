@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Download, FileText, Calendar, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
+import { documentsApi } from '@/api/documents';
 import { formatDate } from '@/lib/dates';
 import { formatBytes } from '@/lib/fileValidation';
 import type { Document } from '@/lib/types';
@@ -35,10 +35,9 @@ export function DocumentCard({ doc, groupName }: DocumentCardProps) {
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ data: { download_url: string } }>(`/documents/${doc.id}/download`);
-      window.open(res.data.data.download_url, '_blank');
+      await documentsApi.download(doc.id, doc.file_name);
     } catch {
-      toast.error('Could not get download link. Try again.');
+      toast.error('Could not download file. Try again.');
     } finally {
       setLoading(false);
     }
@@ -106,7 +105,7 @@ export function DocumentCard({ doc, groupName }: DocumentCardProps) {
           ) : (
             <Download className="h-3.5 w-3.5" />
           )}
-          {loading ? 'Getting link…' : 'Download'}
+          {loading ? 'Downloading…' : 'Download'}
         </button>
       </div>
     </div>

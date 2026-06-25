@@ -55,7 +55,7 @@ export function GroupTabs({ group }: { group: GroupDetail }) {
       </TabsList>
 
       <TabsContent value="participants">
-        <ParticipantsTab groupId={group.id} participants={group.participants} />
+        <ParticipantsTab groupId={group.id} participants={group.participants} groupName={group.name} />
       </TabsContent>
       <TabsContent value="sub-groups">
         <SubGroupsTab groupId={group.id} groupParticipants={group.participants} />

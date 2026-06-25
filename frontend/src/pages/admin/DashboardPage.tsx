@@ -215,7 +215,7 @@ export default function AdminDashboardPage() {
         subtitle="Individual attendance & submission rates"
         icon={<Users className="h-3.5 w-3.5" />}
       >
-        <ParticipantActivityTable data={d.participant_activity ?? []} />
+        <ParticipantActivityTable data={d.participant_activity ?? []} totalParticipants={d.kpis.total_participants} />
       </ChartContainer>
 
     </div>

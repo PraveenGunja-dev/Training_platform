@@ -69,7 +69,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates", BASE_DIR.parent / "frontend" / "dist"],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -106,9 +106,13 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "/static/"
+STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Large file upload support (binary storage in PostgreSQL)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024   # 600 MB for video support
+FILE_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024   # 600 MB
 
 # Redis cache (django-redis)
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")

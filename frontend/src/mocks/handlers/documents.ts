@@ -47,19 +47,48 @@ export const documentsHandlers = [
 
   http.post('*/api/v1/documents', async ({ request }) => {
     const contentType = request.headers.get('content-type') ?? '';
-    let body: Partial<Document> & { group_id: string } = { group_id: '' };
-    if (!contentType.includes('multipart')) {
-      body = await request.json() as typeof body;
-    }
     const userId = mockAuthState.currentUserId;
+    let groupId = '';
+    let classId: string | null = null;
+    let title = 'Untitled Document';
+    let description = '';
+    let docType = 'SLIDES';
+    let visibility = 'GROUP';
+    let allowedUserIds: string[] = [];
+    let fileName = 'upload.pdf';
+    let fileSize = 102400;
+    let fileType = 'application/pdf';
+
+    if (contentType.includes('multipart')) {
+      try {
+        const formData = await request.formData();
+        groupId = (formData.get('group_id') as string | null) ?? '';
+        classId = (formData.get('class_id') as string | null) ?? null;
+        title = (formData.get('title') as string | null) ?? 'Untitled Document';
+        description = (formData.get('description') as string | null) ?? '';
+        docType = (formData.get('doc_type') as string | null) ?? 'SLIDES';
+        visibility = (formData.get('visibility') as string | null) ?? 'GROUP';
+        const allowedRaw = formData.get('allowed_user_ids') as string | null;
+        if (allowedRaw) {
+          try { allowedUserIds = JSON.parse(allowedRaw) as string[]; } catch { /* ignore */ }
+        }
+        const fileField = formData.get('file');
+        if (fileField instanceof File) {
+          fileName = fileField.name;
+          fileSize = fileField.size || fileSize;
+          fileType = fileField.type || 'application/octet-stream';
+        }
+      } catch { /* fall through with defaults */ }
+    }
+
     const newDoc: Document = {
       id: 'doc-' + Math.random().toString(36).slice(2, 8),
-      group_id: body.group_id, class_id: body.class_id ?? null,
-      title: body.title ?? 'Untitled Document',
-      description: body.description ?? '',
-      file_url: '/files/mock-upload.pdf', file_name: body.file_name ?? 'mock-upload.pdf', file_type: 'application/pdf', file_size: 102400,
-      doc_type: body.doc_type ?? 'SLIDES', visibility: body.visibility ?? 'GROUP',
-      allowed_user_ids: body.allowed_user_ids ?? [], uploaded_by_id: userId,
+      group_id: groupId, class_id: classId,
+      title,
+      description,
+      file_url: `mock://documents/${fileName}`, file_name: fileName, file_type: fileType, file_size: fileSize,
+      doc_type: docType, visibility: visibility as Document['visibility'],
+      allowed_user_ids: allowedUserIds, uploaded_by_id: userId,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
     documentsData.push(newDoc);
@@ -81,18 +110,59 @@ export const documentsHandlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // Download document file — returns a stub blob in mock mode
+  http.get('*/api/v1/documents/:id/file', ({ params }) => {
+    const doc = documentsData.find(d => d.id === params.id);
+    if (!doc) return HttpResponse.json({ data: null, errors: [{ code: 'not_found', message: 'Document not found.' }] }, { status: 404 });
+    return new HttpResponse(new Blob(['mock document file content'], { type: doc.file_type || 'application/octet-stream' }), {
+      headers: { 'Content-Disposition': `attachment; filename="${doc.file_name || doc.title}"` },
+    });
+  }),
+
+  // Download shared upload file — returns a stub blob in mock mode
+  http.get('*/api/v1/shared-uploads/:id/file', ({ params }) => {
+    const upload = sharedUploadsData.find(s => s.id === params.id);
+    if (!upload) return HttpResponse.json({ data: null, errors: [{ code: 'not_found', message: 'Shared upload not found.' }] }, { status: 404 });
+    return new HttpResponse(new Blob(['mock shared file content'], { type: upload.file_type || 'application/octet-stream' }), {
+      headers: { 'Content-Disposition': `attachment; filename="${upload.file_name}"` },
+    });
+  }),
+
   // Shared uploads
-  http.post('*/api/v1/groups/:groupId/shared-uploads', async ({ params }) => {
+  http.post('*/api/v1/groups/:groupId/shared-uploads', async ({ params, request }) => {
     const userId = mockAuthState.currentUserId;
     const user = usersData.find(u => u.id === userId);
+    let title = user?.full_name ? `Upload by ${user.full_name}` : 'Shared Upload';
+    let suggestedVisibility = 'GROUP';
+    let suggestedUserIds: string[] = [];
+    let fileName = 'shared-upload.pdf';
+    let fileSize = 204800;
+    let fileType = 'application/pdf';
+
+    try {
+      const formData = await request.formData();
+      title = (formData.get('title') as string | null) ?? title;
+      suggestedVisibility = (formData.get('suggested_visibility') as string | null) ?? suggestedVisibility;
+      const idsRaw = formData.get('suggested_user_ids') as string | null;
+      if (idsRaw) {
+        try { suggestedUserIds = JSON.parse(idsRaw) as string[]; } catch { /* ignore */ }
+      }
+      const fileField = formData.get('file');
+      if (fileField instanceof File) {
+        fileName = fileField.name;
+        fileSize = fileField.size || fileSize;
+        fileType = fileField.type || 'application/octet-stream';
+      }
+    } catch { /* fall through with defaults */ }
+
     const newUpload: ParticipantSharedDoc = {
       id: 'shared-' + Math.random().toString(36).slice(2, 8),
       group_id: params.groupId as string,
       uploaded_by_id: userId,
-      title: user?.full_name ? `Upload by ${user.full_name}` : 'Shared Upload',
-      file_url: '/files/shared-upload.pdf',
-      file_name: 'shared-upload.pdf', file_size: 204800, file_type: 'application/pdf',
-      suggested_visibility: 'GROUP', suggested_user_ids: [],
+      title,
+      file_url: `mock://shared/${fileName}`,
+      file_name: fileName, file_size: fileSize, file_type: fileType,
+      suggested_visibility: suggestedVisibility, suggested_user_ids: suggestedUserIds,
       status: 'PENDING', reviewed_by_id: null, reviewed_at: null, rejection_reason: null, resulting_document_id: null,
       created_at: new Date().toISOString(),
     };

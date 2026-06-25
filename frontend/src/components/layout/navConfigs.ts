@@ -67,6 +67,7 @@ export const instructorNav: NavItem[] = [
 
 export const groupAdminNav: NavItem[] = [
   { to: '/group-admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
+  { to: '/group-admin/calendar',     label: 'Calendar',     icon: CalendarRange,   section: 'Training' },
   { to: '/group-admin/participants', label: 'Participants', icon: Users,           section: 'People'   },
   { to: '/group-admin/instructors',  label: 'Instructors',  icon: GraduationCap                        },
   { to: '/group-admin/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },

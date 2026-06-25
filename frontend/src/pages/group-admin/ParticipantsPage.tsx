@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, UserPlus, Trash2, UserCircle, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -102,6 +103,7 @@ function AddParticipantsDialog({
 
 export default function GroupAdminParticipantsPage() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const groupIds = user?.admin_of_group_ids ?? [];
   const [selectedGroupId, setSelectedGroupId] = useState<string>(groupIds[0] ?? '');
@@ -237,9 +239,17 @@ export default function GroupAdminParticipantsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(p => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium text-slate-800">{p.full_name || '—'}</TableCell>
+              {filtered.map(p => {
+                const groupName = groupData?.data?.name;
+                return (
+                <TableRow
+                  key={p.id}
+                  className="cursor-pointer hover:bg-slate-50/60"
+                  onClick={() => navigate(`/group-admin/participants/${p.id}`, { state: { participant: p, groupName } })}
+                >
+                  <TableCell>
+                    <span className="font-medium text-[#0052A5] hover:underline">{p.full_name || '—'}</span>
+                  </TableCell>
                   <TableCell className="text-slate-500">{p.email}</TableCell>
                   <TableCell>
                     <Badge variant={p.is_active ? 'teal' : 'secondary'}>{p.is_active ? 'Active' : 'Inactive'}</Badge>
@@ -254,7 +264,7 @@ export default function GroupAdminParticipantsPage() {
                       {p.submission_rate}%
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                     <Button
                       variant="ghost" size="sm"
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -265,7 +275,8 @@ export default function GroupAdminParticipantsPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

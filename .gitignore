@@ -1,29 +1,91 @@
-﻿# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-*.egg-info/
-.ruff_cache/
-.mypy_cache/
+# Root-level env (never commit)
+/.env
+/.env.local
+/.env.*.local
 
-# Environment files
-.env
-.env.local
-.env.production
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/dist-ssr
+frontend/*.local
+frontend/.env
+frontend/.env.local
 
-# Development databases
-dev.db
-*.db
-
-# Node
-node_modules/
+# Backend (future)
+backend/__pycache__
+backend/**/__pycache__
+backend/*.pyc
+backend/**/*.pyc
+backend/.venv
+backend/venv
+backend/.env
+backend/.env.local
+backend/staticfiles
+backend/media
+backend/db.sqlite3
 
 # OS
 .DS_Store
 Thumbs.db
-desktop.ini
+
+# Logs
+*.log
+
+Helpful-temp.txt
+sqllite_issue.md
+TEST_REPORT.md
+
+
+#chunks
+chunks/
+
+#never
+never/
+
+#nan
+say.txt
 
 # Editor
 .vscode/
 .idea/
+*.swp
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/worktrees/
+
+# Planning + learning docs (local only, not for GitHub)
+plan/
+learn/
+docs/
+
+#adding instructor role
+instructor_upgrade
+
+#feature_implementing
+submission_review/
+projecet_brief.md
+
+Project_BRD/
+
+#Deployment thing
+ENVIRONMENT_SETUP.MD
+Deployment 1.0/
+CHECKLIST.md
+TECH_STACK.md
+TROUBLESHOOTING.md
+REQUIREMENTS.md
+
+*.zip
+*.xlsx
+# Session notes (local only)
+04-06 changes/
+10-06-changes/
+
+11-06_changes/
+#imp data
+*.dump
+
+
+Bug_fix/
+22-06-change(class-adding)/

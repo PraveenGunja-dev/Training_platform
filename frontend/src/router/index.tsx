@@ -9,6 +9,8 @@ import GroupAdminParticipantsPage from '@/pages/group-admin/ParticipantsPage';
 import GroupAdminAnalyticsPage from '@/pages/group-admin/AnalyticsPage';
 import GroupAdminInstructorsPage from '@/pages/group-admin/InstructorsPage';
 import GroupAdminSubGroupsPage from '@/pages/group-admin/SubGroupsPage';
+import GroupAdminCalendarPage from '@/pages/group-admin/CalendarPage';
+import GroupAdminInstructorProfilePage from '@/pages/group-admin/InstructorProfilePage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { SetPasswordPage } from '@/pages/auth/SetPasswordPage';
 import { ProfilePage } from '@/pages/auth/ProfilePage';
@@ -55,6 +57,7 @@ import InstructorDocumentsPage from '@/pages/instructor/DocumentsPage';
 import InstructorSharedUploadsPage from '@/pages/instructor/SharedUploadsPage';
 import InstructorNotificationsPage from '@/pages/instructor/NotificationsPage';
 import InstructorAttendanceReportPage from '@/pages/instructor/AttendanceReportPage';
+import ParticipantProfilePage from '@/pages/instructor/ParticipantProfilePage';
 
 export const router = createBrowserRouter([
   { path: '/', element: <RootRedirect /> },
@@ -122,6 +125,7 @@ export const router = createBrowserRouter([
       { path: 'shared-uploads', element: <InstructorSharedUploadsPage /> },
       { path: 'notifications', element: <InstructorNotificationsPage /> },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'participants/:id', element: <ParticipantProfilePage /> },
     ],
   },
   {
@@ -130,6 +134,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: 'dashboard', element: <GroupAdminDashboardPage /> },
+      { path: 'calendar', element: <GroupAdminCalendarPage /> },
       { path: 'participants', element: <GroupAdminParticipantsPage /> },
       { path: 'instructors', element: <GroupAdminInstructorsPage /> },
       { path: 'analytics', element: <GroupAdminAnalyticsPage /> },
@@ -137,10 +142,10 @@ export const router = createBrowserRouter([
       { path: 'sub-groups/:subGroupId', element: <GroupAdminSubGroupDetailPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'notifications', element: <NotificationsPage /> },
+      { path: 'participants/:id', element: <ParticipantProfilePage /> },
+      { path: 'instructors/:id', element: <GroupAdminInstructorProfilePage /> },
     ],
   },
   { path: '/change-password', element: <ForceChangePasswordPage /> },
   { path: '*', element: <NotFoundPage /> },
-], {
-  basename: import.meta.env.BASE_URL
-});
+]);

@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Upload, Download, FolderOpen, X, CheckCircle2, ChevronRight } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { FileText, Upload, Download, FolderOpen, X, CheckCircle2, ChevronRight, Trash2, Loader2 } from 'lucide-react';
+import { useAuthStore } from '@/store/auth';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
 import { documentsApi } from '@/api/documents';
 import { validateFile } from '@/lib/fileValidation';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,20 @@ type TypeChoice = 'NORMAL' | 'MOM' | 'CUSTOM';
 
 export function ClassDocumentUploadCard({ classId, groupId }: Props) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const canManageDocs = ['ADMIN', 'INSTRUCTOR', 'GROUP_ADMIN'].includes(user?.role ?? '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => documentsApi.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['documents', { group_id: groupId }] });
+      toast.success('Document deleted.');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.error('Failed to delete document.'),
+  });
   const [dragging, setDragging] = useState(false);
 
   const [step, setStep] = useState<Step>('idle');
@@ -63,12 +76,11 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
   });
   const docs = (data?.data ?? []).filter(d => d.class_id === classId);
 
-  const handleDownload = async (docId: string) => {
+  const handleDownload = async (docId: string, filename: string) => {
     try {
-      const res = await apiClient.get<{ data: { download_url: string } }>(`/documents/${docId}/download`);
-      window.open(res.data.data.download_url, '_blank');
+      await documentsApi.download(docId, filename);
     } catch {
-      toast.error('Could not get download link.');
+      toast.error('Could not download file.');
     }
   };
 
@@ -110,28 +122,17 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
     if (!validation.ok) { toast.error(validation.error); return; }
     setUploading(true);
     try {
-      const urlRes = await documentsApi.getUploadUrl(pendingFile.name, pendingFile.type || 'application/octet-stream');
-      const { upload_url, blob_name } = urlRes.data;
+      const fd = new FormData();
+      fd.append('file', pendingFile);
+      fd.append('group_id', groupId);
+      fd.append('class_id', classId);
+      fd.append('title', pendingFile.name.replace(/\.[^/.]+$/, ''));
+      fd.append('description', description);
+      fd.append('doc_type', docType);
+      fd.append('visibility', 'PUBLIC_TO_CLASS');
+      fd.append('allowed_user_ids', JSON.stringify([]));
 
-      const uploadRes = await fetch(upload_url, {
-        method: 'PUT',
-        body: pendingFile,
-        headers: { 'Content-Type': pendingFile.type || 'application/octet-stream' },
-      });
-      if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`);
-
-      await documentsApi.create({
-        group_id: groupId,
-        class_id: classId,
-        title: pendingFile.name.replace(/\.[^/.]+$/, ''),
-        description,
-        file_url: blob_name,
-        file_name: pendingFile.name,
-        file_type: pendingFile.type || 'application/octet-stream',
-        file_size: pendingFile.size,
-        doc_type: docType,
-        visibility: 'PUBLIC_TO_CLASS',
-      });
+      await documentsApi.create(fd);
 
       void queryClient.invalidateQueries({ queryKey: ['documents', { group_id: groupId }] });
       const typeLabel = typeChoice === 'MOM' ? 'MOM' : typeChoice === 'CUSTOM' ? (customTypeInput.trim() || 'Custom') : 'Normal Doc';
@@ -389,14 +390,49 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
                   {DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type.replace(/_/g, ' ')}
                 </span>
                 <button
-                  onClick={() => void handleDownload(doc.id)}
-                  className="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-[#E31837] hover:bg-violet-50 transition-colors"
+                  onClick={() => void handleDownload(doc.id, doc.file_name)}
+                  className="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-[#0052A5] hover:bg-blue-50 transition-colors"
                   title="Download"
                 >
                   <Download className="h-3.5 w-3.5" />
                 </button>
+                {canManageDocs && (
+                  <button
+                    onClick={() => setDeleteTarget(doc.id)}
+                    className="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Delete document"
+                    disabled={deleteMutation.isPending && deleteTarget === doc.id}
+                  >
+                    {deleteMutation.isPending && deleteTarget === doc.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Trash2 className="h-3.5 w-3.5" />}
+                  </button>
+                )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Delete confirmation */}
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-2xl shadow-xl p-6 w-80 space-y-4">
+              <p className="text-sm font-semibold text-slate-800">Delete this document?</p>
+              <p className="text-xs text-slate-500">This cannot be undone.</p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate(deleteTarget)}
+                >
+                  {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 

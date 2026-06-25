@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.accounts.views import UserPhotoView
 from .views import InstructorListView, UserViewSet, UserVisibilityView
 
 # Explicit URL patterns to avoid DRF router collision: both GET (list) and
@@ -24,4 +25,5 @@ urlpatterns = [
     path("users/<uuid:pk>", users_detail, name="users-detail"),
     path("users/<uuid:pk>/resend-invite", users_resend, name="users-resend-invite"),
     path("users/<uuid:pk>/visibility", UserVisibilityView.as_view(), name="users-visibility"),
+    path("users/<uuid:pk>/photo", UserPhotoView.as_view(), name="users-photo"),
 ]

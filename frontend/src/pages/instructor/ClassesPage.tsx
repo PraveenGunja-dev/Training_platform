@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, ArrowRight, Users, Plus } from 'lucide-react';
+import { CalendarDays, Clock, ArrowRight, Users, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
 import { formatDate } from '@/lib/dates';
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select';
 import { ErrorState } from '@/components/states/ErrorState';
 import type { ClassSession, ClassStatus } from '@/lib/types';
+
+const PAGE_SIZE = 50;
 
 const STATUS_CONFIG: Record<ClassStatus, {
   label:   string;
@@ -49,79 +51,72 @@ function ClassCard({ cls }: { cls: ClassSession }) {
   const attendanceLive = cls.active_session?.status === 'ACTIVE';
 
   return (
-    <>
-      <Link
-        to={`/instructor/classes/${cls.id}`}
-        className="group flex flex-col rounded-2xl border border-[#C5D8EC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden"
-      >
-        {/* Gradient header */}
-        <div className={`relative px-4 pt-4 pb-5 bg-gradient-to-br ${cfg.gradient} overflow-hidden`}>
-          <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
-          <div className="absolute -bottom-4 -right-2 w-14 h-14 rounded-full bg-white/8 pointer-events-none" />
+    <Link
+      to={`/instructor/classes/${cls.id}`}
+      className="group flex flex-col rounded-2xl border border-[#C5D8EC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+    >
+      <div className={`relative px-4 pt-4 pb-5 bg-gradient-to-br ${cfg.gradient} overflow-hidden`}>
+        <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
+        <div className="absolute -bottom-4 -right-2 w-14 h-14 rounded-full bg-white/8 pointer-events-none" />
 
-          {/* Status + group row */}
-          <div className="relative flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
-                {isLive && (
-                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-                  </span>
-                )}
-                {cfg.label}
-              </span>
-              {attendanceLive && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-500 text-white">
-                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-                  </span>
-                  Attendance
+        <div className="relative flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
+              {isLive && (
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
                 </span>
               )}
-            </div>
-            <span className="text-[11px] font-semibold text-white/80 bg-white/15 px-2 py-0.5 rounded-lg truncate max-w-[130px]">
-              {cls.group_name}
+              {cfg.label}
             </span>
-          </div>
-
-          {/* Title */}
-          <div className="relative">
-            <h3 className="font-bold text-white text-sm leading-snug line-clamp-2 group-hover:opacity-90 transition-opacity">
-              {cls.title}
-            </h3>
-            {cls.description && (
-              <p className="text-white/60 text-[11px] mt-1 line-clamp-1">{cls.description}</p>
+            {attendanceLive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-500 text-white">
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                </span>
+                Attendance
+              </span>
             )}
           </div>
+          <span className="text-[11px] font-semibold text-white/80 bg-white/15 px-2 py-0.5 rounded-lg truncate max-w-[130px]">
+            {cls.group_name}
+          </span>
         </div>
 
-        {/* Details body */}
-        <div className="flex flex-col flex-1 bg-white px-4 py-3.5 gap-2">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <CalendarDays className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="font-medium text-slate-700">{formatDate(cls.starts_at, 'EEE, dd MMM yyyy')}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span>{formatDate(cls.starts_at, 'h:mm a')} – {formatDate(cls.ends_at, 'h:mm a')}</span>
-          </div>
-          {(cls.participants_count ?? 0) > 0 && (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
-            </div>
+        <div className="relative">
+          <h3 className="font-bold text-white text-sm leading-snug line-clamp-2 group-hover:opacity-90 transition-opacity">
+            {cls.title}
+          </h3>
+          {cls.description && (
+            <p className="text-white/60 text-[11px] mt-1 line-clamp-1">{cls.description}</p>
           )}
-
-          <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
-              View <ArrowRight className="h-3 w-3" />
-            </span>
-          </div>
         </div>
-      </Link>
-    </>
+      </div>
+
+      <div className="flex flex-col flex-1 bg-white px-4 py-3.5 gap-2">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <CalendarDays className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+          <span className="font-medium text-slate-700">{formatDate(cls.starts_at, 'EEE, dd MMM yyyy')}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+          <span>{formatDate(cls.starts_at, 'h:mm a')} – {formatDate(cls.ends_at, 'h:mm a')}</span>
+        </div>
+        {(cls.participants_count ?? 0) > 0 && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
+            View <ArrowRight className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -146,6 +141,8 @@ export default function InstructorClassesPage() {
   const [selectedGroup, setSelectedGroup]   = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [scheduleOpen, setScheduleOpen]     = useState(false);
+  const [page, setPage]                     = useState(1);
+  const defaultGroupApplied = useRef(false);
 
   const canCreate = useCan('create', 'class');
 
@@ -153,35 +150,57 @@ export default function InstructorClassesPage() {
     queryKey: ['groups'],
     queryFn:  () => groupsApi.list(),
   });
-  const groups = groupsQuery.data?.data ?? [];
+
+  // Auto-select the group when instructor has exactly one assigned group
+  useEffect(() => {
+    if (defaultGroupApplied.current) return;
+    const groups = groupsQuery.data?.data ?? [];
+    if (groups.length === 0) return;
+    defaultGroupApplied.current = true;
+    if (groups.length === 1) {
+      setSelectedGroup(groups[0].id);
+    }
+  }, [groupsQuery.data]);
+
+  const countsQuery = useQuery({
+    queryKey: ['classes-counts', { group_id: selectedGroup }],
+    queryFn:  () => classesApi.counts({
+      group_id: selectedGroup !== 'all' ? selectedGroup : undefined,
+    }),
+    staleTime: 30_000,
+  });
+  const counts = countsQuery.data?.data;
 
   const classesQuery = useQuery({
-    queryKey: ['classes', { group_id: selectedGroup }],
+    queryKey: ['classes', { group_id: selectedGroup, status: selectedStatus, page }],
     queryFn:  () =>
       classesApi.list({
-        group_id: selectedGroup !== 'all' ? selectedGroup : undefined,
+        group_id:  selectedGroup  !== 'all' ? selectedGroup  : undefined,
+        status:    selectedStatus !== 'all' ? selectedStatus : undefined,
+        page,
+        page_size: PAGE_SIZE,
       }),
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
     staleTime: 0,
   });
 
-  const rawClasses = useMemo(() => classesQuery.data?.data ?? [], [classesQuery.data?.data]);
+  const rawClasses = classesQuery.data?.data ?? [];
+  const meta       = classesQuery.data?.meta;
+  const totalPages = meta ? Math.ceil(meta.total / PAGE_SIZE) : 1;
+  const classes    = useMemo(() => sortClasses(rawClasses), [rawClasses]);
 
-  const counts: Record<ClassStatus, number> = useMemo(() => ({
-    UPCOMING:  rawClasses.filter(c => c.status === 'UPCOMING').length,
-    ONGOING:   rawClasses.filter(c => c.status === 'ONGOING').length,
-    COMPLETED: rawClasses.filter(c => c.status === 'COMPLETED').length,
-    CANCELLED: rawClasses.filter(c => c.status === 'CANCELLED').length,
-  }), [rawClasses]);
-
-  const filtered = useMemo(
-    () => selectedStatus !== 'all' ? rawClasses.filter(c => c.status === selectedStatus) : rawClasses,
-    [rawClasses, selectedStatus],
-  );
-  const classes   = useMemo(() => sortClasses(filtered), [filtered]);
   const isLoading = groupsQuery.isLoading || classesQuery.isLoading;
   const isError   = groupsQuery.isError   || classesQuery.isError;
+
+  function handleGroupChange(val: string) {
+    setSelectedGroup(val);
+    setPage(1);
+  }
+  function handleStatusChange(val: string) {
+    setSelectedStatus(val);
+    setPage(1);
+  }
 
   const handleRetry = () => {
     if (groupsQuery.isError)  void groupsQuery.refetch();
@@ -203,11 +222,7 @@ export default function InstructorClassesPage() {
           </div>
         </div>
         {canCreate && (
-          <Button
-            onClick={() => setScheduleOpen(true)}
-            className="gap-1.5"
-            size="sm"
-          >
+          <Button onClick={() => setScheduleOpen(true)} className="gap-1.5" size="sm">
             <Plus className="h-4 w-4" />
             Schedule Class
           </Button>
@@ -223,25 +238,25 @@ export default function InstructorClassesPage() {
       )}
 
       {/* Stats strip */}
-      {!isLoading && !isError && (
+      {counts && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {((['ONGOING', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as ClassStatus[])).map(status => {
-            const cfg = STATUS_CONFIG[status];
-            const active = selectedStatus === status;
+          {(['ONGOING', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as ClassStatus[]).map(s => {
+            const cfg    = STATUS_CONFIG[s];
+            const active = selectedStatus === s;
             return (
               <button
-                key={status}
-                onClick={() => setSelectedStatus(active ? 'all' : status)}
+                key={s}
+                onClick={() => handleStatusChange(active ? 'all' : s)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
                   active
-                    ? `${STAT_BADGE[status]} border ring-2 ring-offset-1 ring-current`
+                    ? `${STAT_BADGE[s]} border ring-2 ring-offset-1 ring-current`
                     : 'bg-white border-[#C5D8EC] hover:border-blue-200 hover:bg-slate-50'
                 }`}
               >
                 <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
                 <div>
                   <p className="text-xs text-slate-500 leading-none mb-0.5">{cfg.label}</p>
-                  <p className="text-xl font-bold text-[#00285A] tabular-nums leading-none">{counts[status]}</p>
+                  <p className="text-xl font-bold text-[#00285A] tabular-nums leading-none">{counts[s]}</p>
                 </div>
               </button>
             );
@@ -251,19 +266,19 @@ export default function InstructorClassesPage() {
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap items-center">
-        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+        <Select value={selectedGroup} onValueChange={handleGroupChange}>
           <SelectTrigger className="w-52 bg-white border-[#C5D8EC]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All groups</SelectItem>
-            {groups.map(g => (
+            {(groupsQuery.data?.data ?? []).map(g => (
               <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+        <Select value={selectedStatus} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-40 bg-white border-[#C5D8EC]">
             <SelectValue />
           </SelectTrigger>
@@ -276,9 +291,9 @@ export default function InstructorClassesPage() {
           </SelectContent>
         </Select>
 
-        {!isLoading && !isError && (
+        {!isLoading && !isError && meta && (
           <span className="ml-auto text-sm text-slate-400">
-            {filtered.length} class{filtered.length !== 1 ? 'es' : ''}
+            {meta.total} class{meta.total !== 1 ? 'es' : ''}
           </span>
         )}
       </div>
@@ -305,6 +320,34 @@ export default function InstructorClassesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {classes.map(cls => <ClassCard key={cls.id} cls={cls} />)}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && !isError && totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          <span className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+            {meta && <span className="text-slate-400"> · {meta.total} total</span>}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         </div>
       )}
     </div>

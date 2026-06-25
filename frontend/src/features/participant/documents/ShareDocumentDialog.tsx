@@ -67,27 +67,14 @@ export function ShareDocumentDialog({ open, onClose, permittedGroups }: Props) {
     if (!file || !title.trim() || !groupId) return;
     setUploading(true);
     try {
-      // 1. Get presigned upload URL
-      const urlRes = await documentsApi.getSharedUploadUrl(groupId, file.name, file.type || 'application/octet-stream');
-      const { upload_url, blob_name } = urlRes.data;
+      // Single multipart upload — submit shared doc for admin review
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('title', title.trim());
+      fd.append('suggested_visibility', visibility);
+      fd.append('suggested_user_ids', JSON.stringify([]));
 
-      // 2. PUT file to storage
-      const uploadRes = await fetch(upload_url, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      });
-      if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`);
-
-      // 3. Submit shared doc for admin review
-      await documentsApi.submitSharedUpload(groupId, {
-        title: title.trim(),
-        file_url: blob_name,
-        file_name: file.name,
-        file_type: file.type || 'application/octet-stream',
-        file_size: file.size,
-        suggested_visibility: visibility,
-      });
+      await documentsApi.submitSharedUpload(groupId, fd);
 
       void queryClient.invalidateQueries({ queryKey: ['my-shared-uploads'] });
       toast.success('Document submitted for review. Admin will approve or reject it shortly.');

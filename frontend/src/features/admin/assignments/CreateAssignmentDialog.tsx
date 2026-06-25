@@ -51,7 +51,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'saving'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'saving'>('idle');
 
   const form = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentSchema),
@@ -125,39 +125,18 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
 
   const mutation = useMutation({
     mutationFn: async (values: AssignmentFormValues) => {
-      let questionFileUrl  = '';
-      let questionFileName = '';
-      let questionFileType = '';
-      let questionFileSize: number | undefined;
-
       if (pendingFile) {
-        // Validate file type and size before consuming a presigned URL slot
+        // Validate file before upload
         const validation = validateFile(pendingFile);
         if (!validation.ok) {
           toast.error(validation.error);
           setUploadProgress('idle');
           return;
         }
-        setUploadProgress('uploading');
-        const urlRes = await assignmentsApi.getQuestionUploadUrl(
-          pendingFile.name,
-          pendingFile.type || 'application/octet-stream',
-        );
-        const { upload_url, blob_name } = urlRes.data;
-        const uploadRes = await fetch(upload_url, {
-          method: 'PUT',
-          body: pendingFile,
-          headers: { 'Content-Type': pendingFile.type || 'application/octet-stream' },
-        });
-        if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`);
-        questionFileUrl  = blob_name;
-        questionFileName = pendingFile.name;
-        questionFileType = pendingFile.type || 'application/octet-stream';
-        questionFileSize = pendingFile.size;
       }
 
       setUploadProgress('saving');
-      return assignmentsApi.create({
+      const taskResult = await assignmentsApi.create({
         group_id:         values.group_id,
         class_id:         values.class_id || undefined,
         title:            values.title,
@@ -168,14 +147,15 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
         deadline_at:      new Date(values.deadline_at).toISOString(),
         late_policy:      values.late_policy,
         reminder_offsets: values.reminder_offsets,
-        sub_group_id: values.sub_group_id || null,
-        ...(questionFileUrl ? {
-          question_file_url:  questionFileUrl,
-          question_file_name: questionFileName,
-          question_file_type: questionFileType,
-          question_file_size: questionFileSize,
-        } : {}),
+        sub_group_id:     values.sub_group_id || null,
       });
+
+      if (pendingFile && taskResult?.data?.id) {
+        setUploadProgress('saving');
+        await assignmentsApi.uploadQuestionFile(taskResult.data.id, pendingFile);
+      }
+
+      return taskResult;
     },
     onSuccess: (_, values) => {
       void queryClient.invalidateQueries({ queryKey: ['assignments'] });
@@ -194,8 +174,7 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
   const isSubmitting = mutation.isPending;
 
   const progressLabel =
-    uploadProgress === 'uploading' ? 'Uploading question file…' :
-    uploadProgress === 'saving'    ? 'Creating assignment…'     : '';
+    uploadProgress === 'saving' ? 'Creating assignment…' : '';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>

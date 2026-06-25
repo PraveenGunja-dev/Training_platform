@@ -35,7 +35,13 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
 
     def get_instructors(self, obj: ClassGroup) -> list:
         return [
-            {"id": str(gi.instructor.id), "full_name": gi.instructor.full_name, "email": gi.instructor.email}
+            {
+                "id": str(gi.instructor.id),
+                "full_name": gi.instructor.full_name,
+                "email": gi.instructor.email,
+                "employee_code": gi.instructor.employee_code or "",
+                "business_unit": gi.instructor.business_unit or "",
+            }
             for gi in obj.instructors.select_related("instructor").all()
         ]
 
@@ -48,16 +54,46 @@ class ClassGroupDetailSerializer(ClassGroupListSerializer):
         fields = ClassGroupListSerializer.Meta.fields + ["participants", "group_admin"]
 
     def get_participants(self, obj: ClassGroup) -> list:
-        return [
-            {
+        from apps.attendance.models import AttendanceRecord, AttendanceSession  # noqa: PLC0415
+        from apps.assignments.models import AssignmentTask, Submission  # noqa: PLC0415
+        from django.db.models import Count  # noqa: PLC0415
+
+        total_sessions = AttendanceSession.objects.filter(class_obj__group=obj).count()
+        open_tasks = AssignmentTask.objects.filter(group=obj, is_open=True).count()
+
+        attendance_map = dict(
+            AttendanceRecord.objects.filter(session__class_obj__group=obj)
+            .values("user_id")
+            .annotate(n=Count("id"))
+            .values_list("user_id", "n")
+        )
+        submission_map = dict(
+            Submission.objects.filter(task__group=obj)
+            .values("user_id", "task_id")
+            .distinct()
+            .values("user_id")
+            .annotate(n=Count("task_id", distinct=True))
+            .values_list("user_id", "n")
+        )
+
+        result = []
+        for m in obj.memberships.all():
+            attended = attendance_map.get(m.user_id, 0)
+            att_rate = round(min(attended / total_sessions * 100, 100), 1) if total_sessions else 0.0
+            submitted = submission_map.get(m.user_id, 0)
+            sub_rate = round(min(submitted / open_tasks * 100, 100), 1) if open_tasks else 0.0
+            result.append({
                 "id": str(m.user_id),
                 "full_name": m.user.full_name,
                 "email": m.user.email,
                 "role": m.user.role,
                 "is_active": m.user.is_active,
-            }
-            for m in obj.memberships.all()
-        ]
+                "employee_code": m.user.employee_code or "",
+                "business_unit": m.user.business_unit or "",
+                "attendance_rate": att_rate,
+                "submission_rate": sub_rate,
+            })
+        return result
 
     def get_group_admin(self, obj: ClassGroup):
         try:
@@ -96,6 +132,7 @@ class GroupInstructorAssignSerializer(serializers.Serializer):
     """Write serializer — bulk assign instructors to a group by user IDs."""
 
     user_ids = serializers.ListField(child=serializers.UUIDField(), min_length=1)
+    promote_participants = serializers.BooleanField(default=False, required=False)
 
     def validate_user_ids(self, value: list) -> list:
         found = User.objects.filter(id__in=value)
@@ -103,13 +140,27 @@ class GroupInstructorAssignSerializer(serializers.Serializer):
         missing = [uid for uid in value if uid not in found_ids]
         if missing:
             raise serializers.ValidationError(f"Users not found: {missing}.")
-        non_instructors = found.exclude(role="INSTRUCTOR")
-        if non_instructors.exists():
-            emails = list(non_instructors.values_list("email", flat=True))
-            raise serializers.ValidationError(
-                f"The following users do not have the INSTRUCTOR role: {', '.join(emails)}."
-            )
         return value
+
+    def validate(self, attrs):
+        promote = attrs.get("promote_participants", False)
+        user_ids = attrs.get("user_ids", [])
+        found = User.objects.filter(id__in=user_ids)
+        if promote:
+            blocked = found.filter(role__in=["ADMIN", "GROUP_ADMIN"])
+            if blocked.exists():
+                emails = list(blocked.values_list("email", flat=True))
+                raise serializers.ValidationError(
+                    {"user_ids": f"Cannot assign ADMIN or GROUP_ADMIN users as instructors: {', '.join(emails)}."}
+                )
+        else:
+            non_instructors = found.exclude(role="INSTRUCTOR")
+            if non_instructors.exists():
+                emails = list(non_instructors.values_list("email", flat=True))
+                raise serializers.ValidationError(
+                    {"user_ids": f"The following users do not have the INSTRUCTOR role: {', '.join(emails)}."}
+                )
+        return attrs
 
 
 class SubGroupSerializer(serializers.ModelSerializer):

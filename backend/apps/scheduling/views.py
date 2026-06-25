@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -90,16 +91,35 @@ class ClassViewSet(ViewSet):
                         ),
                     )
                 )
+        elif request.user.role == "GROUP_ADMIN":
+            from apps.groups.models import GroupAdmin  # noqa: PLC0415
+            managed_ids = GroupAdmin.objects.filter(admin=request.user).values_list("group_id", flat=True)
+            qs = qs.filter(group_id__in=managed_ids)
         return qs
 
     def list(self, request: Request) -> Response:
+        # Silently correct class statuses on every admin list call (no-op when already correct).
+        if request.user.role == "ADMIN":
+            now = timezone.now()
+            # Step 1: currently running → ONGOING
+            Class.objects.filter(
+                starts_at__lte=now, ends_at__gte=now,
+            ).exclude(status_cached=Class.STATUS_ONGOING).exclude(
+                status_cached=Class.STATUS_CANCELLED,
+            ).update(status_cached=Class.STATUS_ONGOING)
+            # Step 2: fully ended (covers UPCOMING and ONGOING that ran past ends_at) → COMPLETED
+            Class.objects.filter(
+                ends_at__lt=now,
+            ).exclude(status_cached=Class.STATUS_COMPLETED).exclude(
+                status_cached=Class.STATUS_CANCELLED,
+            ).update(status_cached=Class.STATUS_COMPLETED)
         qs = self._scoped_queryset(request)
         qs = apply_class_filters(qs, request.query_params)
         context: dict = {"request": request}
         if request.user.role == "INSTRUCTOR":
             context["assigned_group_ids"] = _instructor_assigned_ids(request.user)
         try:
-            page_size = min(int(request.query_params.get("page_size", 50)), 200)
+            page_size = min(int(request.query_params.get("page_size", 50)), 1000)
             page = max(int(request.query_params.get("page", 1)), 1)
         except (ValueError, TypeError):
             page_size, page = 50, 1
@@ -503,3 +523,61 @@ class ClassActivityView(APIView):
         )
 
         return Response({"data": AuditLogSerializer(entries, many=True).data})
+
+
+@extend_schema(exclude=True)
+class ClassCountsView(APIView):
+    """GET /classes/counts — per-status counts scoped to the caller's role."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from django.db.models import Count  # noqa: PLC0415
+        qs = Class.objects.all()
+        if request.user.role == "PARTICIPANT":
+            qs = qs.filter(group__memberships__user=request.user).distinct()
+        elif request.user.role == "INSTRUCTOR":
+            from apps.common.scoping import instructor_class_qs  # noqa: PLC0415
+            qs = instructor_class_qs(request.user)
+        elif request.user.role == "GROUP_ADMIN":
+            from apps.groups.models import GroupAdmin  # noqa: PLC0415
+            managed_ids = GroupAdmin.objects.filter(admin=request.user).values_list("group_id", flat=True)
+            qs = qs.filter(group_id__in=managed_ids)
+        group_id = request.query_params.get("group_id")
+        if group_id:
+            qs = qs.filter(group_id=group_id)
+        rows = qs.values("status_cached").annotate(n=Count("id"))
+        result = {r["status_cached"]: r["n"] for r in rows}
+        past_upcoming = qs.filter(status_cached=Class.STATUS_UPCOMING, starts_at__lt=timezone.now()).count()
+        return Response({"data": {
+            "UPCOMING":      result.get("UPCOMING",  0),
+            "ONGOING":       result.get("ONGOING",   0),
+            "COMPLETED":     result.get("COMPLETED", 0),
+            "CANCELLED":     result.get("CANCELLED", 0),
+            "past_upcoming": past_upcoming,
+        }})
+
+
+@extend_schema(exclude=True)
+class MarkPastClassesCompletedView(APIView):
+    """POST /admin/classes/mark-past-completed — bulk-complete all past UPCOMING classes."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        if request.user.role != "ADMIN":
+            return Response(
+                {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        now = timezone.now()
+        updated = Class.objects.filter(
+            status_cached=Class.STATUS_UPCOMING,
+            starts_at__lt=now,
+        ).update(status_cached=Class.STATUS_COMPLETED)
+        log_action(
+            actor=request.user,
+            action="class.bulk_completed",
+            target_type="Class",
+            target_id=None,
+            metadata={"updated_count": updated},
+        )
+        return Response({"data": {"updated": updated}})

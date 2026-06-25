@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap } from 'lucide-react';
+import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
 import { formatDate } from '@/lib/dates';
@@ -12,6 +12,8 @@ import {
 import { ScheduleClassDialog } from '@/features/admin/scheduling/ScheduleClassDialog';
 import { ErrorState } from '@/components/states/ErrorState';
 import type { ClassSession, ClassStatus } from '@/lib/types';
+
+const PAGE_SIZE = 50;
 
 const STATUS_CONFIG: Record<ClassStatus, {
   label:   string;
@@ -48,96 +50,101 @@ function ClassCard({ cls }: { cls: ClassSession }) {
   const attendanceLive = cls.active_session?.status === 'ACTIVE';
 
   return (
-    <>
-      <Link
-        to={`/admin/classes/${cls.id}`}
-        className="group flex flex-col rounded-2xl border border-[#C5D8EC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden"
-      >
-        {/* ── Gradient header ─────────────────────────────────────────── */}
-        <div className={`relative px-4 pt-4 pb-5 bg-gradient-to-br ${cfg.gradient} overflow-hidden`}>
-          {/* Decorative circles */}
-          <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
-          <div className="absolute -bottom-4 -right-2 w-14 h-14 rounded-full bg-white/8 pointer-events-none" />
+    <Link
+      to={`/admin/classes/${cls.id}`}
+      className="group flex flex-col rounded-2xl border border-[#C5D8EC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden"
+    >
+      <div className={`relative px-4 pt-4 pb-5 bg-gradient-to-br ${cfg.gradient} overflow-hidden`}>
+        <div className="absolute -top-5 -right-5 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
+        <div className="absolute -bottom-4 -right-2 w-14 h-14 rounded-full bg-white/8 pointer-events-none" />
 
-          {/* Status + group row */}
-          <div className="relative flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
-                {isLive && (
-                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-                  </span>
-                )}
-                {cfg.label}
-              </span>
-              {attendanceLive && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-500 text-white">
-                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-                  </span>
-                  Attendance
+        <div className="relative flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
+              {isLive && (
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
                 </span>
               )}
-            </div>
-            <span className="text-[11px] font-semibold text-white/80 bg-white/15 px-2 py-0.5 rounded-lg truncate max-w-[130px]">
-              {cls.group_name}
+              {cfg.label}
             </span>
-          </div>
-
-          {/* Title */}
-          <div className="relative">
-            <h3 className="font-bold text-white text-sm leading-snug line-clamp-2 group-hover:opacity-90 transition-opacity">
-              {cls.title}
-            </h3>
-            {cls.description && (
-              <p className="text-white/60 text-[11px] mt-1 line-clamp-1">{cls.description}</p>
+            {attendanceLive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-500 text-white">
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                </span>
+                Attendance
+              </span>
             )}
           </div>
+          <span className="text-[11px] font-semibold text-white/80 bg-white/15 px-2 py-0.5 rounded-lg truncate max-w-[130px]">
+            {cls.group_name}
+          </span>
         </div>
 
-        {/* ── Details body ────────────────────────────────────────────── */}
-        <div className="flex flex-col flex-1 bg-white px-4 py-3.5 gap-2">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <CalendarDays className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="font-medium text-slate-700">{formatDate(cls.starts_at, 'EEE, dd MMM yyyy')}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span>{formatDate(cls.starts_at, 'h:mm a')} – {formatDate(cls.ends_at, 'h:mm a')}</span>
-          </div>
-          {(cls.participants_count ?? 0) > 0 && (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
-            </div>
+        <div className="relative">
+          <h3 className="font-bold text-white text-sm leading-snug line-clamp-2 group-hover:opacity-90 transition-opacity">
+            {cls.title}
+          </h3>
+          {cls.description && (
+            <p className="text-white/60 text-[11px] mt-1 line-clamp-1">{cls.description}</p>
           )}
-
-          <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
-              View <ArrowRight className="h-3 w-3" />
-            </span>
-          </div>
         </div>
-      </Link>
-    </>
+      </div>
+
+      <div className="flex flex-col flex-1 bg-white px-4 py-3.5 gap-2">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <CalendarDays className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+          <span className="font-medium text-slate-700">{formatDate(cls.starts_at, 'EEE, dd MMM yyyy')}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+          <span>{formatDate(cls.starts_at, 'h:mm a')} – {formatDate(cls.ends_at, 'h:mm a')}</span>
+        </div>
+        {(cls.participants_count ?? 0) > 0 && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
+            View <ArrowRight className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
-function CardsSkeleton() {
+function ClassesLoader() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="rounded-2xl border border-[#C5D8EC] overflow-hidden animate-pulse">
-          <div className="h-24 bg-slate-200" />
-          <div className="bg-white p-4 space-y-2.5">
-            <div className="h-3 w-full bg-slate-100 rounded" />
-            <div className="h-3 w-2/3 bg-slate-100 rounded" />
-            <div className="h-3 w-1/2 bg-slate-100 rounded" />
+    <div className="relative bg-white rounded-2xl border border-[#C5D8EC] shadow-sm overflow-hidden">
+      <div className="h-1 bg-gradient-to-r from-[#0052A5] to-[#E31837]" />
+      <div className="flex flex-col items-center justify-center py-24 gap-5">
+        <div className="relative w-20 h-20">
+          <div className="absolute inset-0 rounded-full border-[3px] border-[#EBF3FB]" />
+          <div className="absolute inset-0 rounded-full border-[3px] border-t-[#0052A5] border-r-[#0052A5] border-b-transparent border-l-transparent animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <CalendarDays className="h-7 w-7 text-[#0052A5]" />
           </div>
         </div>
-      ))}
+        <div className="text-center space-y-1">
+          <p className="text-sm font-bold text-[#00285A]">Loading Classes</p>
+          <p className="text-xs text-slate-500">Fetching all class sessions…</p>
+        </div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-[#0052A5] animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -146,6 +153,19 @@ export default function AdminClassesPage() {
   const [selectedGroup, setSelectedGroup]   = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [scheduleOpen, setScheduleOpen]     = useState(false);
+  const [page, setPage]                     = useState(1);
+  const [searchInput, setSearchInput]       = useState('');
+  const [searchQuery, setSearchQuery]       = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setPage(1);
+    }, 350);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchInput]);
 
   const groupsQuery = useQuery({
     queryKey: ['groups'],
@@ -153,33 +173,48 @@ export default function AdminClassesPage() {
   });
   const groups = groupsQuery.data?.data ?? [];
 
+  // Lightweight counts — single GROUP BY, used for stats strip
+  const countsQuery = useQuery({
+    queryKey: ['classes-counts', { group_id: selectedGroup }],
+    queryFn:  () => classesApi.counts({
+      group_id: selectedGroup !== 'all' ? selectedGroup : undefined,
+    }),
+    staleTime: 30_000,
+  });
+  const counts = countsQuery.data?.data;
+
+  // Paginated list with server-side status + search filter
   const classesQuery = useQuery({
-    queryKey: ['classes', { group_id: selectedGroup }],
+    queryKey: ['classes', { group_id: selectedGroup, status: selectedStatus, search: searchQuery, page }],
     queryFn:  () =>
       classesApi.list({
-        group_id: selectedGroup !== 'all' ? selectedGroup : undefined,
+        group_id:  selectedGroup  !== 'all' ? selectedGroup  : undefined,
+        status:    selectedStatus !== 'all' ? selectedStatus : undefined,
+        search:    searchQuery || undefined,
+        page,
+        page_size: PAGE_SIZE,
       }),
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
     staleTime: 0,
   });
 
-  const rawClasses = useMemo(() => classesQuery.data?.data ?? [], [classesQuery.data?.data]);
+  const rawClasses = classesQuery.data?.data ?? [];
+  const meta       = classesQuery.data?.meta;
+  const totalPages = meta ? Math.ceil(meta.total / PAGE_SIZE) : 1;
+  const classes    = useMemo(() => sortClasses(rawClasses), [rawClasses]);
 
-  const counts: Record<ClassStatus, number> = useMemo(() => ({
-    UPCOMING:  rawClasses.filter(c => c.status === 'UPCOMING').length,
-    ONGOING:   rawClasses.filter(c => c.status === 'ONGOING').length,
-    COMPLETED: rawClasses.filter(c => c.status === 'COMPLETED').length,
-    CANCELLED: rawClasses.filter(c => c.status === 'CANCELLED').length,
-  }), [rawClasses]);
+  const isLoading  = classesQuery.isPending;
+  const isError    = groupsQuery.isError || classesQuery.isError;
 
-  const filtered = useMemo(
-    () => selectedStatus !== 'all' ? rawClasses.filter(c => c.status === selectedStatus) : rawClasses,
-    [rawClasses, selectedStatus],
-  );
-  const classes   = useMemo(() => sortClasses(filtered), [filtered]);
-  const isLoading = groupsQuery.isLoading || classesQuery.isLoading;
-  const isError   = groupsQuery.isError   || classesQuery.isError;
+  function handleGroupChange(val: string) {
+    setSelectedGroup(val);
+    setPage(1);
+  }
+  function handleStatusChange(val: string) {
+    setSelectedStatus(val);
+    setPage(1);
+  }
 
   const handleRetry = () => {
     if (groupsQuery.isError)  void groupsQuery.refetch();
@@ -189,7 +224,7 @@ export default function AdminClassesPage() {
   return (
     <div className="space-y-6">
 
-      {/* ── Page header ──────────────────────────────────────────────── */}
+      {/* Page header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 flex-shrink-0">
@@ -200,35 +235,32 @@ export default function AdminClassesPage() {
             <p className="text-sm text-slate-500">All class sessions across all groups.</p>
           </div>
         </div>
-        <Button
-          onClick={() => setScheduleOpen(true)}
-          className="flex-shrink-0"
-        >
+        <Button onClick={() => setScheduleOpen(true)} className="flex-shrink-0">
           <Plus className="h-4 w-4 mr-1.5" />
           Schedule Class
         </Button>
       </div>
 
-      {/* ── Stats strip ──────────────────────────────────────────────── */}
-      {!isLoading && !isError && (
+      {/* Stats strip — accurate totals from /classes/counts */}
+      {counts && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {((['ONGOING', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as ClassStatus[])).map(status => {
-            const cfg = STATUS_CONFIG[status];
-            const active = selectedStatus === status;
+          {(['ONGOING', 'UPCOMING', 'COMPLETED', 'CANCELLED'] as ClassStatus[]).map(s => {
+            const cfg    = STATUS_CONFIG[s];
+            const active = selectedStatus === s;
             return (
               <button
-                key={status}
-                onClick={() => setSelectedStatus(active ? 'all' : status)}
+                key={s}
+                onClick={() => handleStatusChange(active ? 'all' : s)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
                   active
-                    ? `${STAT_BADGE[status]} border ring-2 ring-offset-1 ring-current`
+                    ? `${STAT_BADGE[s]} border ring-2 ring-offset-1 ring-current`
                     : 'bg-white border-[#C5D8EC] hover:border-blue-200 hover:bg-slate-50'
                 }`}
               >
                 <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
                 <div>
                   <p className="text-xs text-slate-500 leading-none mb-0.5">{cfg.label}</p>
-                  <p className="text-xl font-bold text-[#00285A] tabular-nums leading-none">{counts[status]}</p>
+                  <p className="text-xl font-bold text-[#00285A] tabular-nums leading-none">{counts[s]}</p>
                 </div>
               </button>
             );
@@ -236,9 +268,29 @@ export default function AdminClassesPage() {
         </div>
       )}
 
-      {/* ── Filters ──────────────────────────────────────────────────── */}
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="Search classes by name…"
+          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#C5D8EC] bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0052A5]/30 focus:border-[#0052A5] transition-all shadow-sm"
+        />
+        {searchInput && (
+          <button
+            onClick={() => setSearchInput('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
       <div className="flex gap-3 flex-wrap items-center">
-        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+        <Select value={selectedGroup} onValueChange={handleGroupChange}>
           <SelectTrigger className="w-52 bg-white border-[#C5D8EC]">
             <SelectValue />
           </SelectTrigger>
@@ -250,7 +302,7 @@ export default function AdminClassesPage() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+        <Select value={selectedStatus} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-40 bg-white border-[#C5D8EC]">
             <SelectValue />
           </SelectTrigger>
@@ -263,16 +315,16 @@ export default function AdminClassesPage() {
           </SelectContent>
         </Select>
 
-        {!isLoading && !isError && (
+        {!isLoading && !isError && meta && (
           <span className="ml-auto text-sm text-slate-400">
-            {filtered.length} class{filtered.length !== 1 ? 'es' : ''}
+            {meta.total} class{meta.total !== 1 ? 'es' : ''}
           </span>
         )}
       </div>
 
-      {/* ── Cards grid ───────────────────────────────────────────────── */}
+      {/* Cards grid */}
       {isLoading ? (
-        <CardsSkeleton />
+        <ClassesLoader />
       ) : isError ? (
         <ErrorState title="Failed to load classes" onRetry={handleRetry} />
       ) : classes.length === 0 ? (
@@ -283,17 +335,15 @@ export default function AdminClassesPage() {
           <div>
             <p className="text-sm font-semibold text-slate-700">No classes found</p>
             <p className="text-xs text-slate-400 mt-1">
-              {selectedGroup !== 'all' || selectedStatus !== 'all'
+              {searchQuery
+                ? `No classes matching "${searchQuery}".`
+                : selectedGroup !== 'all' || selectedStatus !== 'all'
                 ? 'Try adjusting your filters.'
                 : 'No classes scheduled yet.'}
             </p>
           </div>
           {selectedGroup === 'all' && selectedStatus === 'all' && (
-            <Button
-              size="sm"
-              onClick={() => setScheduleOpen(true)}
-              className="mt-1"
-            >
+            <Button size="sm" onClick={() => setScheduleOpen(true)} className="mt-1">
               <Zap className="h-3.5 w-3.5 mr-1.5" />
               Schedule your first class
             </Button>
@@ -305,12 +355,41 @@ export default function AdminClassesPage() {
         </div>
       )}
 
+      {/* Pagination */}
+      {!isLoading && !isError && totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+          <span className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+            {meta && <span className="text-slate-400"> · {meta.total} total</span>}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
       <ScheduleClassDialog
         open={scheduleOpen}
         onClose={() => setScheduleOpen(false)}
         groups={groups}
         defaultGroupId={selectedGroup !== 'all' ? selectedGroup : groups[0]?.id}
       />
+
     </div>
   );
 }

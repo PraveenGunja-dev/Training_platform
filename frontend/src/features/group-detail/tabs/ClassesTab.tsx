@@ -48,6 +48,10 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
     ? classes.filter(c => c.sub_group_id === subGroupFilter)
     : classes;
 
+  const now = new Date();
+  const isPastUpcoming = (c: { status: string; starts_at: string }) =>
+    c.status === 'UPCOMING' && new Date(c.starts_at) < now;
+
   return (
     <>
       <div className="mt-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -106,7 +110,7 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
               {filtered.map(c => (
                 <TableRow
                   key={c.id}
-                  className={isStaff ? 'cursor-pointer hover:bg-slate-50' : ''}
+                  className={`${isStaff ? 'cursor-pointer' : ''} ${isPastUpcoming(c) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'}`}
                   onClick={() => {
                     if (isAdmin) navigate(`/admin/classes/${c.id}`);
                     else if (isInstructor) navigate(`/instructor/classes/${c.id}`);
@@ -120,9 +124,16 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
                     {formatDate(c.starts_at, 'h:mm a')} – {formatDate(c.ends_at, 'h:mm a')}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANTS[c.status] ?? 'secondary'}>
-                      {c.status.charAt(0) + c.status.slice(1).toLowerCase()}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant={STATUS_VARIANTS[c.status] ?? 'secondary'}>
+                        {c.status.charAt(0) + c.status.slice(1).toLowerCase()}
+                      </Badge>
+                      {isPastUpcoming(c) && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">
+                          Past
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   {isStaff && (
                     <TableCell>

@@ -15,7 +15,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "role", "is_active", "created_at", "last_login", "must_change_password", "groups", "admin_of_group", "business_unit", "grade_code", "department", "employee_code"]
+        fields = ["id", "email", "full_name", "role", "is_active", "created_at", "last_login", "must_change_password", "groups", "admin_of_group", "business_unit", "grade_code", "department", "employee_code", "can_view_all_classes"]
 
     def get_groups(self, obj: User) -> list:
         return list(

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, UserPlus, Trash2, UserCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -155,16 +156,28 @@ function AddParticipantsDialog({ open, onClose, groupId, existingIds }: AddParti
 interface ParticipantsTabProps {
   groupId: string;
   participants: GroupParticipant[];
+  groupName?: string;
 }
 
-export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps) {
+export function ParticipantsTab({ groupId, participants, groupName }: ParticipantsTabProps) {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [subGroupFilter, setSubGroupFilter] = useState<string>('');
 
   const isAdmin = user?.role === 'ADMIN';
+
+  function handleParticipantClick(p: GroupParticipant) {
+    if (user?.role === 'ADMIN') {
+      navigate(`/admin/users/${p.id}`);
+    } else if (user?.role === 'INSTRUCTOR') {
+      navigate(`/instructor/participants/${p.id}`, { state: { participant: p, groupName } });
+    } else if (user?.role === 'GROUP_ADMIN') {
+      navigate(`/group-admin/participants/${p.id}`, { state: { participant: p, groupName } });
+    }
+  }
 
   const { data: subGroupsData } = useQuery({
     queryKey: ['sub-groups', groupId],
@@ -246,13 +259,15 @@ export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps)
                 <TableHead>Status</TableHead>
                 <TableHead>Attendance</TableHead>
                 <TableHead>Submissions</TableHead>
-                {isAdmin && <TableHead />}
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map(p => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.full_name}</TableCell>
+                <TableRow key={p.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => handleParticipantClick(p)}>
+                  <TableCell>
+                    <span className="font-medium text-[#0052A5] hover:underline">{p.full_name}</span>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{p.email}</TableCell>
                   <TableCell>
                     <Badge variant={p.is_active ? 'success' : 'secondary'}>
@@ -269,8 +284,8 @@ export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps)
                       {p.submission_rate}%
                     </span>
                   </TableCell>
-                  {isAdmin && (
-                    <TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
+                    {isAdmin && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -280,8 +295,8 @@ export function ParticipantsTab({ groupId, participants }: ParticipantsTabProps)
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </TableCell>
-                  )}
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

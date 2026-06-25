@@ -2,6 +2,8 @@ import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, Download, Eye, MessageSquare, Upload, FileText } from 'lucide-react';
 import { submissionsApi } from '@/api/submissions';
+import { assignmentsApi } from '@/api/assignments';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -174,10 +176,19 @@ export function SubmissionsTable({ taskId, latePolicy, participants, taskTitle =
                           <Button size="sm" variant="ghost" onClick={() => setPreview(sub)} title="Preview">
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" asChild title="Download">
-                            <a href={sub.file_url} download={sub.file_name}>
-                              <Download className="h-3.5 w-3.5" />
-                            </a>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Download"
+                            onClick={async () => {
+                              try {
+                                await assignmentsApi.downloadSubmission(sub.id, sub.file_name);
+                              } catch {
+                                toast.error('Could not download file.');
+                              }
+                            }}
+                          >
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             size="sm"

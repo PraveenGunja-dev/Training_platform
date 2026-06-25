@@ -67,7 +67,7 @@ function DeleteDocDialog({
 export function DocumentsTab({ groupId }: { groupId: string }) {
   const { user } = useAuthStore();
   const qc = useQueryClient();
-  const isAdmin = user?.role === 'ADMIN';
+  const canManageDocs = ['ADMIN', 'INSTRUCTOR', 'GROUP_ADMIN'].includes(user?.role ?? '');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const [subGroupFilter, setSubGroupFilter] = useState('__all__');
@@ -92,13 +92,12 @@ export function DocumentsTab({ groupId }: { groupId: string }) {
 
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const handleDownload = useCallback(async (id: string) => {
-    setDownloadingId(id);
+  const handleDownload = useCallback(async (doc: Document) => {
+    setDownloadingId(doc.id);
     try {
-      const res = await documentsApi.download(id);
-      window.open(res.data.download_url, '_blank', 'noreferrer');
+      await documentsApi.download(doc.id, doc.file_name);
     } catch {
-      toast.error('Failed to get download link.');
+      toast.error('Failed to download file.');
     } finally {
       setDownloadingId(null);
     }
@@ -150,7 +149,7 @@ export function DocumentsTab({ groupId }: { groupId: string }) {
                 </SelectContent>
               </Select>
             )}
-            {isAdmin && (
+            {canManageDocs && (
               <Button size="sm" onClick={() => setUploadOpen(true)}>
                 <Upload className="h-4 w-4 mr-1.5" />
                 Upload Document
@@ -199,13 +198,13 @@ export function DocumentsTab({ groupId }: { groupId: string }) {
                     size="sm"
                     aria-label="Download"
                     disabled={downloadingId === doc.id}
-                    onClick={() => handleDownload(doc.id)}
+                    onClick={() => handleDownload(doc)}
                   >
                     {downloadingId === doc.id
                       ? <Loader2 className="h-4 w-4 animate-spin" />
                       : <Download className="h-4 w-4" />}
                   </Button>
-                  {isAdmin && (
+                  {canManageDocs && (
                     <Button
                       variant="ghost"
                       size="sm"

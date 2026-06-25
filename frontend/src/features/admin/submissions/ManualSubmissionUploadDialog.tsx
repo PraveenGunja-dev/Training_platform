@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { submissionsApi } from '@/api/submissions';
+import { assignmentsApi } from '@/api/assignments';
 import type { GroupParticipant } from '@/lib/types';
 
 const ALLOWED_TYPES = ['application/pdf', 'application/msword',
@@ -42,11 +42,7 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
 
   const mutation = useMutation({
     mutationFn: async (vals: FormValues) => {
-      const fd = new FormData();
-      fd.append('file', vals.file);
-      fd.append('note', vals.note ?? '');
-      fd.append('submitted_for', vals.participant_id);
-      return submissionsApi.submit(taskId, fd);
+      return assignmentsApi.submitAssignment(taskId, vals.file, vals.note ?? '', vals.participant_id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['submissions', taskId] });

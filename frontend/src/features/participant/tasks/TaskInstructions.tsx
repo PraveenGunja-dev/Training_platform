@@ -40,16 +40,15 @@ export function TaskInstructions({ task }: TaskInstructionsProps) {
   const handleDownloadQuestionFile = async () => {
     setDownloading(true);
     try {
-      const res = await assignmentsApi.getQuestionDownloadUrl(task.id);
-      window.open(res.data.download_url, '_blank');
+      await assignmentsApi.downloadQuestionFile(task.id, task.question_file_name ?? 'question-file');
     } catch {
-      toast.error('Could not get download link. Please try again.');
+      toast.error('Could not download question file. Please try again.');
     } finally {
       setDownloading(false);
     }
   };
 
-  const hasQuestionFile = !!task.question_file_url;
+  const hasQuestionFile = !!task.question_file_name;
 
   return (
     <div className="space-y-4">

@@ -2,7 +2,8 @@ from datetime import timedelta
 from typing import Literal, cast
 
 from django.conf import settings
-import os
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -314,38 +315,31 @@ class MePhotoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}.get(photo.content_type, "jpg")
-        blob_name = f"photos/{request.user.id}/avatar.{ext}"
         content = photo.read()
+        user = request.user
+        user.photo_data = content  # type: ignore[attr-defined]
+        user.photo_content_type = photo.content_type  # type: ignore[attr-defined]
+        user.photo_url = f"/api/v1/users/{user.id}/photo"  # type: ignore[attr-defined]
+        user.save(update_fields=["photo_data", "photo_content_type", "photo_url"])  # type: ignore[attr-defined]
 
-        photo_url = self._store(blob_name, content, photo.content_type)
-        request.user.photo_url = photo_url  # type: ignore[attr-defined]
-        request.user.save(update_fields=["photo_url"])  # type: ignore[attr-defined]
+        return Response({"data": UserSerializer(user).data})
 
-        return Response({"data": UserSerializer(request.user).data})
 
-    def _store(self, blob_name: str, content: bytes, content_type: str) -> str:
-        from apps.assignments.storage import _azure_config
+@extend_schema(exclude=True)
+class UserPhotoView(APIView):
+    """GET /users/{pk}/photo — serve profile photo binary. No auth required (profile photos are public)."""
+    permission_classes = []
 
-        account_name, account_key, container = _azure_config()
-        if all([account_name, account_key, container]):
-            try:
-                from azure.storage.blob import BlobServiceClient  # type: ignore[import]
-
-                client = BlobServiceClient(
-                    account_url=f"https://{account_name}.blob.core.windows.net",
-                    credential=account_key,
-                )
-                client.get_blob_client(container=container, blob=blob_name).upload_blob(
-                    content, overwrite=True, content_settings={"content_type": content_type}
-                )
-                return f"https://{account_name}.blob.core.windows.net/{container}/{blob_name}"
-            except ImportError:
-                pass
-
-        # Dev fallback — save to dev_media/
-        dest = os.path.join(settings.BASE_DIR, "dev_media", blob_name)
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        with open(dest, "wb") as f:
-            f.write(content)
-        return f"http://localhost:8000/api/v1/dev/download/{blob_name}"
+    def get(self, request: Request, pk: str) -> Response:
+        user = get_object_or_404(
+            User.objects.only("id", "photo_data", "photo_content_type"), pk=pk
+        )
+        if not user.photo_data:
+            return Response(
+                {"errors": [{"code": "not_found", "message": "No photo uploaded."}], "data": None},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return HttpResponse(
+            bytes(user.photo_data),
+            content_type=user.photo_content_type or "image/jpeg",
+        )

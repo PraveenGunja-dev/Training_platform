@@ -19,8 +19,11 @@ export const groupsApi = {
     apiClient.delete(`/groups/${id}/participants/${userId}`),
   getInstructors: (id: string) =>
     apiClient.get<ApiEnvelope<GroupInstructor[]>>(`/groups/${id}/instructors`).then(r => r.data),
-  assignInstructors: (id: string, user_ids: string[]) =>
-    apiClient.post<ApiEnvelope<GroupInstructor[]>>(`/groups/${id}/instructors`, { user_ids }).then(r => r.data),
+  assignInstructors: (id: string, user_ids: string[], promote_participants?: boolean) =>
+    apiClient.post<ApiEnvelope<GroupInstructor[]>>(
+      `/groups/${id}/instructors`,
+      promote_participants ? { user_ids, promote_participants: true } : { user_ids },
+    ).then(r => r.data),
   unassignInstructor: (id: string, userId: string) =>
     apiClient.delete(`/groups/${id}/instructors/${userId}`),
   availableInstructors: (id: string, search?: string) =>

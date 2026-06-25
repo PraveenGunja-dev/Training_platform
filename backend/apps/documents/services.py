@@ -58,7 +58,7 @@ def approve_shared(
     document = Document.objects.create(
         group=shared.group,
         title=shared.title,
-        file_url=shared.file_url,
+        file_data=shared.file_data,
         file_name=shared.file_name,
         file_type=shared.file_type,
         file_size=shared.file_size,

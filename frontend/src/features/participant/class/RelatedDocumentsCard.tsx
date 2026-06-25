@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Download, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
 import { documentsApi } from '@/api/documents';
 
 interface Props {
@@ -27,16 +26,15 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   REPORT: 'Report', SHARED: 'Shared',
 };
 
-function DocItem({ doc }: { doc: { id: string; title: string; description: string; doc_type: string } }) {
+function DocItem({ doc }: { doc: { id: string; title: string; description: string; doc_type: string; file_name: string } }) {
   const [loading, setLoading] = useState(false);
 
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ data: { download_url: string } }>(`/documents/${doc.id}/download`);
-      window.open(res.data.data.download_url, '_blank');
+      await documentsApi.download(doc.id, doc.file_name);
     } catch {
-      toast.error('Could not get download link.');
+      toast.error('Could not download file.');
     } finally {
       setLoading(false);
     }
@@ -72,7 +70,7 @@ function DocItem({ doc }: { doc: { id: string; title: string; description: strin
                 ? <span className="h-3 w-3 rounded-full border border-violet-300 border-t-violet-600 animate-spin" />
                 : <Download className="h-3 w-3" />
               }
-              {loading ? 'Loading…' : 'Download'}
+              {loading ? 'Downloading…' : 'Download'}
             </button>
           </div>
         </div>
