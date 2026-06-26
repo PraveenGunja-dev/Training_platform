@@ -836,7 +836,7 @@ export function LoginPage() {
                     <div className="lp-content">
                         {/* Brand mark */}
                         <div className="lp-brandmark">
-                            <img src="/adani-logo-white.svg" alt="Adani" className="lp-bm-logo" />
+                            <img src={`${import.meta.env.BASE_URL}adani-logo-white.svg`} alt="Adani" className="lp-bm-logo" />
                             <div className="lp-bm-divider" />
                             <div>
                                 <span className="lp-bm-name">ACLP</span>
@@ -907,7 +907,7 @@ export function LoginPage() {
                             <div className="lp-form-accent" />
                             <div className="lp-form-inner">
                                 <div className="lp-fhead">
-                                    <img src="/adani-logo.svg" alt="Adani" className="lp-logo-dark" />
+                                    <img src={`${import.meta.env.BASE_URL}adani-logo.svg`} alt="Adani" className="lp-logo-dark" />
                                     <h2 className="lp-ftitle">Welcome back</h2>
                                     <p className="lp-fsub">Sign in to access your ACLP training account</p>
                                 </div>
@@ -1048,7 +1048,7 @@ export function LoginPage() {
                         <div className="ls-ring-wrap">
                             <div className="ls-ring" />
                             <div className="ls-inner">
-                                <img src="/adani-logo-white.svg" alt="Adani" className="ls-logo-img" />
+                                <img src={`${import.meta.env.BASE_URL}adani-logo-white.svg`} alt="Adani" className="ls-logo-img" />
                             </div>
                         </div>
 

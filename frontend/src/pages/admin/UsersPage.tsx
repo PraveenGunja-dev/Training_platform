@@ -25,6 +25,7 @@ import {
 import { InviteUserDialog } from '@/features/admin/users/InviteUserDialog';
 import { BulkInviteDialog } from '@/features/admin/users/BulkInviteDialog';
 import { ErrorState } from '@/components/states/ErrorState';
+import { cn, getFileUrl } from '@/lib/utils';
 import type { Role } from '@/lib/types';
 
 /* ── Role styling ────────────────────────────────────────────────────── */
@@ -270,7 +271,7 @@ export default function AdminUsersPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.photo_url ?? undefined} />
+                            <AvatarImage src={getFileUrl(user.photo_url) ?? undefined} />
                             <AvatarFallback className={`text-xs font-semibold ${rc.avatarBg} ${rc.avatarText}`}>
                               {initials}
                             </AvatarFallback>

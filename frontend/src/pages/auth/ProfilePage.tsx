@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { cn, getFileUrl } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -132,7 +132,7 @@ export function ProfilePage() {
   const accentRing   = isAdmin ? 'ring-[#0052A5]' : isInstructor ? 'ring-emerald-500' : isGroupAdmin ? 'ring-teal-500' : 'ring-violet-500';
   const roleLabel    = isAdmin ? 'Super Admin' : isInstructor ? 'Instructor' : isGroupAdmin ? 'Group Admin' : 'Participant';
 
-  const photoSrc = preview ?? user?.photo_url ?? undefined;
+  const photoSrc = preview ?? getFileUrl(user?.photo_url) ?? undefined;
   const userInitials = user ? initials(user.full_name) : '?';
 
   return (

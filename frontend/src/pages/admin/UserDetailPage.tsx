@@ -175,7 +175,7 @@ export default function AdminUserDetailPage() {
             <Avatar
               className="h-20 w-20 border-4 border-white shadow-lg flex-shrink-0"
             >
-              <AvatarImage src={user.photo_url ?? undefined} />
+              <AvatarImage src={getFileUrl(user.photo_url) ?? undefined} />
               <AvatarFallback
                 className="text-2xl font-bold text-white"
                 style={{ background: rc.gradient }}
