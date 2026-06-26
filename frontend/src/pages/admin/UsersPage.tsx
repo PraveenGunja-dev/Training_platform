@@ -25,7 +25,7 @@ import {
 import { InviteUserDialog } from '@/features/admin/users/InviteUserDialog';
 import { BulkInviteDialog } from '@/features/admin/users/BulkInviteDialog';
 import { ErrorState } from '@/components/states/ErrorState';
-import { cn, getFileUrl } from '@/lib/utils';
+import { getFileUrl } from '@/lib/utils';
 import type { Role } from '@/lib/types';
 
 /* ── Role styling ────────────────────────────────────────────────────── */

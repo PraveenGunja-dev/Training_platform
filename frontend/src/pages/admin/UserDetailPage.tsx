@@ -19,6 +19,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { AuditTable } from '@/features/admin/audit/AuditTable';
+import { getFileUrl } from '@/lib/utils';
 import type { Role } from '@/lib/types';
 
 const ROLE_CONFIG: Record<Role, {
