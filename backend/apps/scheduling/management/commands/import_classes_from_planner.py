@@ -78,8 +78,8 @@ class Command(BaseCommand):
                 skipped_no_group += 1
                 continue
 
-            starts_at = make_ist_datetime(rec['date'], 9, 0)
-            ends_at   = make_ist_datetime(rec['date'], 18, 0)
+            starts_at = make_ist_datetime(rec['date'], 7, 30)
+            ends_at   = make_ist_datetime(rec['date'], 9, 30)
             title     = rec['class_name'][:300]  # enforce max_length
 
             # Duplicate check
