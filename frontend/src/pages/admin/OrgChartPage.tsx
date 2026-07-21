@@ -288,13 +288,13 @@ export default function AdminOrgChartPage() {
   const filteredGroups = useMemo(() => {
     if (!orgData) return [];
     const q = search.toLowerCase();
-    if (!search) return [...orgData.groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    if (!search) return [...orgData.groups].sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
     return orgData.groups.filter(g =>
       g.name.toLowerCase().includes(q) ||
       g.group_admin?.name.toLowerCase().includes(q) ||
       g.instructors.some(i => i.name.toLowerCase().includes(q)) ||
       g.participants.some(p => p.name.toLowerCase().includes(q))
-    ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    ).sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
   }, [orgData, search]);
 
   const filteredUnassigned = useMemo(() => {

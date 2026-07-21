@@ -3,7 +3,12 @@ import type { ApiEnvelope, ClassGroup, GroupDetail, GroupAnalytics, GroupInstruc
 
 export const groupsApi = {
   list: (params?: { is_archived?: boolean; search?: string; sort?: string }) =>
-    apiClient.get<ApiEnvelope<ClassGroup[]>>('/groups', { params }).then(r => r.data),
+    apiClient.get<ApiEnvelope<ClassGroup[]>>('/groups', { params }).then(r => {
+      if (r.data && Array.isArray(r.data.data)) {
+        r.data.data.sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
+      }
+      return r.data;
+    }),
   get: (id: string) =>
     apiClient.get<ApiEnvelope<GroupDetail>>(`/groups/${id}`).then(r => r.data),
   analytics: (id: string, params?: { sub_group_id?: string }) =>

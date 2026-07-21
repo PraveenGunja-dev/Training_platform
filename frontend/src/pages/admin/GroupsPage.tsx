@@ -246,7 +246,7 @@ export default function AdminGroupsPage() {
       instructorFilter === 'ALL' ||
       (g.instructors ?? []).some(i => i.id === instructorFilter)
     )
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    .sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
 
   return (
     <div className="space-y-6">
