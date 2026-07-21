@@ -1,3 +1,10 @@
+import os
+import django
+
+# Initialize Django environment
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
+django.setup()
+
 from apps.scheduling.models import Class
 from django.utils import timezone
 from datetime import datetime
