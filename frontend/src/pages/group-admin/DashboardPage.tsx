@@ -81,7 +81,7 @@ export default function GroupAdminDashboardPage() {
       {/* KPI Row 2 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Classes Today"    value={d.kpis.classes_today}      accent="emerald" />
-        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Upcoming Classes" value={d.kpis.classes_upcoming}                   />
+        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Balance 2026"    value={d.kpis.classes_upcoming}                   />
         <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted"        value={d.kpis.submitted}          accent="emerald" />
         <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Late Submissions" value={d.kpis.late}               accent="rose"    />
       </div>

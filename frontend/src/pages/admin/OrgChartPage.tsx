@@ -96,7 +96,7 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
         <ShieldCheck className="h-3.5 w-3.5 text-teal-600 flex-shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-teal-600 block">
-            Group Admin
+            Batch Admin
           </span>
           {group.group_admin ? (
             <p className="text-xs text-slate-700 font-medium truncate" title={group.group_admin.email}>
@@ -288,13 +288,13 @@ export default function AdminOrgChartPage() {
   const filteredGroups = useMemo(() => {
     if (!orgData) return [];
     const q = search.toLowerCase();
-    if (!search) return orgData.groups;
+    if (!search) return [...orgData.groups].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     return orgData.groups.filter(g =>
       g.name.toLowerCase().includes(q) ||
       g.group_admin?.name.toLowerCase().includes(q) ||
       g.instructors.some(i => i.name.toLowerCase().includes(q)) ||
       g.participants.some(p => p.name.toLowerCase().includes(q))
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   }, [orgData, search]);
 
   const filteredUnassigned = useMemo(() => {
@@ -325,7 +325,7 @@ export default function AdminOrgChartPage() {
       {/* ── Stats ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Super Admins"     value={orgData.stats.total_admins}       accent="indigo"  />
-        <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Group Admins"     value={orgData.stats.total_group_admins} accent="teal"    />
+        <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Batch Admins"     value={orgData.stats.total_group_admins} accent="teal"    />
         <KpiCard icon={<Building2     className="h-4 w-4" />} label="Groups"           value={orgData.stats.total_groups}       accent="cyan"    />
         <KpiCard icon={<Layers        className="h-4 w-4" />} label="Total Sub-Groups" value={orgData.stats.total_sub_groups}   accent="violet"  />
         <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="Instructors"      value={orgData.stats.total_instructors}  accent="default" />

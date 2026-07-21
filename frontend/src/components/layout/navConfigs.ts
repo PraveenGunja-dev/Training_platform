@@ -30,7 +30,7 @@ export interface NavItem {
 export const adminNav: NavItem[] = [
   { to: '/admin/dashboard',     label: 'Dashboard',     icon: LayoutDashboard, section: 'Overview'  },
   { to: '/admin/users',         label: 'Users',          icon: Users,           section: 'People'    },
-  { to: '/admin/groups',        label: 'Class Groups',   icon: FolderKanban                          },
+  { to: '/admin/groups',        label: 'Batches',        icon: FolderKanban                          },
   { to: '/admin/classes',       label: 'Classes',        icon: CalendarDays,    section: 'Training'  },
   { to: '/admin/calendar',      label: 'Calendar',       icon: CalendarRange                         },
   { to: '/admin/assignments',   label: 'Assignments',    icon: ListChecks                            },
