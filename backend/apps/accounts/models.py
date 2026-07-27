@@ -9,9 +9,9 @@ from .managers import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
         ("ADMIN", "Admin"),
-        ("INSTRUCTOR", "Instructor"),
+        ("SUB_MENTOR", "Sub-Mentor"),
         ("PARTICIPANT", "Participant"),
-        ("GROUP_ADMIN", "Group Admin"),
+        ("LEAD_MENTOR", "Lead Mentor"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

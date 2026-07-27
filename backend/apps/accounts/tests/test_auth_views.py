@@ -214,14 +214,14 @@ class TestChangeEmailView:
         headers = self._auth_headers(client, "admin@test.com", "password123")
         resp = client.post(
             reverse("me-email"),
-            {"current_email": "admin@test.com", "new_email": "new.admin@test.com", "current_password": "password123"},
+            {"current_email": "admin@test.com", "new_email": "new.lead_mentor@test.com", "current_password": "password123"},
             content_type="application/json",
             **headers,
         )
         assert resp.status_code == 200
-        assert resp.json()["data"]["email"] == "new.admin@test.com"
+        assert resp.json()["data"]["email"] == "new.lead_mentor@test.com"
         admin_user.refresh_from_db()
-        assert admin_user.email == "new.admin@test.com"
+        assert admin_user.email == "new.lead_mentor@test.com"
 
     def test_change_email_new_email_case_normalised(self, client, admin_user):
         headers = self._auth_headers(client, "admin@test.com", "password123")
@@ -238,7 +238,7 @@ class TestChangeEmailView:
         headers = self._auth_headers(client, "admin@test.com", "password123")
         resp = client.post(
             reverse("me-email"),
-            {"current_email": "wrong@test.com", "new_email": "new.admin@test.com", "current_password": "password123"},
+            {"current_email": "wrong@test.com", "new_email": "new.lead_mentor@test.com", "current_password": "password123"},
             content_type="application/json",
             **headers,
         )
@@ -249,7 +249,7 @@ class TestChangeEmailView:
         headers = self._auth_headers(client, "admin@test.com", "password123")
         resp = client.post(
             reverse("me-email"),
-            {"current_email": "admin@test.com", "new_email": "new.admin@test.com", "current_password": "wrongpass"},
+            {"current_email": "admin@test.com", "new_email": "new.lead_mentor@test.com", "current_password": "wrongpass"},
             content_type="application/json",
             **headers,
         )
@@ -346,3 +346,47 @@ class TestRefreshView:
     def test_refresh_without_cookie_returns_401(self, client):
         resp = client.post(reverse("auth-refresh"))
         assert resp.status_code == 401
+
+@pytest.mark.django_db
+def test_login_and_me_serialize_canonical_mentor_roles(client):
+    from apps.groups.models import ClassGroup, GroupLeadMentor
+
+    admin = User.objects.create_user(
+        email="auth-admin@test.com", password="password123", full_name="Auth Admin", role="ADMIN"
+    )
+    lead_mentor = User.objects.create_user(
+        email="lead@test.com", password="password123", full_name="Lead Mentor", role="LEAD_MENTOR"
+    )
+    sub_mentor = User.objects.create_user(
+        email="sub@test.com", password="password123", full_name="Sub Mentor", role="SUB_MENTOR"
+    )
+    group = ClassGroup.objects.create(name="Auth Contract Group", created_by=admin)
+    GroupLeadMentor.objects.create(group=group, lead_mentor=lead_mentor, assigned_by=admin)
+
+    sub_login = client.post(
+        reverse("auth-login"),
+        {"email": sub_mentor.email, "password": "password123"},
+        content_type="application/json",
+    )
+    assert sub_login.status_code == 200
+    assert sub_login.json()["data"]["user"]["role"] == "SUB_MENTOR"
+    assert sub_login.json()["data"]["user"]["lead_mentor_of_group_ids"] == []
+
+    lead_login = client.post(
+        reverse("auth-login"),
+        {"email": lead_mentor.email, "password": "password123"},
+        content_type="application/json",
+    )
+    assert lead_login.status_code == 200
+    lead_payload = lead_login.json()["data"]["user"]
+    assert lead_payload["role"] == "LEAD_MENTOR"
+    assert lead_payload["lead_mentor_of_group_ids"] == [str(group.id)]
+    assert "admin_of_group_ids" not in lead_payload
+
+    me = client.get(
+        reverse("me"),
+        HTTP_AUTHORIZATION=f"Bearer {lead_login.json()['data']['access']}",
+    )
+    assert me.status_code == 200
+    assert me.json()["data"]["role"] == "LEAD_MENTOR"
+    assert me.json()["data"]["lead_mentor_of_group_ids"] == [str(group.id)]

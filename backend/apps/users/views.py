@@ -14,8 +14,8 @@ from rest_framework.views import APIView
 from apps.accounts.models import User
 from apps.accounts.services import invite_user
 from apps.accounts.throttles import InviteRateThrottle
-from apps.groups.models import GroupAdmin
-from apps.audit.actions import INSTRUCTOR_VISIBILITY_CHANGED
+from apps.groups.models import GroupLeadMentor
+from apps.audit.actions import SUB_MENTOR_VISIBILITY_CHANGED
 from apps.audit.services import log_action
 from apps.common.pagination import EnvelopePageNumberPagination
 from apps.common.permissions import IsAdmin
@@ -23,7 +23,7 @@ from apps.common.permissions import IsAdmin
 from .filters import UserFilter
 from .serializers import (
     BulkInviteSerializer,
-    InstructorListSerializer,
+    SubMentorListSerializer,
     InviteSerializer,
     UserDetailSerializer,
     UserListSerializer,
@@ -141,7 +141,7 @@ class UserViewSet(
     def stats(self, request: Request) -> Response:
         """GET /users/stats — aggregate counts, always reflects full DB."""
         qs = User.objects.values("role", "is_active").annotate(n=Count("id"))
-        totals: dict[str, int] = {"ADMIN": 0, "INSTRUCTOR": 0, "PARTICIPANT": 0, "GROUP_ADMIN": 0}
+        totals: dict[str, int] = {"ADMIN": 0, "SUB_MENTOR": 0, "PARTICIPANT": 0, "LEAD_MENTOR": 0}
         active = blocked = 0
         for row in qs:
             totals[row["role"]] = totals.get(row["role"], 0) + row["n"]
@@ -154,9 +154,9 @@ class UserViewSet(
                 "data": {
                     "total": sum(totals.values()),
                     "admins": totals["ADMIN"],
-                    "instructors": totals["INSTRUCTOR"],
+                    "sub_mentors": totals["SUB_MENTOR"],
                     "participants": totals["PARTICIPANT"],
-                    "group_admins": totals["GROUP_ADMIN"],
+                    "lead_mentors": totals["LEAD_MENTOR"],
                     "active": active,
                     "blocked": blocked,
                 }
@@ -254,28 +254,28 @@ class UserViewSet(
         return Response({"data": {"detail": "Invite resent."}})
 
 
-class InstructorListView(APIView):
-    """GET /instructors — list all users with role INSTRUCTOR.
+class SubMentorListView(APIView):
+    """GET /sub-mentors — list all users with role SUB_MENTOR.
 
     Supports ?q= to filter by name or email (case-insensitive substring).
-    Used by the Admin "assign instructors" picker in the group detail panel.
+    Used by the Admin "assign Sub-Mentors" picker in the group detail panel.
     """
 
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request: Request) -> Response:
-        qs = User.objects.filter(role="INSTRUCTOR").order_by("full_name")
+        qs = User.objects.filter(role="SUB_MENTOR").order_by("full_name")
         q = request.query_params.get("q", "").strip()
         if q:
             qs = qs.filter(Q(full_name__icontains=q) | Q(email__icontains=q))
-        return Response({"data": InstructorListSerializer(qs, many=True).data})
+        return Response({"data": SubMentorListSerializer(qs, many=True).data})
 
 
 class UserVisibilityView(APIView):
-    """PATCH /users/{pk}/visibility — update an instructor's can_view_all_classes tri-state.
+    """PATCH /users/{pk}/visibility — update a Sub-Mentor's can_view_all_classes tri-state.
 
     Accepts body: {"can_view_all_classes": null | true | false}
-    null  → inherit system default (SystemSettings.instructors_can_view_all_classes)
+    null  → inherit system default (SystemSettings.sub_mentors_can_view_all_classes)
     true  → always see all classes regardless of group assignment (read-only outside assigned)
     false → strict scoping (only assigned groups)
 
@@ -286,13 +286,13 @@ class UserVisibilityView(APIView):
 
     def patch(self, request: Request, pk: str | None = None) -> Response:
         target = get_object_or_404(User, pk=pk)
-        if target.role != "INSTRUCTOR":
+        if target.role != "SUB_MENTOR":
             return Response(
                 {
                     "errors": [
                         {
-                            "code": "user.not_instructor",
-                            "message": "Visibility override can only be set for users with role INSTRUCTOR.",
+                            "code": "user.not_sub_mentor",
+                            "message": "Visibility override can only be set for users with role SUB_MENTOR.",
                         }
                     ],
                     "data": None,
@@ -307,7 +307,7 @@ class UserVisibilityView(APIView):
         target.save(update_fields=["can_view_all_classes"])
         log_action(
             actor=request.user,
-            action=INSTRUCTOR_VISIBILITY_CHANGED,
+            action=SUB_MENTOR_VISIBILITY_CHANGED,
             target_type="User",
             target_id=target.id,
             metadata={"scope": "user", "old": old_value, "new": new_value},

@@ -1,6 +1,6 @@
-"""Chunk 08 — Cross-instructor visibility tests for the scheduling app.
+"""Chunk 08 — Cross-sub_mentor visibility tests for the scheduling app.
 
-Verifies that the effective instructor_can_view_all flag (resolved from the
+Verifies that the effective sub_mentor_can_view_all flag (resolved from the
 tri-state user override + system default) correctly:
   - Expands the class list queryset to the superset (all groups) when ON.
   - Annotates each row with read_only=False (assigned) or read_only=True (not).
@@ -15,7 +15,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.common.models import SystemSettings
-from apps.groups.models import ClassGroup, GroupInstructor
+from apps.groups.models import ClassGroup, GroupSubMentor
 from apps.scheduling.models import Class
 
 User = get_user_model()
@@ -38,16 +38,16 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
+def sub_mentor(db):
     return User.objects.create_user(
-        email="ins@cv8.test", password="pass", full_name="Instructor CV8", role="INSTRUCTOR"
+        email="ins@cv8.test", password="pass", full_name="Sub-Mentor CV8", role="SUB_MENTOR"
     )
 
 
 @pytest.fixture
-def instructor_client(instructor):
+def sub_mentor_client(sub_mentor):
     c = APIClient()
-    c.force_authenticate(user=instructor)
+    c.force_authenticate(user=sub_mentor)
     return c
 
 
@@ -69,8 +69,8 @@ def group_b(db, admin):
 
 
 @pytest.fixture
-def assigned_group(group_a, instructor):
-    GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=None)
+def assigned_group(group_a, sub_mentor):
+    GroupSubMentor.objects.create(group=group_a, sub_mentor=sub_mentor, assigned_by=None)
     return group_a
 
 
@@ -99,17 +99,17 @@ def class_unassigned(admin, group_b):
 @pytest.fixture
 def settings_on(db):
     s = SystemSettings.get_solo()
-    s.instructors_can_view_all_classes = True
+    s.sub_mentors_can_view_all_classes = True
     s.save()
     yield s
-    s.instructors_can_view_all_classes = False
+    s.sub_mentors_can_view_all_classes = False
     s.save()
 
 
 @pytest.fixture
 def settings_off(db):
     s = SystemSettings.get_solo()
-    s.instructors_can_view_all_classes = False
+    s.sub_mentors_can_view_all_classes = False
     s.save()
     return s
 
@@ -121,12 +121,12 @@ def settings_off(db):
 
 @pytest.mark.django_db
 def test_list_superset_system_on_no_override(
-    instructor_client, instructor, class_assigned, class_unassigned, settings_on
+    sub_mentor_client, sub_mentor, class_assigned, class_unassigned, settings_on
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get("/api/v1/classes")
+    resp = sub_mentor_client.get("/training/api/v1/classes")
     assert resp.status_code == 200
 
     ids = {c["id"] for c in resp.data["data"]}
@@ -146,12 +146,12 @@ def test_list_superset_system_on_no_override(
 
 @pytest.mark.django_db
 def test_list_superset_user_override_on(
-    instructor_client, instructor, class_assigned, class_unassigned, settings_off
+    sub_mentor_client, sub_mentor, class_assigned, class_unassigned, settings_off
 ):
-    instructor.can_view_all_classes = True
-    instructor.save()
+    sub_mentor.can_view_all_classes = True
+    sub_mentor.save()
 
-    resp = instructor_client.get("/api/v1/classes")
+    resp = sub_mentor_client.get("/training/api/v1/classes")
     assert resp.status_code == 200
 
     ids = {c["id"] for c in resp.data["data"]}
@@ -166,12 +166,12 @@ def test_list_superset_user_override_on(
 
 @pytest.mark.django_db
 def test_list_assigned_only_user_override_off_wins(
-    instructor_client, instructor, class_assigned, class_unassigned, settings_on
+    sub_mentor_client, sub_mentor, class_assigned, class_unassigned, settings_on
 ):
-    instructor.can_view_all_classes = False
-    instructor.save()
+    sub_mentor.can_view_all_classes = False
+    sub_mentor.save()
 
-    resp = instructor_client.get("/api/v1/classes")
+    resp = sub_mentor_client.get("/training/api/v1/classes")
     assert resp.status_code == 200
 
     ids = {c["id"] for c in resp.data["data"]}
@@ -186,12 +186,12 @@ def test_list_assigned_only_user_override_off_wins(
 
 @pytest.mark.django_db
 def test_retrieve_unassigned_effective_on_200_read_only(
-    instructor_client, instructor, class_unassigned, settings_on
+    sub_mentor_client, sub_mentor, class_unassigned, settings_on
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get(f"/api/v1/classes/{class_unassigned.id}")
+    resp = sub_mentor_client.get(f"/training/api/v1/classes/{class_unassigned.id}")
     assert resp.status_code == 200
     assert resp.data["data"]["read_only"] is True
 
@@ -203,12 +203,12 @@ def test_retrieve_unassigned_effective_on_200_read_only(
 
 @pytest.mark.django_db
 def test_retrieve_unassigned_effective_off_404(
-    instructor_client, instructor, class_unassigned, settings_off
+    sub_mentor_client, sub_mentor, class_unassigned, settings_off
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get(f"/api/v1/classes/{class_unassigned.id}")
+    resp = sub_mentor_client.get(f"/training/api/v1/classes/{class_unassigned.id}")
     assert resp.status_code == 404
 
 
@@ -219,13 +219,13 @@ def test_retrieve_unassigned_effective_off_404(
 
 @pytest.mark.django_db
 def test_patch_unassigned_effective_on_still_403(
-    instructor_client, instructor, class_unassigned, settings_on
+    sub_mentor_client, sub_mentor, class_unassigned, settings_on
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.patch(
-        f"/api/v1/classes/{class_unassigned.id}",
+    resp = sub_mentor_client.patch(
+        f"/training/api/v1/classes/{class_unassigned.id}",
         {"title": "Hijacked"},
         format="json",
     )
@@ -239,12 +239,12 @@ def test_patch_unassigned_effective_on_still_403(
 
 @pytest.mark.django_db
 def test_assigned_class_read_only_always_false(
-    instructor_client, instructor, class_assigned, settings_on
+    sub_mentor_client, sub_mentor, class_assigned, settings_on
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get(f"/api/v1/classes/{class_assigned.id}")
+    resp = sub_mentor_client.get(f"/training/api/v1/classes/{class_assigned.id}")
     assert resp.status_code == 200
     assert resp.data["data"]["read_only"] is False
 
@@ -256,23 +256,23 @@ def test_assigned_class_read_only_always_false(
 
 @pytest.mark.django_db
 def test_me_groups_returns_effective_can_view_all_true(
-    instructor_client, instructor, assigned_group, settings_on
+    sub_mentor_client, sub_mentor, assigned_group, settings_on
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get("/api/v1/me/groups")  # no trailing slash (router: trailing_slash=False)
+    resp = sub_mentor_client.get("/training/api/v1/me/groups")  # no trailing slash (router: trailing_slash=False)
     assert resp.status_code == 200
     assert resp.data["effective_can_view_all"] is True
 
 
 @pytest.mark.django_db
 def test_me_groups_returns_effective_can_view_all_false(
-    instructor_client, instructor, assigned_group, settings_off
+    sub_mentor_client, sub_mentor, assigned_group, settings_off
 ):
-    instructor.can_view_all_classes = None
-    instructor.save()
+    sub_mentor.can_view_all_classes = None
+    sub_mentor.save()
 
-    resp = instructor_client.get("/api/v1/me/groups")  # no trailing slash (router: trailing_slash=False)
+    resp = sub_mentor_client.get("/training/api/v1/me/groups")  # no trailing slash (router: trailing_slash=False)
     assert resp.status_code == 200
     assert resp.data["effective_can_view_all"] is False

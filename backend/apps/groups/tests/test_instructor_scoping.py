@@ -3,7 +3,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+from apps.groups.models import ClassGroup, GroupSubMentor, GroupMembership
 
 User = get_user_model()
 
@@ -20,7 +20,7 @@ def admin(db):
 
 @pytest.fixture
 def instructor(db):
-    return User.objects.create_user(email="ins@grp.s.test", password="pass", full_name="Instructor", role="INSTRUCTOR")
+    return User.objects.create_user(email="ins@grp.s.test", password="pass", full_name="Instructor", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def group_b(db, admin):
 
 @pytest.fixture
 def assigned_instructor(group_a, instructor, admin):
-    return GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=admin)
+    return GroupSubMentor.objects.create(group=group_a, sub_mentor=instructor, assigned_by=admin)
 
 
 # ---------------------------------------------------------------------------
@@ -72,19 +72,19 @@ def assigned_instructor(group_a, instructor, admin):
 @pytest.mark.django_db
 class TestGroupList:
     def test_admin_sees_all_groups(self, admin_client, group_a, group_b):
-        resp = admin_client.get("/api/v1/groups")
+        resp = admin_client.get("/training/api/v1/groups")
         assert resp.status_code == 200
         names = {g["name"] for g in resp.json()["data"]}
         assert "Group A" in names
         assert "Group B" in names
 
     def test_instructor_no_assignment_sees_empty(self, instructor_client, group_a, group_b):
-        resp = instructor_client.get("/api/v1/groups")
+        resp = instructor_client.get("/training/api/v1/groups")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
     def test_instructor_assigned_sees_only_own_group(self, instructor_client, assigned_instructor, group_a, group_b):
-        resp = instructor_client.get("/api/v1/groups")
+        resp = instructor_client.get("/training/api/v1/groups")
         assert resp.status_code == 200
         names = {g["name"] for g in resp.json()["data"]}
         assert "Group A" in names
@@ -92,7 +92,7 @@ class TestGroupList:
 
     def test_participant_sees_only_enrolled_groups(self, participant_client, participant, group_a, group_b):
         GroupMembership.objects.create(group=group_a, user=participant)
-        resp = participant_client.get("/api/v1/groups")
+        resp = participant_client.get("/training/api/v1/groups")
         assert resp.status_code == 200
         names = {g["name"] for g in resp.json()["data"]}
         assert "Group A" in names
@@ -107,20 +107,20 @@ class TestGroupList:
 @pytest.mark.django_db
 class TestGroupRetrieve:
     def test_admin_retrieves_any_group(self, admin_client, group_b):
-        resp = admin_client.get(f"/api/v1/groups/{group_b.id}")
+        resp = admin_client.get(f"/training/api/v1/groups/{group_b.id}")
         assert resp.status_code == 200
 
     def test_instructor_retrieves_assigned_group(self, instructor_client, assigned_instructor, group_a):
-        resp = instructor_client.get(f"/api/v1/groups/{group_a.id}")
+        resp = instructor_client.get(f"/training/api/v1/groups/{group_a.id}")
         assert resp.status_code == 200
 
     def test_instructor_cannot_retrieve_unassigned_group(self, instructor_client, group_b):
-        resp = instructor_client.get(f"/api/v1/groups/{group_b.id}")
+        resp = instructor_client.get(f"/training/api/v1/groups/{group_b.id}")
         assert resp.status_code == 403
-        assert resp.json()["errors"][0]["code"] == "perm.not_instructor_of_group"
+        assert resp.json()["errors"][0]["code"] == "perm.not_sub_mentor_of_group"
 
     def test_participant_cannot_retrieve_unenrolled_group(self, participant_client, group_a):
-        resp = participant_client.get(f"/api/v1/groups/{group_a.id}")
+        resp = participant_client.get(f"/training/api/v1/groups/{group_a.id}")
         assert resp.status_code == 403
 
 
@@ -132,16 +132,16 @@ class TestGroupRetrieve:
 @pytest.mark.django_db
 class TestGroupWriteDenials:
     def test_instructor_cannot_create_group(self, instructor_client):
-        resp = instructor_client.post("/api/v1/groups", {"name": "New", "description": ""}, format="json")
+        resp = instructor_client.post("/training/api/v1/groups", {"name": "New", "description": ""}, format="json")
         assert resp.status_code == 403
 
     def test_instructor_cannot_delete_group(self, instructor_client, group_a):
-        resp = instructor_client.delete(f"/api/v1/groups/{group_a.id}")
+        resp = instructor_client.delete(f"/training/api/v1/groups/{group_a.id}")
         assert resp.status_code == 403
 
     def test_instructor_cannot_add_participants(self, instructor_client, group_a, participant):
         resp = instructor_client.post(
-            f"/api/v1/groups/{group_a.id}/participants",
+            f"/training/api/v1/groups/{group_a.id}/participants",
             {"user_ids": [str(participant.id)]},
             format="json",
         )
@@ -156,9 +156,9 @@ class TestGroupWriteDenials:
 @pytest.mark.django_db
 class TestGroupAnalytics:
     def test_instructor_can_access_analytics_on_assigned_group(self, instructor_client, assigned_instructor, group_a):
-        resp = instructor_client.get(f"/api/v1/groups/{group_a.id}/analytics")
+        resp = instructor_client.get(f"/training/api/v1/groups/{group_a.id}/analytics")
         assert resp.status_code == 200
 
     def test_instructor_cannot_access_analytics_on_unassigned_group(self, instructor_client, group_b):
-        resp = instructor_client.get(f"/api/v1/groups/{group_b.id}/analytics")
+        resp = instructor_client.get(f"/training/api/v1/groups/{group_b.id}/analytics")
         assert resp.status_code == 403

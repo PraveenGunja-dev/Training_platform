@@ -208,7 +208,7 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # Feature flag — kept False until Chunk 9 integration flip
-INSTRUCTOR_ROLE_ENABLED = False
+SUB_MENTOR_ROLE_ENABLED = False
 
 CELERY_BEAT_SCHEDULE = {
     "heartbeat": {

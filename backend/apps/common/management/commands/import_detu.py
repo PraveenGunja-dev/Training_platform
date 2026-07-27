@@ -1,7 +1,7 @@
 """
 Management command: import_detu
 Reads detu.xlsx from the project root, creates 25 batch groups,
-registers ~1128 participants, and wires up coordinator-instructors.
+registers ~1128 participants, and wires up coordinator Sub-Mentors.
 
 Usage:
     python manage.py import_detu
@@ -41,7 +41,7 @@ def _normalize_batch(raw: str) -> str:
 
 
 class Command(BaseCommand):
-    help = "Import detu.xlsx: create batch groups, participant users, and instructor assignments."
+    help = "Import detu.xlsx: create batch groups, participant users, and Sub-Mentor assignments."
 
     def add_arguments(self, parser):
         parser.add_argument("--xlsx", default=str(XLSX_DEFAULT), help="Path to detu.xlsx")
@@ -49,7 +49,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from apps.accounts.models import User
-        from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+        from apps.groups.models import ClassGroup, GroupSubMentor, GroupMembership
 
         xlsx_path = options["xlsx"]
         dry_run = options["dry_run"]
@@ -73,7 +73,7 @@ class Command(BaseCommand):
             except User.DoesNotExist:
                 raise CommandError(
                     f"Coordinator '{name}' not found in DB (expected email {email}). "
-                    "Run migrations and ensure these 4 instructors exist."
+                    "Run migrations and ensure these 4 Sub-Mentors exist."
                 )
         self.stdout.write(f"  {len(coordinator_users)} coordinators resolved.")
 
@@ -119,7 +119,7 @@ class Command(BaseCommand):
 
         # Write to DB
         hashed_password = make_password("admin123")
-        created_groups = created_users = created_members = created_instructors = 0
+        created_groups = created_users = created_members = created_sub_mentors = 0
         updated_users = 0
 
         with transaction.atomic():
@@ -135,15 +135,15 @@ class Command(BaseCommand):
                 if g_created:
                     created_groups += 1
 
-                # Assign coordinator as instructor
+                # Assign coordinator as Sub-Mentor
                 if coordinator_name and coordinator_name in coordinator_users:
                     coord_user = coordinator_users[coordinator_name]
-                    _, gi_created = GroupInstructor.objects.get_or_create(
+                    _, gi_created = GroupSubMentor.objects.get_or_create(
                         group=group,
-                        instructor=coord_user,
+                        sub_mentor=coord_user,
                     )
                     if gi_created:
-                        created_instructors += 1
+                        created_sub_mentors += 1
                 elif coordinator_name:
                     self.stdout.write(
                         self.style.WARNING(f"  Unknown coordinator '{coordinator_name}' for {batch_name}")
@@ -190,6 +190,6 @@ class Command(BaseCommand):
             f"  Users created:       {created_users}\n"
             f"  Users updated:       {updated_users}\n"
             f"  Memberships created: {created_members}\n"
-            f"  Instructors wired:   {created_instructors}\n"
+            f"  Sub-Mentors wired:   {created_sub_mentors}\n"
             f"  Rows skipped:        {skipped}"
         ))

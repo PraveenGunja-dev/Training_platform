@@ -1,10 +1,11 @@
-"""Chunk 02 — Instructor scoping tests for the documents app."""
+"""Chunk 02 — Sub-Mentor scoping tests for the documents app."""
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from apps.documents.models import Document, ParticipantSharedDoc
-from apps.groups.models import ClassGroup, GroupInstructor
+from apps.groups.models import ClassGroup, GroupSubMentor
 
 User = get_user_model()
 
@@ -20,8 +21,8 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
-    return User.objects.create_user(email="ins@doc.s.test", password="pass", full_name="Instructor", role="INSTRUCTOR")
+def sub_mentor(db):
+    return User.objects.create_user(email="ins@doc.s.test", password="pass", full_name="Sub-Mentor", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -37,9 +38,9 @@ def admin_client(admin):
 
 
 @pytest.fixture
-def instructor_client(instructor):
+def sub_mentor_client(sub_mentor):
     c = APIClient()
-    c.force_authenticate(user=instructor)
+    c.force_authenticate(user=sub_mentor)
     return c
 
 
@@ -61,8 +62,8 @@ def group_b(db, admin):
 
 
 @pytest.fixture
-def assigned(group_a, instructor, admin):
-    return GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=admin)
+def assigned(group_a, sub_mentor, admin):
+    return GroupSubMentor.objects.create(group=group_a, sub_mentor=sub_mentor, assigned_by=admin)
 
 
 @pytest.fixture
@@ -70,7 +71,7 @@ def doc_a(db, group_a, admin):
     return Document.objects.create(
         group=group_a,
         title="Doc in A",
-        file_url="mock://doc-a.pdf",
+        file_data=b"doc-a",
         file_name="doc-a.pdf",
         file_type="application/pdf",
         file_size=1024,
@@ -85,7 +86,7 @@ def doc_b(db, group_b, admin):
     return Document.objects.create(
         group=group_b,
         title="Doc in B",
-        file_url="mock://doc-b.pdf",
+        file_data=b"doc-b",
         file_name="doc-b.pdf",
         file_type="application/pdf",
         file_size=1024,
@@ -101,7 +102,7 @@ def shared_a(db, group_a, participant):
         group=group_a,
         uploaded_by=participant,
         title="Shared in A",
-        file_url="mock://shared-a.pdf",
+        file_data=b"shared-a",
         file_name="shared-a.pdf",
         file_type="application/pdf",
         file_size=512,
@@ -115,7 +116,7 @@ def shared_b(db, group_b, participant):
         group=group_b,
         uploaded_by=participant,
         title="Shared in B",
-        file_url="mock://shared-b.pdf",
+        file_data=b"shared-b",
         file_name="shared-b.pdf",
         file_type="application/pdf",
         file_size=512,
@@ -131,19 +132,19 @@ def shared_b(db, group_b, participant):
 @pytest.mark.django_db
 class TestDocumentList:
     def test_admin_sees_all_docs(self, admin_client, doc_a, doc_b):
-        resp = admin_client.get("/api/v1/documents")
+        resp = admin_client.get("/training/api/v1/documents")
         assert resp.status_code == 200
         titles = {d["title"] for d in resp.json()["data"]}
         assert "Doc in A" in titles
         assert "Doc in B" in titles
 
-    def test_instructor_no_assignment_sees_empty(self, instructor_client, doc_a):
-        resp = instructor_client.get("/api/v1/documents")
+    def test_sub_mentor_no_assignment_sees_empty(self, sub_mentor_client, doc_a):
+        resp = sub_mentor_client.get("/training/api/v1/documents")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
-    def test_instructor_assigned_sees_only_own_docs(self, instructor_client, assigned, doc_a, doc_b):
-        resp = instructor_client.get("/api/v1/documents")
+    def test_sub_mentor_assigned_sees_only_own_docs(self, sub_mentor_client, assigned, doc_a, doc_b):
+        resp = sub_mentor_client.get("/training/api/v1/documents")
         assert resp.status_code == 200
         titles = {d["title"] for d in resp.json()["data"]}
         assert "Doc in A" in titles
@@ -157,12 +158,12 @@ class TestDocumentList:
 
 @pytest.mark.django_db
 class TestDocumentRetrieve:
-    def test_instructor_retrieves_doc_in_assigned_group(self, instructor_client, assigned, doc_a):
-        resp = instructor_client.get(f"/api/v1/documents/{doc_a.id}")
+    def test_sub_mentor_retrieves_doc_in_assigned_group(self, sub_mentor_client, assigned, doc_a):
+        resp = sub_mentor_client.get(f"/training/api/v1/documents/{doc_a.id}")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_retrieve_doc_in_unassigned_group(self, instructor_client, doc_b):
-        resp = instructor_client.get(f"/api/v1/documents/{doc_b.id}")
+    def test_sub_mentor_cannot_retrieve_doc_in_unassigned_group(self, sub_mentor_client, doc_b):
+        resp = sub_mentor_client.get(f"/training/api/v1/documents/{doc_b.id}")
         assert resp.status_code == 403
 
 
@@ -177,24 +178,21 @@ class TestDocumentCreate:
         return {
             "group_id": str(group_id),
             "title": "New Doc",
-            "file_url": "mock://new.pdf",
-            "file_name": "new.pdf",
-            "file_type": "application/pdf",
-            "file_size": 512,
+            "file": SimpleUploadedFile("new.pdf", b"new", content_type="application/pdf"),
             "doc_type": "GUIDE",
             "visibility": "GROUP",
         }
 
-    def test_instructor_can_create_doc_in_assigned_group(self, instructor_client, assigned, group_a):
-        resp = instructor_client.post("/api/v1/documents", self._payload(group_a.id), format="json")
+    def test_sub_mentor_can_create_doc_in_assigned_group(self, sub_mentor_client, assigned, group_a):
+        resp = sub_mentor_client.post("/training/api/v1/documents", self._payload(group_a.id), format="multipart")
         assert resp.status_code == 201
 
-    def test_instructor_cannot_create_doc_in_unassigned_group(self, instructor_client, group_b):
-        resp = instructor_client.post("/api/v1/documents", self._payload(group_b.id), format="json")
+    def test_sub_mentor_cannot_create_doc_in_unassigned_group(self, sub_mentor_client, group_b):
+        resp = sub_mentor_client.post("/training/api/v1/documents", self._payload(group_b.id), format="multipart")
         assert resp.status_code == 403
 
     def test_participant_cannot_create_doc(self, participant_client, group_a):
-        resp = participant_client.post("/api/v1/documents", self._payload(group_a.id), format="json")
+        resp = participant_client.post("/training/api/v1/documents", self._payload(group_a.id), format="multipart")
         assert resp.status_code == 403
 
 
@@ -205,20 +203,20 @@ class TestDocumentCreate:
 
 @pytest.mark.django_db
 class TestDocumentWriteScoping:
-    def test_instructor_can_update_doc_in_assigned_group(self, instructor_client, assigned, doc_a):
-        resp = instructor_client.patch(f"/api/v1/documents/{doc_a.id}", {"title": "Updated"}, format="json")
+    def test_sub_mentor_can_update_doc_in_assigned_group(self, sub_mentor_client, assigned, doc_a):
+        resp = sub_mentor_client.patch(f"/training/api/v1/documents/{doc_a.id}", {"title": "Updated"}, format="json")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_update_doc_in_unassigned_group(self, instructor_client, doc_b):
-        resp = instructor_client.patch(f"/api/v1/documents/{doc_b.id}", {"title": "Hacked"}, format="json")
+    def test_sub_mentor_cannot_update_doc_in_unassigned_group(self, sub_mentor_client, doc_b):
+        resp = sub_mentor_client.patch(f"/training/api/v1/documents/{doc_b.id}", {"title": "Hacked"}, format="json")
         assert resp.status_code == 403
 
-    def test_instructor_can_delete_doc_in_assigned_group(self, instructor_client, assigned, doc_a):
-        resp = instructor_client.delete(f"/api/v1/documents/{doc_a.id}")
+    def test_sub_mentor_can_delete_doc_in_assigned_group(self, sub_mentor_client, assigned, doc_a):
+        resp = sub_mentor_client.delete(f"/training/api/v1/documents/{doc_a.id}")
         assert resp.status_code == 204
 
-    def test_instructor_cannot_delete_doc_in_unassigned_group(self, instructor_client, doc_b):
-        resp = instructor_client.delete(f"/api/v1/documents/{doc_b.id}")
+    def test_sub_mentor_cannot_delete_doc_in_unassigned_group(self, sub_mentor_client, doc_b):
+        resp = sub_mentor_client.delete(f"/training/api/v1/documents/{doc_b.id}")
         assert resp.status_code == 403
 
 
@@ -229,35 +227,35 @@ class TestDocumentWriteScoping:
 
 @pytest.mark.django_db
 class TestSharedUploads:
-    def test_instructor_sees_only_assigned_group_pending_uploads(
-        self, instructor_client, assigned, shared_a, shared_b
+    def test_sub_mentor_sees_only_assigned_group_pending_uploads(
+        self, sub_mentor_client, assigned, shared_a, shared_b
     ):
-        resp = instructor_client.get("/api/v1/admin/shared-uploads/pending")
+        resp = sub_mentor_client.get("/training/api/v1/admin/shared-uploads/pending")
         assert resp.status_code == 200
         titles = {d["title"] for d in resp.json()["data"]}
         assert "Shared in A" in titles
         assert "Shared in B" not in titles
 
-    def test_instructor_can_reject_shared_upload_in_assigned_group(
-        self, instructor_client, assigned, shared_a
+    def test_sub_mentor_can_reject_shared_upload_in_assigned_group(
+        self, sub_mentor_client, assigned, shared_a
     ):
-        resp = instructor_client.post(
-            f"/api/v1/admin/shared-uploads/{shared_a.id}/reject",
+        resp = sub_mentor_client.post(
+            f"/training/api/v1/admin/shared-uploads/{shared_a.id}/reject",
             {"reason": "Not relevant"},
             format="json",
         )
         assert resp.status_code == 200
 
-    def test_instructor_cannot_reject_shared_upload_in_unassigned_group(
-        self, instructor_client, shared_b
+    def test_sub_mentor_cannot_reject_shared_upload_in_unassigned_group(
+        self, sub_mentor_client, shared_b
     ):
-        resp = instructor_client.post(
-            f"/api/v1/admin/shared-uploads/{shared_b.id}/reject",
+        resp = sub_mentor_client.post(
+            f"/training/api/v1/admin/shared-uploads/{shared_b.id}/reject",
             {"reason": "Trying"},
             format="json",
         )
         assert resp.status_code == 403
 
     def test_participant_cannot_access_pending_queue(self, participant_client):
-        resp = participant_client.get("/api/v1/admin/shared-uploads/pending")
+        resp = participant_client.get("/training/api/v1/admin/shared-uploads/pending")
         assert resp.status_code == 403

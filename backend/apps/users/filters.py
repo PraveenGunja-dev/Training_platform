@@ -10,7 +10,7 @@ class UserFilter(django_filters.FilterSet):
     setup = django_filters.CharFilter(method="filter_setup")
     search = django_filters.CharFilter(method="filter_search")
     business_unit = django_filters.CharFilter(field_name="business_unit", lookup_expr="iexact")
-    group_admin = django_filters.BooleanFilter(method="filter_group_admin")
+    lead_mentor = django_filters.BooleanFilter(method="filter_lead_mentor")
 
     def filter_status(self, qs, name: str, value: str):  # type: ignore[override]
         if value in ("active", "allowed"):
@@ -33,13 +33,13 @@ class UserFilter(django_filters.FilterSet):
             | models.Q(employee_code__icontains=value)
         )
 
-    def filter_group_admin(self, qs, name: str, value: bool):  # type: ignore[override]
-        from apps.groups.models import GroupAdmin
+    def filter_lead_mentor(self, qs, name: str, value: bool):  # type: ignore[override]
+        from apps.groups.models import GroupLeadMentor
         if value:
-            admin_ids = GroupAdmin.objects.values_list("admin_id", flat=True)
+            admin_ids = GroupLeadMentor.objects.values_list("lead_mentor_id", flat=True)
             return qs.filter(id__in=admin_ids)
         return qs
 
     class Meta:
         model = User
-        fields = ["role", "status", "setup", "group_admin"]
+        fields = ["role", "status", "setup", "lead_mentor"]

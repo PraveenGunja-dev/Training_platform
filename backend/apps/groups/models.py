@@ -53,17 +53,17 @@ class GroupMembership(models.Model):
         return f"{self.user_id} → {self.group_id}"
 
 
-class GroupInstructor(models.Model):
+class GroupSubMentor(models.Model):
     group = models.ForeignKey(
         ClassGroup,
         on_delete=models.CASCADE,
-        related_name="instructors",
+        related_name="sub_mentors",
     )
-    instructor = models.ForeignKey(
+    sub_mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="instructed_groups",
-        limit_choices_to={"role": "INSTRUCTOR"},
+        related_name="sub_mentored_groups",
+        limit_choices_to={"role": "SUB_MENTOR"},
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
     assigned_by = models.ForeignKey(
@@ -71,17 +71,17 @@ class GroupInstructor(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="instructor_assignments_made",
+        related_name="sub_mentor_assignments_made",
     )
 
     class Meta:
-        unique_together = ("group", "instructor")
+        unique_together = ("group", "sub_mentor")
         indexes = [
-            models.Index(fields=["instructor", "group"], name="grp_ins_lookup_idx"),
+            models.Index(fields=["sub_mentor", "group"], name="grp_sub_mentor_lookup_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"{self.instructor_id} teaches {self.group_id}"
+        return f"{self.sub_mentor_id} teaches {self.group_id}"
 
 
 class SubGroup(TimestampedModel):
@@ -133,29 +133,29 @@ class SubGroupMembership(models.Model):
         return f"{self.sub_group.name} — {self.user}"
 
 
-class GroupAdmin(TimestampedModel):
-    """One designated admin per ClassGroup, assigned by a Super Admin."""
+class GroupLeadMentor(TimestampedModel):
+    """One designated Lead Mentor per ClassGroup, assigned by a Super Admin."""
     group = models.OneToOneField(
         ClassGroup,
         on_delete=models.CASCADE,
-        related_name="group_admin",
+        related_name="lead_mentor_assignment",
     )
-    admin = models.ForeignKey(
+    lead_mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="admin_of_groups",
+        related_name="lead_mentor_of_groups",
     )
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="group_admins_assigned",
+        related_name="lead_mentors_assigned",
     )
 
     class Meta:
-        verbose_name = "Group Admin"
-        verbose_name_plural = "Group Admins"
+        verbose_name = "Group Lead Mentor"
+        verbose_name_plural = "Group Lead Mentors"
 
     def __str__(self):
-        return f"{self.admin.full_name} → {self.group.name}"
+        return f"{self.lead_mentor.full_name} → {self.group.name}"

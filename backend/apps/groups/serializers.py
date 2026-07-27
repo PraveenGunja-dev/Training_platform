@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import ClassGroup, GroupAdmin, GroupInstructor, SubGroup, SubGroupMembership
+from .models import ClassGroup, GroupLeadMentor, GroupSubMentor, SubGroup, SubGroupMembership
 
 User = get_user_model()
 
@@ -10,7 +10,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
     participants_count = serializers.SerializerMethodField()
 
-    instructors = serializers.SerializerMethodField()
+    sub_mentors = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassGroup
@@ -22,7 +22,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
             "created_by",
             "created_by_name",
             "participants_count",
-            "instructors",
+            "sub_mentors",
             "created_at",
             "updated_at",
         ]
@@ -33,25 +33,25 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
     def get_participants_count(self, obj: ClassGroup) -> int:
         return obj.memberships.count()
 
-    def get_instructors(self, obj: ClassGroup) -> list:
+    def get_sub_mentors(self, obj: ClassGroup) -> list:
         return [
             {
-                "id": str(gi.instructor.id),
-                "full_name": gi.instructor.full_name,
-                "email": gi.instructor.email,
-                "employee_code": gi.instructor.employee_code or "",
-                "business_unit": gi.instructor.business_unit or "",
+                "id": str(gi.sub_mentor.id),
+                "full_name": gi.sub_mentor.full_name,
+                "email": gi.sub_mentor.email,
+                "employee_code": gi.sub_mentor.employee_code or "",
+                "business_unit": gi.sub_mentor.business_unit or "",
             }
-            for gi in obj.instructors.select_related("instructor").all()
+            for gi in obj.sub_mentors.select_related("sub_mentor").all()
         ]
 
 
 class ClassGroupDetailSerializer(ClassGroupListSerializer):
     participants = serializers.SerializerMethodField()
-    group_admin = serializers.SerializerMethodField()
+    lead_mentor = serializers.SerializerMethodField()
 
     class Meta(ClassGroupListSerializer.Meta):
-        fields = ClassGroupListSerializer.Meta.fields + ["participants", "group_admin"]
+        fields = ClassGroupListSerializer.Meta.fields + ["participants", "lead_mentor"]
 
     def get_participants(self, obj: ClassGroup) -> list:
         from apps.attendance.models import AttendanceRecord, AttendanceSession  # noqa: PLC0415
@@ -95,10 +95,10 @@ class ClassGroupDetailSerializer(ClassGroupListSerializer):
             })
         return result
 
-    def get_group_admin(self, obj: ClassGroup):
+    def get_lead_mentor(self, obj: ClassGroup):
         try:
-            return GroupAdminSerializer(obj.group_admin).data
-        except GroupAdmin.DoesNotExist:
+            return GroupLeadMentorSerializer(obj.lead_mentor_assignment).data
+        except GroupLeadMentor.DoesNotExist:
             return None
 
 
@@ -116,20 +116,20 @@ class BulkAddParticipantsSerializer(serializers.Serializer):
     user_ids = serializers.ListField(child=serializers.UUIDField(), min_length=1)
 
 
-class GroupInstructorSerializer(serializers.ModelSerializer):
-    """Read serializer — embeds minimal instructor user data."""
+class GroupSubMentorSerializer(serializers.ModelSerializer):
+    """Read serializer — embeds minimal Sub-Mentor user data."""
 
-    id = serializers.UUIDField(source="instructor.id", read_only=True)
-    full_name = serializers.CharField(source="instructor.full_name", read_only=True)
-    email = serializers.EmailField(source="instructor.email", read_only=True)
+    id = serializers.UUIDField(source="sub_mentor.id", read_only=True)
+    full_name = serializers.CharField(source="sub_mentor.full_name", read_only=True)
+    email = serializers.EmailField(source="sub_mentor.email", read_only=True)
 
     class Meta:
-        model = GroupInstructor
+        model = GroupSubMentor
         fields = ["id", "full_name", "email", "assigned_at"]
 
 
-class GroupInstructorAssignSerializer(serializers.Serializer):
-    """Write serializer — bulk assign instructors to a group by user IDs."""
+class GroupSubMentorAssignSerializer(serializers.Serializer):
+    """Write serializer — bulk assign Sub-Mentors to a group by user IDs."""
 
     user_ids = serializers.ListField(child=serializers.UUIDField(), min_length=1)
     promote_participants = serializers.BooleanField(default=False, required=False)
@@ -147,18 +147,18 @@ class GroupInstructorAssignSerializer(serializers.Serializer):
         user_ids = attrs.get("user_ids", [])
         found = User.objects.filter(id__in=user_ids)
         if promote:
-            blocked = found.filter(role__in=["ADMIN", "GROUP_ADMIN"])
+            blocked = found.filter(role__in=["ADMIN", "LEAD_MENTOR"])
             if blocked.exists():
                 emails = list(blocked.values_list("email", flat=True))
                 raise serializers.ValidationError(
-                    {"user_ids": f"Cannot assign ADMIN or GROUP_ADMIN users as instructors: {', '.join(emails)}."}
+                    {"user_ids": f"Cannot assign ADMIN or LEAD_MENTOR users as Sub-Mentors: {', '.join(emails)}."}
                 )
         else:
-            non_instructors = found.exclude(role="INSTRUCTOR")
-            if non_instructors.exists():
-                emails = list(non_instructors.values_list("email", flat=True))
+            non_sub_mentors = found.exclude(role="SUB_MENTOR")
+            if non_sub_mentors.exists():
+                emails = list(non_sub_mentors.values_list("email", flat=True))
                 raise serializers.ValidationError(
-                    {"user_ids": f"The following users do not have the INSTRUCTOR role: {', '.join(emails)}."}
+                    {"user_ids": f"The following users do not have the SUB_MENTOR role: {', '.join(emails)}."}
                 )
         return attrs
 
@@ -198,20 +198,20 @@ class SubGroupWriteSerializer(serializers.Serializer):
         return value.strip()
 
 
-class GroupAdminSerializer(serializers.ModelSerializer):
-    """Read serializer — returns admin user details."""
-    admin_id = serializers.UUIDField(source="admin.id", read_only=True)
-    full_name = serializers.CharField(source="admin.full_name", read_only=True)
-    email = serializers.EmailField(source="admin.email", read_only=True)
+class GroupLeadMentorSerializer(serializers.ModelSerializer):
+    """Read serializer — returns Lead Mentor user details."""
+    lead_mentor_id = serializers.UUIDField(source="lead_mentor.id", read_only=True)
+    full_name = serializers.CharField(source="lead_mentor.full_name", read_only=True)
+    email = serializers.EmailField(source="lead_mentor.email", read_only=True)
     assigned_at = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
-        model = GroupAdmin
-        fields = ["admin_id", "full_name", "email", "assigned_at"]
+        model = GroupLeadMentor
+        fields = ["lead_mentor_id", "full_name", "email", "assigned_at"]
 
 
-class GroupAdminWriteSerializer(serializers.Serializer):
-    """Write serializer for assigning a group admin."""
+class GroupLeadMentorWriteSerializer(serializers.Serializer):
+    """Write serializer for assigning a Lead Mentor."""
     user_id = serializers.UUIDField()
 
     def validate_user_id(self, value):

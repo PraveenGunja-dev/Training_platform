@@ -1,4 +1,4 @@
-"""Chunk 02 — Instructor scoping tests for the assignments app."""
+"""Chunk 02 — Sub-Mentor scoping tests for the assignments app."""
 from datetime import timedelta
 
 import pytest
@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.assignments.models import AssignmentTask, Submission
-from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+from apps.groups.models import ClassGroup, GroupSubMentor, GroupMembership
 
 User = get_user_model()
 
@@ -27,8 +27,8 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
-    return User.objects.create_user(email="ins@asgn.s.test", password="pass", full_name="Instructor", role="INSTRUCTOR")
+def sub_mentor(db):
+    return User.objects.create_user(email="ins@asgn.s.test", password="pass", full_name="Sub-Mentor", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -44,9 +44,9 @@ def admin_client(admin):
 
 
 @pytest.fixture
-def instructor_client(instructor):
+def sub_mentor_client(sub_mentor):
     c = APIClient()
-    c.force_authenticate(user=instructor)
+    c.force_authenticate(user=sub_mentor)
     return c
 
 
@@ -68,8 +68,8 @@ def group_b(db, admin):
 
 
 @pytest.fixture
-def assigned(group_a, instructor, admin):
-    return GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=admin)
+def assigned(group_a, sub_mentor, admin):
+    return GroupSubMentor.objects.create(group=group_a, sub_mentor=sub_mentor, assigned_by=admin)
 
 
 @pytest.fixture
@@ -106,19 +106,19 @@ def task_b(db, group_b, admin):
 @pytest.mark.django_db
 class TestAssignmentList:
     def test_admin_sees_all_tasks(self, admin_client, task_a, task_b):
-        resp = admin_client.get("/api/v1/assignments")
+        resp = admin_client.get("/training/api/v1/assignments")
         assert resp.status_code == 200
         titles = {t["title"] for t in resp.json()["data"]}
         assert "Task in A" in titles
         assert "Task in B" in titles
 
-    def test_instructor_no_assignment_sees_empty(self, instructor_client, task_a):
-        resp = instructor_client.get("/api/v1/assignments")
+    def test_sub_mentor_no_assignment_sees_empty(self, sub_mentor_client, task_a):
+        resp = sub_mentor_client.get("/training/api/v1/assignments")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
-    def test_instructor_assigned_sees_only_own_tasks(self, instructor_client, assigned, task_a, task_b):
-        resp = instructor_client.get("/api/v1/assignments")
+    def test_sub_mentor_assigned_sees_only_own_tasks(self, sub_mentor_client, assigned, task_a, task_b):
+        resp = sub_mentor_client.get("/training/api/v1/assignments")
         assert resp.status_code == 200
         titles = {t["title"] for t in resp.json()["data"]}
         assert "Task in A" in titles
@@ -132,14 +132,14 @@ class TestAssignmentList:
 
 @pytest.mark.django_db
 class TestAssignmentRetrieve:
-    def test_instructor_retrieves_assigned_task(self, instructor_client, assigned, task_a):
-        resp = instructor_client.get(f"/api/v1/assignments/{task_a.id}")
+    def test_sub_mentor_retrieves_assigned_task(self, sub_mentor_client, assigned, task_a):
+        resp = sub_mentor_client.get(f"/training/api/v1/assignments/{task_a.id}")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_retrieve_unassigned_task(self, instructor_client, task_b):
-        resp = instructor_client.get(f"/api/v1/assignments/{task_b.id}")
+    def test_sub_mentor_cannot_retrieve_unassigned_task(self, sub_mentor_client, task_b):
+        resp = sub_mentor_client.get(f"/training/api/v1/assignments/{task_b.id}")
         assert resp.status_code == 403
-        assert resp.json()["errors"][0]["code"] == "perm.not_instructor_of_group"
+        assert resp.json()["errors"][0]["code"] == "perm.not_sub_mentor_of_group"
 
 
 # ---------------------------------------------------------------------------
@@ -159,16 +159,16 @@ class TestAssignmentCreate:
             "deadline_at": DEADLINE.isoformat(),
         }
 
-    def test_instructor_can_create_task_in_assigned_group(self, instructor_client, assigned, group_a):
-        resp = instructor_client.post("/api/v1/assignments", self._task_payload(group_a.id), format="json")
+    def test_sub_mentor_can_create_task_in_assigned_group(self, sub_mentor_client, assigned, group_a):
+        resp = sub_mentor_client.post("/training/api/v1/assignments", self._task_payload(group_a.id), format="json")
         assert resp.status_code == 201
 
-    def test_instructor_cannot_create_task_in_unassigned_group(self, instructor_client, group_b):
-        resp = instructor_client.post("/api/v1/assignments", self._task_payload(group_b.id), format="json")
+    def test_sub_mentor_cannot_create_task_in_unassigned_group(self, sub_mentor_client, group_b):
+        resp = sub_mentor_client.post("/training/api/v1/assignments", self._task_payload(group_b.id), format="json")
         assert resp.status_code == 403
 
     def test_participant_cannot_create_task(self, participant_client, group_a):
-        resp = participant_client.post("/api/v1/assignments", self._task_payload(group_a.id), format="json")
+        resp = participant_client.post("/training/api/v1/assignments", self._task_payload(group_a.id), format="json")
         assert resp.status_code == 403
 
 
@@ -179,28 +179,28 @@ class TestAssignmentCreate:
 
 @pytest.mark.django_db
 class TestAssignmentWriteScoping:
-    def test_instructor_can_update_task_in_assigned_group(self, instructor_client, assigned, task_a):
-        resp = instructor_client.patch(
-            f"/api/v1/assignments/{task_a.id}",
+    def test_sub_mentor_can_update_task_in_assigned_group(self, sub_mentor_client, assigned, task_a):
+        resp = sub_mentor_client.patch(
+            f"/training/api/v1/assignments/{task_a.id}",
             {"title": "Updated Task"},
             format="json",
         )
         assert resp.status_code == 200
 
-    def test_instructor_cannot_update_task_in_unassigned_group(self, instructor_client, task_b):
-        resp = instructor_client.patch(
-            f"/api/v1/assignments/{task_b.id}",
+    def test_sub_mentor_cannot_update_task_in_unassigned_group(self, sub_mentor_client, task_b):
+        resp = sub_mentor_client.patch(
+            f"/training/api/v1/assignments/{task_b.id}",
             {"title": "Hacked"},
             format="json",
         )
         assert resp.status_code == 403
 
-    def test_instructor_can_delete_task_in_assigned_group(self, instructor_client, assigned, task_a):
-        resp = instructor_client.delete(f"/api/v1/assignments/{task_a.id}")
+    def test_sub_mentor_can_delete_task_in_assigned_group(self, sub_mentor_client, assigned, task_a):
+        resp = sub_mentor_client.delete(f"/training/api/v1/assignments/{task_a.id}")
         assert resp.status_code == 204
 
-    def test_instructor_cannot_delete_task_in_unassigned_group(self, instructor_client, task_b):
-        resp = instructor_client.delete(f"/api/v1/assignments/{task_b.id}")
+    def test_sub_mentor_cannot_delete_task_in_unassigned_group(self, sub_mentor_client, task_b):
+        resp = sub_mentor_client.delete(f"/training/api/v1/assignments/{task_b.id}")
         assert resp.status_code == 403
 
 
@@ -211,12 +211,12 @@ class TestAssignmentWriteScoping:
 
 @pytest.mark.django_db
 class TestAssignmentClose:
-    def test_instructor_can_close_task_in_assigned_group(self, instructor_client, assigned, task_a):
-        resp = instructor_client.post(f"/api/v1/assignments/{task_a.id}/close")
+    def test_sub_mentor_can_close_task_in_assigned_group(self, sub_mentor_client, assigned, task_a):
+        resp = sub_mentor_client.post(f"/training/api/v1/assignments/{task_a.id}/close")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_close_task_in_unassigned_group(self, instructor_client, task_b):
-        resp = instructor_client.post(f"/api/v1/assignments/{task_b.id}/close")
+    def test_sub_mentor_cannot_close_task_in_unassigned_group(self, sub_mentor_client, task_b):
+        resp = sub_mentor_client.post(f"/training/api/v1/assignments/{task_b.id}/close")
         assert resp.status_code == 403
 
 
@@ -227,10 +227,10 @@ class TestAssignmentClose:
 
 @pytest.mark.django_db
 class TestListSubmissions:
-    def test_instructor_can_list_submissions_for_assigned_task(self, instructor_client, assigned, task_a):
-        resp = instructor_client.get(f"/api/v1/assignments/{task_a.id}/submissions")
+    def test_sub_mentor_can_list_submissions_for_assigned_task(self, sub_mentor_client, assigned, task_a):
+        resp = sub_mentor_client.get(f"/training/api/v1/assignments/{task_a.id}/submissions")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_list_submissions_for_unassigned_task(self, instructor_client, task_b):
-        resp = instructor_client.get(f"/api/v1/assignments/{task_b.id}/submissions")
+    def test_sub_mentor_cannot_list_submissions_for_unassigned_task(self, sub_mentor_client, task_b):
+        resp = sub_mentor_client.get(f"/training/api/v1/assignments/{task_b.id}/submissions")
         assert resp.status_code == 403

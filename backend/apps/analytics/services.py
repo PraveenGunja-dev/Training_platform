@@ -287,19 +287,19 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     }
 
 
-def compute_instructor_payload(user) -> dict:
-    """Dashboard payload scoped to the instructor's assigned groups."""
+def compute_sub_mentor_payload(user) -> dict:
+    """Dashboard payload scoped to the Sub-Mentor's assigned groups."""
     from apps.assignments.models import AssignmentTask, Submission
     from apps.attendance.models import AttendanceRecord, AttendanceSession
     from apps.documents.models import ParticipantSharedDoc
-    from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+    from apps.groups.models import ClassGroup, GroupSubMentor, GroupMembership
     from apps.scheduling.models import Class
 
     now = timezone.now()
     today = now.date()
 
     assigned_group_ids = list(
-        GroupInstructor.objects.filter(instructor=user).values_list("group_id", flat=True)
+        GroupSubMentor.objects.filter(sub_mentor=user).values_list("group_id", flat=True)
     )
     groups = ClassGroup.objects.filter(pk__in=assigned_group_ids, is_archived=False)
 
@@ -390,7 +390,7 @@ def compute_instructor_payload(user) -> dict:
             "submission_rate": min(100.0, sub_rate),
         })
 
-    # 4-week attendance & submission trend (scoped to instructor's groups)
+    # 4-week attendance & submission trend (scoped to Sub-Mentor's groups)
     weekly_trend = []
     for week in range(3, -1, -1):
         w_end   = now - timedelta(weeks=week)
@@ -461,7 +461,7 @@ def compute_instructor_payload(user) -> dict:
         {"label": "Cancelled", "value": Class.objects.filter(status_cached="CANCELLED", **_class_q).count()},
     ]
 
-    # Recent activity scoped to instructor's groups (class + attendance + assignment events)
+    # Recent activity scoped to Sub-Mentor's groups (class + attendance + assignment events)
     from apps.audit.models import AuditLog  # noqa: PLC0415
     class_ids = list(Class.objects.filter(**_class_q).values_list("id", flat=True))
     class_id_strs = [str(c) for c in class_ids]
@@ -486,7 +486,7 @@ def compute_instructor_payload(user) -> dict:
             "created_at": log.created_at.isoformat(),
         })
 
-    # --- Participant activity scoped to instructor's groups ---
+    # --- Participant activity scoped to Sub-Mentor's groups ---
     _sessions_per_group = {
         row["class_obj__group_id"]: row["cnt"]
         for row in AttendanceSession.objects.filter(class_obj__group_id__in=assigned_group_ids)
@@ -726,11 +726,11 @@ def compute_participant_payload(user) -> dict:
     }
 
 
-def compute_group_admin_payload(group_id: str) -> dict:
+def compute_lead_mentor_payload(group_id: str) -> dict:
     from apps.accounts.models import User
     from apps.assignments.models import AssignmentTask, Submission
     from apps.attendance.models import AttendanceRecord, AttendanceSession
-    from apps.groups.models import ClassGroup, GroupAdmin, GroupInstructor, GroupMembership, SubGroup
+    from apps.groups.models import ClassGroup, GroupLeadMentor, GroupSubMentor, GroupMembership, SubGroup
     from apps.scheduling.models import Class
 
     now = timezone.now()
@@ -741,7 +741,7 @@ def compute_group_admin_payload(group_id: str) -> dict:
 
     # KPIs
     total_participants = GroupMembership.objects.filter(group_id=group_id).values("user_id").distinct().count()
-    total_instructors = GroupInstructor.objects.filter(group_id=group_id).count()
+    total_sub_mentors = GroupSubMentor.objects.filter(group_id=group_id).count()
     total_sub_groups = SubGroup.objects.filter(parent_group_id=group_id).count()
     total_assignments = AssignmentTask.objects.filter(group_id=group_id).count()
     classes_today = Class.objects.filter(group_id=group_id, starts_at__date=today).count()
@@ -867,7 +867,7 @@ def compute_group_admin_payload(group_id: str) -> dict:
         "group_name": group_name,
         "kpis": {
             "total_participants": total_participants,
-            "total_instructors": total_instructors,
+            "total_sub_mentors": total_sub_mentors,
             "total_sub_groups": total_sub_groups,
             "total_assignments": total_assignments,
             "classes_today": classes_today,

@@ -1,4 +1,4 @@
-"""Chunk 02 — Instructor scoping tests for the scheduling (classes) app."""
+"""Chunk 02 — Sub-Mentor scoping tests for the scheduling (classes) app."""
 from datetime import timedelta
 
 import pytest
@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.groups.models import ClassGroup, GroupInstructor
+from apps.groups.models import ClassGroup, GroupSubMentor
 from apps.scheduling.models import Class
 
 User = get_user_model()
@@ -27,8 +27,8 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
-    return User.objects.create_user(email="ins@sched.s.test", password="pass", full_name="Instructor", role="INSTRUCTOR")
+def sub_mentor(db):
+    return User.objects.create_user(email="ins@sched.s.test", password="pass", full_name="Sub-Mentor", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -44,9 +44,9 @@ def admin_client(admin):
 
 
 @pytest.fixture
-def instructor_client(instructor):
+def sub_mentor_client(sub_mentor):
     c = APIClient()
-    c.force_authenticate(user=instructor)
+    c.force_authenticate(user=sub_mentor)
     return c
 
 
@@ -68,8 +68,8 @@ def group_b(db, admin):
 
 
 @pytest.fixture
-def assigned(group_a, instructor, admin):
-    return GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=admin)
+def assigned(group_a, sub_mentor, admin):
+    return GroupSubMentor.objects.create(group=group_a, sub_mentor=sub_mentor, assigned_by=admin)
 
 
 @pytest.fixture
@@ -102,19 +102,19 @@ def class_in_b(db, group_b, admin):
 @pytest.mark.django_db
 class TestClassList:
     def test_admin_sees_all_classes(self, admin_client, class_in_a, class_in_b):
-        resp = admin_client.get("/api/v1/classes")
+        resp = admin_client.get("/training/api/v1/classes")
         assert resp.status_code == 200
         titles = {c["title"] for c in resp.json()["data"]}
         assert "Class in A" in titles
         assert "Class in B" in titles
 
-    def test_instructor_no_assignment_sees_empty(self, instructor_client, class_in_a):
-        resp = instructor_client.get("/api/v1/classes")
+    def test_sub_mentor_no_assignment_sees_empty(self, sub_mentor_client, class_in_a):
+        resp = sub_mentor_client.get("/training/api/v1/classes")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
-    def test_instructor_assigned_sees_only_own_classes(self, instructor_client, assigned, class_in_a, class_in_b):
-        resp = instructor_client.get("/api/v1/classes")
+    def test_sub_mentor_assigned_sees_only_own_classes(self, sub_mentor_client, assigned, class_in_a, class_in_b):
+        resp = sub_mentor_client.get("/training/api/v1/classes")
         assert resp.status_code == 200
         titles = {c["title"] for c in resp.json()["data"]}
         assert "Class in A" in titles
@@ -123,7 +123,7 @@ class TestClassList:
     def test_participant_sees_only_enrolled_classes(self, participant_client, participant, class_in_a, class_in_b):
         from apps.groups.models import GroupMembership
         GroupMembership.objects.create(group=class_in_a.group, user=participant)
-        resp = participant_client.get("/api/v1/classes")
+        resp = participant_client.get("/training/api/v1/classes")
         assert resp.status_code == 200
         titles = {c["title"] for c in resp.json()["data"]}
         assert "Class in A" in titles
@@ -138,15 +138,15 @@ class TestClassList:
 @pytest.mark.django_db
 class TestClassRetrieve:
     def test_admin_retrieves_any_class(self, admin_client, class_in_b):
-        resp = admin_client.get(f"/api/v1/classes/{class_in_b.id}")
+        resp = admin_client.get(f"/training/api/v1/classes/{class_in_b.id}")
         assert resp.status_code == 200
 
-    def test_instructor_retrieves_assigned_class(self, instructor_client, assigned, class_in_a):
-        resp = instructor_client.get(f"/api/v1/classes/{class_in_a.id}")
+    def test_sub_mentor_retrieves_assigned_class(self, sub_mentor_client, assigned, class_in_a):
+        resp = sub_mentor_client.get(f"/training/api/v1/classes/{class_in_a.id}")
         assert resp.status_code == 200
 
-    def test_instructor_cannot_retrieve_unassigned_class(self, instructor_client, class_in_b):
-        resp = instructor_client.get(f"/api/v1/classes/{class_in_b.id}")
+    def test_sub_mentor_cannot_retrieve_unassigned_class(self, sub_mentor_client, class_in_b):
+        resp = sub_mentor_client.get(f"/training/api/v1/classes/{class_in_b.id}")
         assert resp.status_code == 404
 
 
@@ -157,9 +157,9 @@ class TestClassRetrieve:
 
 @pytest.mark.django_db
 class TestClassCreate:
-    def test_instructor_can_create_class_in_assigned_group(self, instructor_client, assigned, group_a):
-        resp = instructor_client.post(
-            "/api/v1/classes",
+    def test_sub_mentor_can_create_class_in_assigned_group(self, sub_mentor_client, assigned, group_a):
+        resp = sub_mentor_client.post(
+            "/training/api/v1/classes",
             {
                 "group_id": str(group_a.id),
                 "title": "New Class",
@@ -171,9 +171,9 @@ class TestClassCreate:
         assert resp.status_code == 201
         assert resp.json()["data"]["title"] == "New Class"
 
-    def test_instructor_cannot_create_class_in_unassigned_group(self, instructor_client, group_b):
-        resp = instructor_client.post(
-            "/api/v1/classes",
+    def test_sub_mentor_cannot_create_class_in_unassigned_group(self, sub_mentor_client, group_b):
+        resp = sub_mentor_client.post(
+            "/training/api/v1/classes",
             {
                 "group_id": str(group_b.id),
                 "title": "Hack Class",
@@ -186,7 +186,7 @@ class TestClassCreate:
 
     def test_participant_cannot_create_class(self, participant_client, group_a):
         resp = participant_client.post(
-            "/api/v1/classes",
+            "/training/api/v1/classes",
             {
                 "group_id": str(group_a.id),
                 "title": "Bad Class",
@@ -205,27 +205,27 @@ class TestClassCreate:
 
 @pytest.mark.django_db
 class TestClassWriteScoping:
-    def test_instructor_can_update_assigned_class(self, instructor_client, assigned, class_in_a):
-        resp = instructor_client.patch(
-            f"/api/v1/classes/{class_in_a.id}",
+    def test_sub_mentor_can_update_assigned_class(self, sub_mentor_client, assigned, class_in_a):
+        resp = sub_mentor_client.patch(
+            f"/training/api/v1/classes/{class_in_a.id}",
             {"title": "Updated"},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.json()["data"]["title"] == "Updated"
 
-    def test_instructor_cannot_update_unassigned_class(self, instructor_client, class_in_b):
-        resp = instructor_client.patch(
-            f"/api/v1/classes/{class_in_b.id}",
+    def test_sub_mentor_cannot_update_unassigned_class(self, sub_mentor_client, class_in_b):
+        resp = sub_mentor_client.patch(
+            f"/training/api/v1/classes/{class_in_b.id}",
             {"title": "Hacked"},
             format="json",
         )
         assert resp.status_code == 403
 
-    def test_instructor_can_delete_assigned_class(self, instructor_client, assigned, class_in_a):
-        resp = instructor_client.delete(f"/api/v1/classes/{class_in_a.id}")
+    def test_sub_mentor_can_delete_assigned_class(self, sub_mentor_client, assigned, class_in_a):
+        resp = sub_mentor_client.delete(f"/training/api/v1/classes/{class_in_a.id}")
         assert resp.status_code == 204
 
-    def test_instructor_cannot_delete_unassigned_class(self, instructor_client, class_in_b):
-        resp = instructor_client.delete(f"/api/v1/classes/{class_in_b.id}")
+    def test_sub_mentor_cannot_delete_unassigned_class(self, sub_mentor_client, class_in_b):
+        resp = sub_mentor_client.delete(f"/training/api/v1/classes/{class_in_b.id}")
         assert resp.status_code == 403

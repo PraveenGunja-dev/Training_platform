@@ -1,9 +1,9 @@
-"""Chunk 02 — Instructor scoping tests for the analytics app."""
+"""Chunk 02 — Sub-Mentor scoping tests for the analytics app."""
 import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.groups.models import ClassGroup, GroupInstructor
+from apps.groups.models import ClassGroup, GroupSubMentor
 
 User = get_user_model()
 
@@ -19,8 +19,8 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
-    return User.objects.create_user(email="ins@anal.s.test", password="pass", full_name="Instructor", role="INSTRUCTOR")
+def sub_mentor(db):
+    return User.objects.create_user(email="ins@anal.s.test", password="pass", full_name="Sub-Mentor", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -36,9 +36,9 @@ def admin_client(admin):
 
 
 @pytest.fixture
-def instructor_client(instructor):
+def sub_mentor_client(sub_mentor):
     c = APIClient()
-    c.force_authenticate(user=instructor)
+    c.force_authenticate(user=sub_mentor)
     return c
 
 
@@ -55,8 +55,8 @@ def group_a(db, admin):
 
 
 @pytest.fixture
-def assigned(group_a, instructor, admin):
-    return GroupInstructor.objects.create(group=group_a, instructor=instructor, assigned_by=admin)
+def assigned(group_a, sub_mentor, admin):
+    return GroupSubMentor.objects.create(group=group_a, sub_mentor=sub_mentor, assigned_by=admin)
 
 
 # ---------------------------------------------------------------------------
@@ -67,25 +67,25 @@ def assigned(group_a, instructor, admin):
 @pytest.mark.django_db
 class TestDashboard:
     def test_admin_can_access_dashboard(self, admin_client):
-        resp = admin_client.get("/api/v1/dashboard/admin")
+        resp = admin_client.get("/training/api/v1/dashboard/admin")
         assert resp.status_code == 200
         assert "kpis" in resp.json()["data"]
 
-    def test_instructor_can_access_dashboard(self, instructor_client, assigned):
-        resp = instructor_client.get("/api/v1/dashboard/admin")
+    def test_sub_mentor_can_access_dashboard(self, sub_mentor_client, assigned):
+        resp = sub_mentor_client.get("/training/api/v1/dashboard/admin")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert "kpis" in data
         assert "charts" in data
 
-    def test_instructor_no_assignment_gets_empty_dashboard(self, instructor_client):
-        resp = instructor_client.get("/api/v1/dashboard/admin")
+    def test_sub_mentor_no_assignment_gets_empty_dashboard(self, sub_mentor_client):
+        resp = sub_mentor_client.get("/training/api/v1/dashboard/admin")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["kpis"]["total_groups"] == 0
 
     def test_participant_cannot_access_admin_dashboard(self, participant_client):
-        resp = participant_client.get("/api/v1/dashboard/admin")
+        resp = participant_client.get("/training/api/v1/dashboard/admin")
         assert resp.status_code == 403
 
 
@@ -96,21 +96,21 @@ class TestDashboard:
 
 @pytest.mark.django_db
 class TestHardDenials:
-    def test_instructor_cannot_access_audit_log(self, instructor_client):
-        resp = instructor_client.get("/api/v1/audit")
+    def test_sub_mentor_cannot_access_audit_log(self, sub_mentor_client):
+        resp = sub_mentor_client.get("/training/api/v1/audit")
         assert resp.status_code == 403
 
-    def test_instructor_cannot_access_settings(self, instructor_client):
-        resp = instructor_client.get("/api/v1/admin/settings")
+    def test_sub_mentor_cannot_access_settings(self, sub_mentor_client):
+        resp = sub_mentor_client.get("/training/api/v1/admin/settings")
         assert resp.status_code == 403
 
-    def test_instructor_cannot_list_users(self, instructor_client):
-        resp = instructor_client.get("/api/v1/users")
+    def test_sub_mentor_cannot_list_users(self, sub_mentor_client):
+        resp = sub_mentor_client.get("/training/api/v1/users")
         assert resp.status_code == 403
 
-    def test_instructor_cannot_invite_user(self, instructor_client):
-        resp = instructor_client.post(
-            "/api/v1/users",
+    def test_sub_mentor_cannot_invite_user(self, sub_mentor_client):
+        resp = sub_mentor_client.post(
+            "/training/api/v1/users",
             {"email": "hack@test.com", "full_name": "Hack", "role": "PARTICIPANT"},
             format="json",
         )

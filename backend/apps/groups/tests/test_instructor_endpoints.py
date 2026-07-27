@@ -1,12 +1,12 @@
 """Chunk 03 — tests for new instructor-management endpoints.
 
 Covers:
-  GET  /groups/{id}/instructors        — list instructors (permission matrix)
-  POST /groups/{id}/instructors        — bulk assign
-  DELETE /groups/{id}/instructors/{uid} — unassign
-  GET  /instructors                    — picker list (admin, ?q= filter)
+  GET  /groups/{id}/sub-mentors        — list instructors (permission matrix)
+  POST /groups/{id}/sub-mentors        — bulk assign
+  DELETE /groups/{id}/sub-mentors/{uid} — unassign
+  GET  /sub-mentors                    — picker list (admin, ?q= filter)
   GET  /me/groups                      — instructor's own assigned groups
-  PATCH /admin/settings                — instructors_can_view_all_classes + audit
+  PATCH /lead-mentor/settings                — sub_mentors_can_view_all_classes + audit
   PATCH /users/{id}/visibility         — per-instructor override + audit
 """
 import pytest
@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 
 from apps.audit.models import AuditLog
 from apps.common.models import SystemSettings
-from apps.groups.models import ClassGroup, GroupInstructor
+from apps.groups.models import ClassGroup, GroupSubMentor
 
 User = get_user_model()
 
@@ -35,14 +35,14 @@ def admin(db):
 @pytest.fixture
 def instructor(db):
     return User.objects.create_user(
-        email="ins@ep.test", password="pass", full_name="Jane Instructor", role="INSTRUCTOR"
+        email="ins@ep.test", password="pass", full_name="Jane Instructor", role="SUB_MENTOR"
     )
 
 
 @pytest.fixture
 def instructor2(db):
     return User.objects.create_user(
-        email="ins2@ep.test", password="pass", full_name="Bob Instructor", role="INSTRUCTOR"
+        email="ins2@ep.test", password="pass", full_name="Bob Instructor", role="SUB_MENTOR"
     )
 
 
@@ -94,18 +94,18 @@ def group_b(db, admin):
 @pytest.fixture
 def assignment(group, instructor, admin):
     """Instructor assigned to group."""
-    return GroupInstructor.objects.create(group=group, instructor=instructor, assigned_by=admin)
+    return GroupSubMentor.objects.create(group=group, sub_mentor=instructor, assigned_by=admin)
 
 
 # ---------------------------------------------------------------------------
-# GET /groups/{id}/instructors — permission matrix
+# GET /groups/{id}/sub-mentors — permission matrix
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-class TestListGroupInstructors:
+class TestListGroupSubMentors:
     def test_admin_can_list_instructors(self, admin_client, group, assignment):
-        resp = admin_client.get(f"/api/v1/groups/{group.id}/instructors")
+        resp = admin_client.get(f"/training/api/v1/groups/{group.id}/sub-mentors")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data) == 1
@@ -113,27 +113,27 @@ class TestListGroupInstructors:
         assert "assigned_at" in data[0]
 
     def test_instructor_of_group_can_list(self, instructor_client, group, assignment):
-        resp = instructor_client.get(f"/api/v1/groups/{group.id}/instructors")
+        resp = instructor_client.get(f"/training/api/v1/groups/{group.id}/sub-mentors")
         assert resp.status_code == 200
         assert len(resp.json()["data"]) == 1
 
     def test_instructor_elsewhere_gets_403(self, instructor2_client, group, assignment):
         # instructor2 is NOT assigned to group
-        resp = instructor2_client.get(f"/api/v1/groups/{group.id}/instructors")
+        resp = instructor2_client.get(f"/training/api/v1/groups/{group.id}/sub-mentors")
         assert resp.status_code == 403
 
     def test_participant_gets_403(self, participant_client, group, assignment):
-        resp = participant_client.get(f"/api/v1/groups/{group.id}/instructors")
+        resp = participant_client.get(f"/training/api/v1/groups/{group.id}/sub-mentors")
         assert resp.status_code == 403
 
     def test_empty_list_when_no_instructors(self, admin_client, group):
-        resp = admin_client.get(f"/api/v1/groups/{group.id}/instructors")
+        resp = admin_client.get(f"/training/api/v1/groups/{group.id}/sub-mentors")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
 
 # ---------------------------------------------------------------------------
-# POST /groups/{id}/instructors — bulk assign
+# POST /groups/{id}/sub-mentors — bulk assign
 # ---------------------------------------------------------------------------
 
 
@@ -141,16 +141,16 @@ class TestListGroupInstructors:
 class TestAssignInstructors:
     def test_admin_assigns_multiple_instructors(self, admin_client, admin, group, instructor, instructor2):
         payload = {"user_ids": [str(instructor.id), str(instructor2.id)]}
-        resp = admin_client.post(f"/api/v1/groups/{group.id}/instructors", payload, format="json")
+        resp = admin_client.post(f"/training/api/v1/groups/{group.id}/sub-mentors", payload, format="json")
         assert resp.status_code == 200
         assert resp.json()["data"]["assigned"] == 2
         assert resp.json()["data"]["skipped"] == 0
-        assert GroupInstructor.objects.filter(group=group).count() == 2
+        assert GroupSubMentor.objects.filter(group=group).count() == 2
 
     def test_assign_emits_audit_per_new_instructor(self, admin_client, group, instructor, instructor2):
         payload = {"user_ids": [str(instructor.id), str(instructor2.id)]}
-        admin_client.post(f"/api/v1/groups/{group.id}/instructors", payload, format="json")
-        audit_rows = AuditLog.objects.filter(action="instructor_assigned")
+        admin_client.post(f"/training/api/v1/groups/{group.id}/sub-mentors", payload, format="json")
+        audit_rows = AuditLog.objects.filter(action="sub_mentor_assigned")
         assert audit_rows.count() == 2
         meta = audit_rows.first().metadata
         assert meta["group_id"] == str(group.id)
@@ -158,28 +158,28 @@ class TestAssignInstructors:
 
     def test_participant_user_id_returns_400(self, admin_client, group, participant):
         resp = admin_client.post(
-            f"/api/v1/groups/{group.id}/instructors",
+            f"/training/api/v1/groups/{group.id}/sub-mentors",
             {"user_ids": [str(participant.id)]},
             format="json",
         )
         assert resp.status_code == 400
-        assert "INSTRUCTOR" in str(resp.json())
+        assert "SUB_MENTOR" in str(resp.json())
 
     def test_duplicate_assign_is_idempotent(self, admin_client, group, instructor, assignment):
-        # assignment fixture already created one GroupInstructor row
+        # assignment fixture already created one GroupSubMentor row
         resp = admin_client.post(
-            f"/api/v1/groups/{group.id}/instructors",
+            f"/training/api/v1/groups/{group.id}/sub-mentors",
             {"user_ids": [str(instructor.id)]},
             format="json",
         )
         assert resp.status_code == 200
         assert resp.json()["data"]["assigned"] == 0
         assert resp.json()["data"]["skipped"] == 1
-        assert GroupInstructor.objects.filter(group=group, instructor=instructor).count() == 1
+        assert GroupSubMentor.objects.filter(group=group, sub_mentor=instructor).count() == 1
 
     def test_instructor_cannot_assign(self, instructor_client, group, instructor2):
         resp = instructor_client.post(
-            f"/api/v1/groups/{group.id}/instructors",
+            f"/training/api/v1/groups/{group.id}/sub-mentors",
             {"user_ids": [str(instructor2.id)]},
             format="json",
         )
@@ -187,7 +187,7 @@ class TestAssignInstructors:
 
     def test_participant_cannot_assign(self, participant_client, group, instructor):
         resp = participant_client.post(
-            f"/api/v1/groups/{group.id}/instructors",
+            f"/training/api/v1/groups/{group.id}/sub-mentors",
             {"user_ids": [str(instructor.id)]},
             format="json",
         )
@@ -195,43 +195,43 @@ class TestAssignInstructors:
 
 
 # ---------------------------------------------------------------------------
-# DELETE /groups/{id}/instructors/{user_id} — unassign
+# DELETE /groups/{id}/sub-mentors/{user_id} — unassign
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
 class TestUnassignInstructor:
     def test_admin_unassigns_instructor(self, admin_client, group, instructor, assignment):
-        resp = admin_client.delete(f"/api/v1/groups/{group.id}/instructors/{instructor.id}")
+        resp = admin_client.delete(f"/training/api/v1/groups/{group.id}/sub-mentors/{instructor.id}")
         assert resp.status_code == 204
-        assert not GroupInstructor.objects.filter(group=group, instructor=instructor).exists()
+        assert not GroupSubMentor.objects.filter(group=group, sub_mentor=instructor).exists()
 
     def test_unassign_emits_audit(self, admin_client, group, instructor, assignment):
-        admin_client.delete(f"/api/v1/groups/{group.id}/instructors/{instructor.id}")
-        row = AuditLog.objects.filter(action="instructor_unassigned").first()
+        admin_client.delete(f"/training/api/v1/groups/{group.id}/sub-mentors/{instructor.id}")
+        row = AuditLog.objects.filter(action="sub_mentor_unassigned").first()
         assert row is not None
         assert row.metadata["group_id"] == str(group.id)
 
     def test_unassign_nonexistent_returns_404(self, admin_client, group, instructor2):
         # instructor2 is not assigned to group
-        resp = admin_client.delete(f"/api/v1/groups/{group.id}/instructors/{instructor2.id}")
+        resp = admin_client.delete(f"/training/api/v1/groups/{group.id}/sub-mentors/{instructor2.id}")
         assert resp.status_code == 404
 
     def test_instructor_cannot_unassign(self, instructor_client, group, instructor2, admin):
-        GroupInstructor.objects.create(group=group, instructor=instructor2, assigned_by=admin)
-        resp = instructor_client.delete(f"/api/v1/groups/{group.id}/instructors/{instructor2.id}")
+        GroupSubMentor.objects.create(group=group, sub_mentor=instructor2, assigned_by=admin)
+        resp = instructor_client.delete(f"/training/api/v1/groups/{group.id}/sub-mentors/{instructor2.id}")
         assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# GET /instructors — picker list
+# GET /sub-mentors — picker list
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
 class TestInstructorListView:
     def test_returns_only_instructors(self, admin_client, instructor, instructor2, participant):
-        resp = admin_client.get("/api/v1/instructors")
+        resp = admin_client.get("/training/api/v1/sub-mentors")
         assert resp.status_code == 200
         emails = {u["email"] for u in resp.json()["data"]}
         assert "ins@ep.test" in emails
@@ -240,25 +240,25 @@ class TestInstructorListView:
 
     def test_q_filter_by_name(self, admin_client, instructor, instructor2):
         # "Jane" matches instructor (full_name="Jane Instructor"), not instructor2
-        resp = admin_client.get("/api/v1/instructors?q=Jane")
+        resp = admin_client.get("/training/api/v1/sub-mentors?q=Jane")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data) == 1
         assert data[0]["email"] == "ins@ep.test"
 
     def test_q_filter_by_email(self, admin_client, instructor, instructor2):
-        resp = admin_client.get("/api/v1/instructors?q=ins2")
+        resp = admin_client.get("/training/api/v1/sub-mentors?q=ins2")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data) == 1
         assert data[0]["email"] == "ins2@ep.test"
 
     def test_participant_gets_403(self, participant_client):
-        resp = participant_client.get("/api/v1/instructors")
+        resp = participant_client.get("/training/api/v1/sub-mentors")
         assert resp.status_code == 403
 
     def test_instructor_gets_403(self, instructor_client):
-        resp = instructor_client.get("/api/v1/instructors")
+        resp = instructor_client.get("/training/api/v1/sub-mentors")
         assert resp.status_code == 403
 
 
@@ -270,14 +270,14 @@ class TestInstructorListView:
 @pytest.mark.django_db
 class TestMeGroupsView:
     def test_empty_when_no_assignments(self, instructor_client):
-        resp = instructor_client.get("/api/v1/me/groups")
+        resp = instructor_client.get("/training/api/v1/me/groups")
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
     def test_returns_assigned_groups_only(self, instructor_client, instructor, admin, group, group_b):
-        GroupInstructor.objects.create(group=group, instructor=instructor, assigned_by=admin)
+        GroupSubMentor.objects.create(group=group, sub_mentor=instructor, assigned_by=admin)
         # group_b is NOT assigned
-        resp = instructor_client.get("/api/v1/me/groups")
+        resp = instructor_client.get("/training/api/v1/me/groups")
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data) == 1
@@ -285,16 +285,16 @@ class TestMeGroupsView:
         assert "participant_count" in data[0]
 
     def test_admin_gets_403(self, admin_client):
-        resp = admin_client.get("/api/v1/me/groups")
+        resp = admin_client.get("/training/api/v1/me/groups")
         assert resp.status_code == 403
 
     def test_participant_gets_403(self, participant_client):
-        resp = participant_client.get("/api/v1/me/groups")
+        resp = participant_client.get("/training/api/v1/me/groups")
         assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# PATCH /admin/settings — instructors_can_view_all_classes
+# PATCH /lead-mentor/settings — sub_mentors_can_view_all_classes
 # ---------------------------------------------------------------------------
 
 
@@ -302,21 +302,21 @@ class TestMeGroupsView:
 class TestSettingsVisibilityPatch:
     def test_update_flag_to_true(self, admin_client):
         resp = admin_client.patch(
-            "/api/v1/admin/settings",
-            {"instructors_can_view_all_classes": True},
+            "/training/api/v1/admin/settings",
+            {"sub_mentors_can_view_all_classes": True},
             format="json",
         )
         assert resp.status_code == 200
-        assert resp.json()["data"]["instructors_can_view_all_classes"] is True
-        assert SystemSettings.get_solo().instructors_can_view_all_classes is True
+        assert resp.json()["data"]["sub_mentors_can_view_all_classes"] is True
+        assert SystemSettings.get_solo().sub_mentors_can_view_all_classes is True
 
     def test_update_flag_emits_audit(self, admin_client):
         admin_client.patch(
-            "/api/v1/admin/settings",
-            {"instructors_can_view_all_classes": True},
+            "/training/api/v1/admin/settings",
+            {"sub_mentors_can_view_all_classes": True},
             format="json",
         )
-        row = AuditLog.objects.filter(action="instructor_visibility_changed").first()
+        row = AuditLog.objects.filter(action="sub_mentor_visibility_changed").first()
         assert row is not None
         assert row.metadata["scope"] == "system"
         assert row.metadata["old"] is False
@@ -325,16 +325,16 @@ class TestSettingsVisibilityPatch:
     def test_no_audit_when_value_unchanged(self, admin_client):
         # Default is False; patching with False should not emit audit
         admin_client.patch(
-            "/api/v1/admin/settings",
-            {"instructors_can_view_all_classes": False},
+            "/training/api/v1/admin/settings",
+            {"sub_mentors_can_view_all_classes": False},
             format="json",
         )
-        assert AuditLog.objects.filter(action="instructor_visibility_changed").count() == 0
+        assert AuditLog.objects.filter(action="sub_mentor_visibility_changed").count() == 0
 
     def test_instructor_cannot_patch_settings(self, instructor_client):
         resp = instructor_client.patch(
-            "/api/v1/admin/settings",
-            {"instructors_can_view_all_classes": True},
+            "/training/api/v1/admin/settings",
+            {"sub_mentors_can_view_all_classes": True},
             format="json",
         )
         assert resp.status_code == 403
@@ -349,7 +349,7 @@ class TestSettingsVisibilityPatch:
 class TestUserVisibilityPatch:
     def test_set_to_true(self, admin_client, instructor):
         resp = admin_client.patch(
-            f"/api/v1/users/{instructor.id}/visibility",
+            f"/training/api/v1/users/{instructor.id}/visibility",
             {"can_view_all_classes": True},
             format="json",
         )
@@ -359,7 +359,7 @@ class TestUserVisibilityPatch:
 
     def test_set_to_false(self, admin_client, instructor):
         resp = admin_client.patch(
-            f"/api/v1/users/{instructor.id}/visibility",
+            f"/training/api/v1/users/{instructor.id}/visibility",
             {"can_view_all_classes": False},
             format="json",
         )
@@ -371,7 +371,7 @@ class TestUserVisibilityPatch:
         instructor.can_view_all_classes = True
         instructor.save()
         resp = admin_client.patch(
-            f"/api/v1/users/{instructor.id}/visibility",
+            f"/training/api/v1/users/{instructor.id}/visibility",
             {"can_view_all_classes": None},
             format="json",
         )
@@ -381,22 +381,22 @@ class TestUserVisibilityPatch:
 
     def test_400_when_target_is_not_instructor(self, admin_client, participant):
         resp = admin_client.patch(
-            f"/api/v1/users/{participant.id}/visibility",
+            f"/training/api/v1/users/{participant.id}/visibility",
             {"can_view_all_classes": True},
             format="json",
         )
         assert resp.status_code == 400
-        assert resp.json()["errors"][0]["code"] == "user.not_instructor"
+        assert resp.json()["errors"][0]["code"] == "user.not_sub_mentor"
 
     def test_audit_emitted_with_old_and_new(self, admin_client, instructor):
         instructor.can_view_all_classes = False
         instructor.save()
         admin_client.patch(
-            f"/api/v1/users/{instructor.id}/visibility",
+            f"/training/api/v1/users/{instructor.id}/visibility",
             {"can_view_all_classes": True},
             format="json",
         )
-        row = AuditLog.objects.filter(action="instructor_visibility_changed").first()
+        row = AuditLog.objects.filter(action="sub_mentor_visibility_changed").first()
         assert row is not None
         assert row.metadata["scope"] == "user"
         assert row.metadata["old"] is False
@@ -404,7 +404,7 @@ class TestUserVisibilityPatch:
 
     def test_instructor_cannot_call_visibility_endpoint(self, instructor_client, instructor2):
         resp = instructor_client.patch(
-            f"/api/v1/users/{instructor2.id}/visibility",
+            f"/training/api/v1/users/{instructor2.id}/visibility",
             {"can_view_all_classes": True},
             format="json",
         )
@@ -412,7 +412,7 @@ class TestUserVisibilityPatch:
 
     def test_participant_cannot_call_visibility_endpoint(self, participant_client, instructor):
         resp = participant_client.patch(
-            f"/api/v1/users/{instructor.id}/visibility",
+            f"/training/api/v1/users/{instructor.id}/visibility",
             {"can_view_all_classes": True},
             format="json",
         )
