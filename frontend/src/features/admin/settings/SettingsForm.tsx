@@ -72,7 +72,7 @@ const DEFAULT_VALUES: SystemSettings = {
   video_max_mb: 500,
   reminder_offsets: [60, 30, 10],
   session_lifetime_hours: 24,
-  instructors_can_view_all_classes: false,
+  sub_mentors_can_view_all_classes: false,
 };
 
 function SectionCard({
@@ -146,7 +146,7 @@ export function SettingsForm({
 
   const reminders = watch('reminder_offsets') ?? [];
   const brandColor = watch('brand_color') ?? '#4F46E5';
-  const instructorViewAll = watch('instructors_can_view_all_classes') ?? false;
+  const subMentorViewAll = watch('sub_mentors_can_view_all_classes') ?? false;
 
   const addOffset = (val?: number) => {
     const raw = val ?? parseInt(newOffset, 10);
@@ -433,39 +433,39 @@ export function SettingsForm({
         </div>
       </SectionCard>
 
-      {/* ── Instructor Calendar Visibility ────────────────────────── */}
+      {/* ── SubMentor Calendar Visibility ────────────────────────── */}
       <SectionCard
         icon={GraduationCap}
-        title="Instructor Calendar Visibility"
-        description="Control which classes instructors can see by default"
+        title="SubMentor Calendar Visibility"
+        description="Control which classes sub_mentors can see by default"
         accent="bg-gradient-to-r from-[#0052A5] to-[#E31837]"
       >
         <div className="flex items-start gap-4">
           <button
             type="button"
             role="switch"
-            aria-checked={instructorViewAll}
+            aria-checked={subMentorViewAll}
             onClick={() =>
-              setValue('instructors_can_view_all_classes', !instructorViewAll, {
+              setValue('sub_mentors_can_view_all_classes', !subMentorViewAll, {
                 shouldDirty: true,
               })
             }
             className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
-              instructorViewAll ? 'bg-[#E31837]' : 'bg-slate-200'
+              subMentorViewAll ? 'bg-[#E31837]' : 'bg-slate-200'
             }`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                instructorViewAll ? 'translate-x-6' : 'translate-x-1'
+                subMentorViewAll ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
           </button>
           <div>
             <p className="text-sm font-medium text-slate-700">
-              Allow instructors to view classes from all groups (read-only)
+              Allow sub_mentors to view classes from all groups (read-only)
             </p>
             <p className="text-xs text-slate-500 mt-0.5">
-              When on, instructors see every class on the calendar and reports. They can
+              When on, sub_mentors see every class on the calendar and reports. They can
               still only edit classes for groups they are assigned to.
             </p>
           </div>

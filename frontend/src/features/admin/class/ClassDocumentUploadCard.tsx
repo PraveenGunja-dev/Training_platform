@@ -45,7 +45,7 @@ type TypeChoice = 'NORMAL' | 'MOM' | 'CUSTOM';
 export function ClassDocumentUploadCard({ classId, groupId }: Props) {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const canManageDocs = ['ADMIN', 'INSTRUCTOR', 'GROUP_ADMIN'].includes(user?.role ?? '');
+  const canManageDocs = ['ADMIN', 'SUB_MENTOR', 'LEAD_MENTOR'].includes(user?.role ?? '');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 

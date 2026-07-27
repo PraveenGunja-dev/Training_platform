@@ -72,8 +72,8 @@ type NameInput = z.infer<typeof nameSchema>;
 export function ProfilePage() {
   const user = useAuthStore(s => s.user);
   const isAdmin = user?.role === 'ADMIN';
-  const isInstructor = user?.role === 'INSTRUCTOR';
-  const isGroupAdmin = user?.role === 'GROUP_ADMIN' || (user?.admin_of_group_ids?.length ?? 0) > 0;
+  const isSubMentor = user?.role === 'SUB_MENTOR';
+  const isLeadMentor = user?.role === 'LEAD_MENTOR' || (user?.lead_mentor_of_group_ids?.length ?? 0) > 0;
 
   // Photo
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,17 +120,17 @@ export function ProfilePage() {
 
   const accentGradient = isAdmin
     ? 'from-indigo-600 via-indigo-700 to-indigo-800'
-    : isInstructor
+    : isSubMentor
       ? 'from-emerald-600 via-emerald-700 to-teal-800'
-      : isGroupAdmin
+      : isLeadMentor
         ? 'from-teal-600 via-teal-700 to-teal-800'
         : 'from-violet-600 via-purple-700 to-purple-800';
 
-  const accentBg   = isAdmin ? 'bg-[#0052A5]' : isInstructor ? 'bg-emerald-600' : isGroupAdmin ? 'bg-teal-600' : 'bg-[#E31837]';
-  const accentText = isAdmin ? 'text-[#0052A5]' : isInstructor ? 'text-emerald-700' : isGroupAdmin ? 'text-teal-700' : 'text-[#E31837]';
-  const accentBorder = isAdmin ? 'border-blue-200' : isInstructor ? 'border-emerald-200' : isGroupAdmin ? 'border-teal-200' : 'border-violet-200';
-  const accentRing   = isAdmin ? 'ring-[#0052A5]' : isInstructor ? 'ring-emerald-500' : isGroupAdmin ? 'ring-teal-500' : 'ring-violet-500';
-  const roleLabel    = isAdmin ? 'Super Admin' : isInstructor ? 'Instructor' : isGroupAdmin ? 'Group Admin' : 'Participant';
+  const accentBg   = isAdmin ? 'bg-[#0052A5]' : isSubMentor ? 'bg-emerald-600' : isLeadMentor ? 'bg-teal-600' : 'bg-[#E31837]';
+  const accentText = isAdmin ? 'text-[#0052A5]' : isSubMentor ? 'text-emerald-700' : isLeadMentor ? 'text-teal-700' : 'text-[#E31837]';
+  const accentBorder = isAdmin ? 'border-blue-200' : isSubMentor ? 'border-emerald-200' : isLeadMentor ? 'border-teal-200' : 'border-violet-200';
+  const accentRing   = isAdmin ? 'ring-[#0052A5]' : isSubMentor ? 'ring-emerald-500' : isLeadMentor ? 'ring-teal-500' : 'ring-violet-500';
+  const roleLabel    = isAdmin ? 'Super Admin' : isSubMentor ? 'SubMentor' : isLeadMentor ? 'Group Admin' : 'Participant';
 
   const photoSrc = preview ?? getFileUrl(user?.photo_url) ?? undefined;
   const userInitials = user ? initials(user.full_name) : '?';
@@ -187,7 +187,7 @@ export function ProfilePage() {
                 'text-xs font-semibold px-2.5',
                 isAdmin
                   ? 'bg-blue-100 text-[#0052A5] border-blue-200'
-                  : isInstructor
+                  : isSubMentor
                     ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
                     : 'bg-violet-100 text-violet-700 border-violet-200',
               )}>
@@ -338,7 +338,7 @@ export function ProfilePage() {
           <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-[#0052A5] to-[#E31837]" />
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-              <div className={cn('p-1.5 rounded-lg', isAdmin ? 'bg-blue-50' : isInstructor ? 'bg-emerald-50' : 'bg-violet-50')}>
+              <div className={cn('p-1.5 rounded-lg', isAdmin ? 'bg-blue-50' : isSubMentor ? 'bg-emerald-50' : 'bg-violet-50')}>
                 <Building2 className={cn('h-4 w-4', accentText)} />
               </div>
               <h2 className="font-semibold text-slate-800">Organisation Details</h2>

@@ -16,7 +16,7 @@ export const VISIBILITY_OPTIONS = [
   { value: 'GROUP',           label: 'All Group Participants',     desc: 'Every participant in the selected group can see this.' },
   { value: 'PUBLIC_TO_CLASS', label: 'Public to Assigned Class',   desc: 'Only participants in the linked class session.'        },
   { value: 'SELECTED',        label: 'Selected Participants Only', desc: 'Choose specific participants below.'                   },
-  { value: 'STAFF_ONLY',      label: 'Staff Only',                 desc: 'Hidden from all participants. Visible to admins and instructors only.' },
+  { value: 'STAFF_ONLY',      label: 'Staff Only',                 desc: 'Hidden from all participants. Visible to admins and sub_mentors only.' },
 ] as const;
 
 // File is managed outside the form (local state), schema only covers metadata

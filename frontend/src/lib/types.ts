@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'INSTRUCTOR' | 'PARTICIPANT' | 'GROUP_ADMIN';
+export type Role = 'ADMIN' | 'SUB_MENTOR' | 'PARTICIPANT' | 'LEAD_MENTOR';
 export type ClassStatus = 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'MANUAL_PRESENT';
 export type AttendanceSessionStatus = 'ACTIVE' | 'ENDED';
@@ -22,13 +22,13 @@ export type NotificationType =
   | 'ATTENDANCE_SESSION_ENDED'
   | 'ATTENDANCE_CLOSING_SOON'
   | 'GROUP_ADDED'
-  // Instructor notification types
+  // SubMentor notification types
   | 'GROUP_ASSIGNED'
   | 'GROUP_UNASSIGNED'
-  | 'CO_INSTRUCTOR_ADDED'
+  | 'CO_SUB_MENTOR_ADDED'
   | 'CLASS_SCHEDULED_BY_ADMIN'
   | 'CLASS_CANCELLED'
-  | 'CO_INSTRUCTOR_EDITED_CLASS'
+  | 'CO_SUB_MENTOR_EDITED_CLASS'
   | 'ASSIGNMENT_CREATED_IN_GROUP'
   | 'SUBMISSION_RECEIVED'
   | 'DEADLINE_APPROACHING'
@@ -37,7 +37,7 @@ export type NotificationType =
   | 'PARTICIPANTS_REMOVED_FROM_GROUP'
   | 'SHARED_UPLOAD_PENDING'
   | 'SUBMISSION_REVIEWED'
-  | 'GROUP_ADMIN_ASSIGNED';
+  | 'LEAD_MENTOR_ASSIGNED';
 
 export interface NotificationPreference {
   in_app_enabled: boolean;
@@ -60,12 +60,12 @@ export interface User {
   grade_code?: string;
   department?: string;
   employee_code?: string;
-  admin_of_group_ids?: string[];
-  admin_of_group?: { id: string; name: string } | null;
+  lead_mentor_of_group_ids?: string[];
+  lead_mentor_of_group?: { id: string; name: string } | null;
 }
 
-export function isGroupAdmin(user: User | null): boolean {
-  return (user?.admin_of_group_ids?.length ?? 0) > 0;
+export function isLeadMentor(user: User | null): boolean {
+  return (user?.lead_mentor_of_group_ids?.length ?? 0) > 0;
 }
 
 export interface SystemSettings {
@@ -77,10 +77,10 @@ export interface SystemSettings {
   video_max_mb: number;
   reminder_offsets: number[];
   session_lifetime_hours: number;
-  instructors_can_view_all_classes?: boolean;
+  sub_mentors_can_view_all_classes?: boolean;
 }
 
-export interface GroupInstructor {
+export interface GroupSubMentor {
   id: string;
   full_name: string;
   email: string;
@@ -94,7 +94,7 @@ export interface ClassGroup {
   participants_count: number;
   is_archived: boolean;
   created_at: string;
-  instructors: { id: string; full_name: string; email: string; employee_code?: string; business_unit?: string }[];
+  sub_mentors: { id: string; full_name: string; email: string; employee_code?: string; business_unit?: string }[];
 }
 
 export interface GroupParticipant extends User {
@@ -104,7 +104,7 @@ export interface GroupParticipant extends User {
 
 export interface GroupDetail extends ClassGroup {
   participants: GroupParticipant[];
-  group_admin?: GroupAdminData | null;
+  lead_mentor?: LeadMentorData | null;
 }
 
 export interface GroupAnalytics {
@@ -122,7 +122,7 @@ export interface SubGroup {
   created_at: string;
 }
 
-export interface GroupAdminData {
+export interface LeadMentorData {
   admin_id: string;
   full_name: string;
   email: string;
@@ -213,10 +213,10 @@ export interface ClassSession {
   related_tasks?: RelatedTask[];
   meeting_link?: string;
   sub_group_id?: string | null;
-  // Cross-visibility flag: true when instructor sees a non-assigned class
+  // Cross-visibility flag: true when subMentor sees a non-assigned class
   read_only?: boolean;
-  instructors?: Array<{ id: string; full_name: string; email: string }>;
-  group_admin?: { id: string; full_name: string; email: string } | null;
+  sub_mentors?: Array<{ id: string; full_name: string; email: string }>;
+  lead_mentor?: { id: string; full_name: string; email: string } | null;
 }
 
 export interface AssignmentTask {

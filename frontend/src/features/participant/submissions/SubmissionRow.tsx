@@ -91,7 +91,7 @@ export function SubmissionRow({ submission, task }: SubmissionRowProps) {
             <div className="mx-4 my-2 rounded-lg border border-indigo-100 bg-white px-4 py-3 space-y-2">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-3.5 w-3.5 text-[#0066BB] shrink-0" />
-                <span className="text-xs font-semibold text-[#0052A5] uppercase tracking-wide">Instructor Feedback</span>
+                <span className="text-xs font-semibold text-[#0052A5] uppercase tracking-wide">SubMentor Feedback</span>
               </div>
 
               {(review.grade_numeric !== null && review.grade_numeric !== undefined) && (
@@ -122,7 +122,7 @@ export function SubmissionRow({ submission, task }: SubmissionRowProps) {
 
               <p className="text-xs text-slate-400 pt-1">
                 Reviewed by{' '}
-                <span className="font-medium text-slate-500">{review.reviewer_name ?? 'Instructor'}</span>
+                <span className="font-medium text-slate-500">{review.reviewer_name ?? 'SubMentor'}</span>
                 {' · '}
                 {new Date(review.reviewed_at).toLocaleDateString('en-US', {
                   day: 'numeric', month: 'short', year: 'numeric',

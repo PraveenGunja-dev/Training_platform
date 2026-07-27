@@ -5,7 +5,7 @@ import { router } from '@/router';
 import { simulateStartAttendance, simulateEndAttendance } from '@/mocks/data/attendance';
 import type { Role } from '@/lib/types';
 
-type DevRole = Role | 'GROUP_ADMIN';
+type DevRole = Role;
 
 export function DevSwitcher() {
   const [hidden, setHidden] = useState(false);
@@ -63,10 +63,10 @@ export function DevSwitcher() {
           Admin
         </button>
         <button
-          onClick={() => handleLogin('INSTRUCTOR')}
+          onClick={() => handleLogin('SUB_MENTOR')}
           className="px-2 py-1 rounded bg-card border border-amber-200 hover:bg-amber-50"
         >
-          Instructor
+          Sub-Mentor
         </button>
         <button
           onClick={() => handleLogin('PARTICIPANT')}
@@ -75,10 +75,10 @@ export function DevSwitcher() {
           Participant
         </button>
         <button
-          onClick={() => handleLogin('GROUP_ADMIN')}
+          onClick={() => handleLogin('LEAD_MENTOR')}
           className="px-2 py-1 rounded bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100"
         >
-          Group Admin
+          Lead Mentor
         </button>
         {user && (
           <button

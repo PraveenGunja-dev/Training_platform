@@ -16,13 +16,13 @@ import { groupsApi } from '@/api/groups';
 import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/dates';
-import type { GroupInstructor, User } from '@/lib/types';
+import type { GroupSubMentor, User } from '@/lib/types';
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Admin',
-  INSTRUCTOR: 'Instructor',
+  SUB_MENTOR: 'SubMentor',
   PARTICIPANT: 'Participant',
-  GROUP_ADMIN: 'Group Admin',
+  LEAD_MENTOR: 'Group Admin',
 };
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPendin
           <DialogDescription className="text-left space-y-2">
             <span className="block">
               The following {participants.length === 1 ? 'user is' : 'users are'} currently a{' '}
-              <strong>Participant</strong>. Assigning them as instructors will:
+              <strong>Participant</strong>. Assigning them as sub_mentors will:
             </span>
             <ul className="list-disc list-inside text-sm space-y-0.5 text-slate-600 bg-amber-50 rounded-lg p-3">
               {participants.map(p => (
@@ -58,7 +58,7 @@ function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPendin
               ))}
             </ul>
             <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
-              <li>Change their role from Participant to Instructor</li>
+              <li>Change their role from Participant to SubMentor</li>
               <li>Remove access to participant features (assignments, submissions)</li>
               <li>Existing attendance records and submissions will be retained but inaccessible</li>
             </ul>
@@ -83,17 +83,17 @@ function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPendin
 }
 
 // ---------------------------------------------------------------------------
-// AddInstructorsDialog
+// AddSubMentorsDialog
 // ---------------------------------------------------------------------------
 
-interface AddInstructorsDialogProps {
+interface AddSubMentorsDialogProps {
   open: boolean;
   onClose: () => void;
   groupId: string;
   existingIds: string[];
 }
 
-function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstructorsDialogProps) {
+function AddSubMentorsDialog({ open, onClose, groupId, existingIds }: AddSubMentorsDialogProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -118,13 +118,13 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
   const mutation = useMutation({
     mutationFn: (users: User[]) => {
       const hasParticipants = users.some(u => u.role === 'PARTICIPANT');
-      return groupsApi.assignInstructors(groupId, users.map(u => u.id), hasParticipants || undefined);
+      return groupsApi.assignSubMentors(groupId, users.map(u => u.id), hasParticipants || undefined);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
+      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', groupId] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
       toast.success(
-        `${selected.length} instructor${selected.length !== 1 ? 's' : ''} assigned.`,
+        `${selected.length} subMentor${selected.length !== 1 ? 's' : ''} assigned.`,
       );
       setSelected([]);
       setQuery('');
@@ -132,7 +132,7 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
       setShowConfirm(false);
       onClose();
     },
-    onError: () => toast.error('Failed to assign instructors.'),
+    onError: () => toast.error('Failed to assign sub_mentors.'),
   });
 
   function toggle(user: User) {
@@ -168,9 +168,9 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
       <Dialog open={open && !showConfirm} onOpenChange={v => { if (!v) handleClose(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Instructors</DialogTitle>
+            <DialogTitle>Add SubMentors</DialogTitle>
             <DialogDescription>
-              Search all users to find and assign instructors to this group.
+              Search all users to find and assign sub_mentors to this group.
             </DialogDescription>
           </DialogHeader>
 
@@ -209,7 +209,7 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-foreground truncate">{user.full_name}</p>
                       <Badge
-                        variant={user.role === 'PARTICIPANT' ? 'secondary' : user.role === 'INSTRUCTOR' ? 'teal' : 'info'}
+                        variant={user.role === 'PARTICIPANT' ? 'secondary' : user.role === 'SUB_MENTOR' ? 'teal' : 'info'}
                         className="text-[10px] px-1.5 py-0 shrink-0"
                       >
                         {ROLE_LABEL[user.role] ?? user.role}
@@ -269,7 +269,7 @@ function AddInstructorsDialog({ open, onClose, groupId, existingIds }: AddInstru
 
 interface RemoveConfirmDialogProps {
   open: boolean;
-  instructorName: string;
+  subMentorName: string;
   onConfirm: () => void;
   onClose: () => void;
   isPending: boolean;
@@ -277,7 +277,7 @@ interface RemoveConfirmDialogProps {
 
 function RemoveConfirmDialog({
   open,
-  instructorName,
+  subMentorName,
   onConfirm,
   onClose,
   isPending,
@@ -286,9 +286,9 @@ function RemoveConfirmDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Remove Instructor</DialogTitle>
+          <DialogTitle>Remove SubMentor</DialogTitle>
           <DialogDescription>
-            Remove <strong>{instructorName}</strong> from this group? They will lose access to
+            Remove <strong>{subMentorName}</strong> from this group? They will lose access to
             all group resources.
           </DialogDescription>
         </DialogHeader>
@@ -308,36 +308,36 @@ function RemoveConfirmDialog({
 }
 
 // ---------------------------------------------------------------------------
-// InstructorsTab (exported)
+// SubMentorsTab (exported)
 // ---------------------------------------------------------------------------
 
-export interface InstructorsTabProps {
+export interface SubMentorsTabProps {
   groupId: string;
 }
 
-export function InstructorsTab({ groupId }: InstructorsTabProps) {
+export function SubMentorsTab({ groupId }: SubMentorsTabProps) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<GroupInstructor | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<GroupSubMentor | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['group-instructors', groupId],
-    queryFn: () => groupsApi.getInstructors(groupId),
+    queryKey: ['group-sub_mentors', groupId],
+    queryFn: () => groupsApi.getSubMentors(groupId),
   });
 
-  const instructors: GroupInstructor[] = data?.data ?? [];
+  const sub_mentors: GroupSubMentor[] = data?.data ?? [];
 
   const removeMutation = useMutation({
-    mutationFn: (userId: string) => groupsApi.unassignInstructor(groupId, userId),
+    mutationFn: (userId: string) => groupsApi.unassignSubMentor(groupId, userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
-      toast.success('Instructor removed.');
+      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', groupId] });
+      toast.success('SubMentor removed.');
       setRemoveTarget(null);
     },
-    onError: () => toast.error('Failed to remove instructor.'),
+    onError: () => toast.error('Failed to remove subMentor.'),
   });
 
   if (isLoading) {
@@ -355,23 +355,23 @@ export function InstructorsTab({ groupId }: InstructorsTabProps) {
 
         <div className="p-4 flex items-center justify-between border-b border-slate-100">
           <div>
-            <h3 className="font-semibold text-slate-800">Instructors</h3>
+            <h3 className="font-semibold text-slate-800">SubMentors</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {instructors.length} instructor{instructors.length !== 1 ? 's' : ''} assigned
+              {sub_mentors.length} subMentor{sub_mentors.length !== 1 ? 's' : ''} assigned
             </p>
           </div>
           {isAdmin && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4 mr-1.5" />
-              Add Instructors
+              Add SubMentors
             </Button>
           )}
         </div>
 
-        {instructors.length === 0 ? (
+        {sub_mentors.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground/70">
             <GraduationCap className="h-10 w-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No instructors assigned. Admins are running this group.</p>
+            <p className="text-sm">No sub_mentors assigned. Admins are running this group.</p>
           </div>
         ) : (
           <Table>
@@ -384,7 +384,7 @@ export function InstructorsTab({ groupId }: InstructorsTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {instructors.map(inst => (
+              {sub_mentors.map(inst => (
                 <TableRow key={inst.id}>
                   <TableCell className="font-medium">
                     <Link
@@ -419,17 +419,17 @@ export function InstructorsTab({ groupId }: InstructorsTabProps) {
       </div>
 
       {isAdmin && (
-        <AddInstructorsDialog
+        <AddSubMentorsDialog
           open={addOpen}
           onClose={() => setAddOpen(false)}
           groupId={groupId}
-          existingIds={instructors.map(i => i.id)}
+          existingIds={sub_mentors.map(i => i.id)}
         />
       )}
 
       <RemoveConfirmDialog
         open={!!removeTarget}
-        instructorName={removeTarget?.full_name ?? ''}
+        subMentorName={removeTarget?.full_name ?? ''}
         onConfirm={() => removeTarget && removeMutation.mutate(removeTarget.id)}
         onClose={() => setRemoveTarget(null)}
         isPending={removeMutation.isPending}

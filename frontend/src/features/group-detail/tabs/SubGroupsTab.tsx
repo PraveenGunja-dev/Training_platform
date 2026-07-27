@@ -253,7 +253,7 @@ function SubGroupCard({
 
   return (
     <Link
-      to={`/admin/groups/${groupId}/sub-groups/${subGroup.id}`}
+      to={`/lead-mentor/groups/${groupId}/sub-groups/${subGroup.id}`}
       className="block bg-white rounded-xl border border-violet-100 shadow-sm overflow-hidden hover:border-violet-300 hover:shadow-md transition-all"
     >
       <div className="h-1 bg-gradient-to-r from-violet-500 to-purple-400" />

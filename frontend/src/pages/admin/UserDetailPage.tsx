@@ -34,8 +34,8 @@ const ROLE_CONFIG: Record<Role, {
     gradient: 'linear-gradient(135deg, #001f4d 0%, #0052A5 100%)',
     icon: <ShieldCheck className="h-3 w-3" />,
   },
-  INSTRUCTOR: {
-    label: 'Instructor',
+  SUB_MENTOR: {
+    label: 'SubMentor',
     variant: 'warning',
     gradient: 'linear-gradient(135deg, #0052A5 0%, #C41230 100%)',
     icon: <GraduationCap className="h-3 w-3" />,
@@ -46,7 +46,7 @@ const ROLE_CONFIG: Record<Role, {
     gradient: 'linear-gradient(135deg, #0D7E5B 0%, #059669 100%)',
     icon: <UserCircle className="h-3 w-3" />,
   },
-  GROUP_ADMIN: {
+  LEAD_MENTOR: {
     label: 'Group Admin',
     variant: 'secondary',
     gradient: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
@@ -219,9 +219,9 @@ export default function AdminUserDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ADMIN">Super Admin</SelectItem>
-                    <SelectItem value="INSTRUCTOR">Instructor</SelectItem>
+                    <SelectItem value="SUB_MENTOR">SubMentor</SelectItem>
                     <SelectItem value="PARTICIPANT">Participant</SelectItem>
-                    <SelectItem value="GROUP_ADMIN">Group Admin</SelectItem>
+                    <SelectItem value="LEAD_MENTOR">Group Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -326,7 +326,7 @@ export default function AdminUserDetailPage() {
       )}
 
       {/* ── Group Admin — Assigned Batch ───────────────────────────────── */}
-      {user.role === 'GROUP_ADMIN' && (
+      {user.role === 'LEAD_MENTOR' && (
         <div className="rounded-2xl overflow-hidden shadow-sm border border-[#C5D8EC] bg-white">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-[#EBF3FB]">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0f766e, #0d9488)' }}>
@@ -338,16 +338,16 @@ export default function AdminUserDetailPage() {
             </div>
           </div>
           <div className="px-5 py-4">
-            {user.admin_of_group ? (
+            {user.lead_mentor_of_group ? (
               <Link
-                to={`/admin/groups/${user.admin_of_group.id}`}
+                to={`/admin/groups/${user.lead_mentor_of_group.id}`}
                 className="inline-flex items-center gap-2.5 px-4 py-3 rounded-xl border border-teal-200 bg-teal-50 hover:bg-teal-100 hover:border-teal-300 transition-colors group"
               >
                 <div className="w-8 h-8 rounded-lg bg-teal-100 group-hover:bg-teal-200 flex items-center justify-center flex-shrink-0 transition-colors">
                   <ShieldCheck className="h-4 w-4 text-teal-700" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-teal-800">{user.admin_of_group.name}</p>
+                  <p className="text-sm font-semibold text-teal-800">{user.lead_mentor_of_group.name}</p>
                   <p className="text-[11px] text-teal-600">Click to view group →</p>
                 </div>
               </Link>
@@ -358,9 +358,9 @@ export default function AdminUserDetailPage() {
         </div>
       )}
 
-      {/* ── Instructor Calendar Visibility ─────────────────────────────── */}
-      {user.role === 'INSTRUCTOR' && (
-        <InstructorVisibilityCard userId={user.id} currentValue={user.can_view_all_classes ?? null} />
+      {/* ── SubMentor Calendar Visibility ─────────────────────────────── */}
+      {user.role === 'SUB_MENTOR' && (
+        <SubMentorVisibilityCard userId={user.id} currentValue={user.can_view_all_classes ?? null} />
       )}
 
       {/* ── Recent Activity ────────────────────────────────────────────── */}
@@ -404,7 +404,7 @@ function ProfileField({
 }
 
 // ---------------------------------------------------------------------------
-// InstructorVisibilityCard
+// SubMentorVisibilityCard
 // ---------------------------------------------------------------------------
 
 type VisibilityOption = 'inherit' | 'all' | 'own';
@@ -439,7 +439,7 @@ const VISIBILITY_OPTIONS = [
   },
 ];
 
-function InstructorVisibilityCard({
+function SubMentorVisibilityCard({
   userId,
   currentValue,
 }: {
@@ -478,7 +478,7 @@ function InstructorVisibilityCard({
         </div>
         <div>
           <h2 className="text-sm font-bold text-[#00285A] tracking-tight">Calendar Visibility</h2>
-          <p className="text-[11px] text-[#5A7A9A]">Controls which classes this instructor can see in the calendar</p>
+          <p className="text-[11px] text-[#5A7A9A]">Controls which classes this subMentor can see in the calendar</p>
         </div>
       </div>
 
@@ -511,7 +511,7 @@ function InstructorVisibilityCard({
               </div>
               <input
                 type="radio"
-                name="instructor-visibility"
+                name="subMentor-visibility"
                 value={opt.value}
                 checked={isActive}
                 onChange={() => handleChange(opt.value)}

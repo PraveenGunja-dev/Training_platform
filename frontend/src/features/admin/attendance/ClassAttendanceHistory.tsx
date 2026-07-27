@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/dates';
 
 interface Props {
   classId: string;
-  /** Base path for the report link, e.g. '/admin/attendance/sessions' or '/instructor/attendance/sessions' */
+  /** Base path for the report link, e.g. '/admin/attendance/sessions' or '/sub-mentor/attendance/sessions' */
   reportBasePath: string;
 }
 

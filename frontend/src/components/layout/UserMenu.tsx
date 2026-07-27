@@ -15,8 +15,8 @@ import type { Role } from '@/lib/types';
 
 function profilePath(role: Role): string {
   if (role === 'ADMIN') return '/admin/profile';
-  if (role === 'INSTRUCTOR') return '/instructor/profile';
-  if (role === 'GROUP_ADMIN') return '/group-admin/profile';
+  if (role === 'SUB_MENTOR') return '/sub-mentor/profile';
+  if (role === 'LEAD_MENTOR') return '/lead-mentor/profile';
   return '/me/profile';
 }
 

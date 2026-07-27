@@ -72,11 +72,11 @@ export interface ParticipantDashboardData {
   quick_stats: { attendance_rate: number; submitted_count: number; pending_count: number };
 }
 
-export interface GroupAdminDashboardData {
+export interface LeadMentorDashboardData {
   group_name: string;
   kpis: {
     total_participants: number;
-    total_instructors: number;
+    total_sub_mentors: number;
     total_sub_groups: number;
     total_assignments: number;
     classes_today: number;
@@ -100,6 +100,6 @@ export const dashboardApi = {
     apiClient.get<ApiEnvelope<AdminDashboardData>>('/dashboard/admin', { params }).then(r => r.data),
   participant: () =>
     apiClient.get<ApiEnvelope<ParticipantDashboardData>>('/dashboard/participant').then(r => r.data),
-  groupAdmin: () =>
-    apiClient.get<ApiEnvelope<GroupAdminDashboardData>>('/dashboard/group-admin').then(r => r.data),
+  leadMentor: () =>
+    apiClient.get<ApiEnvelope<LeadMentorDashboardData>>('/dashboard/lead-mentor').then(r => r.data),
 };

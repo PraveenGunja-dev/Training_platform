@@ -1,16 +1,16 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RootRedirect } from './RootRedirect';
 import { MustChangePasswordGuard } from './MustChangePasswordGuard';
-import { AdminLayout, ParticipantLayout, InstructorLayout, GroupAdminLayout } from '@/components/layout/AppShell';
+import { AdminLayout, ParticipantLayout, SubMentorLayout, LeadMentorLayout } from '@/components/layout/AppShell';
 import { ForceChangePasswordPage } from '@/pages/auth/ForceChangePasswordPage';
-import GroupAdminDashboardPage from '@/pages/group-admin/DashboardPage';
-import GroupAdminSubGroupDetailPage from '@/pages/group-admin/SubGroupDetailPage';
-import GroupAdminParticipantsPage from '@/pages/group-admin/ParticipantsPage';
-import GroupAdminAnalyticsPage from '@/pages/group-admin/AnalyticsPage';
-import GroupAdminInstructorsPage from '@/pages/group-admin/InstructorsPage';
-import GroupAdminSubGroupsPage from '@/pages/group-admin/SubGroupsPage';
-import GroupAdminCalendarPage from '@/pages/group-admin/CalendarPage';
-import GroupAdminInstructorProfilePage from '@/pages/group-admin/InstructorProfilePage';
+import LeadMentorDashboardPage from '@/pages/lead-mentor/DashboardPage';
+import LeadMentorSubGroupDetailPage from '@/pages/lead-mentor/SubGroupDetailPage';
+import LeadMentorParticipantsPage from '@/pages/lead-mentor/ParticipantsPage';
+import LeadMentorAnalyticsPage from '@/pages/lead-mentor/AnalyticsPage';
+import LeadMentorSubMentorsPage from '@/pages/lead-mentor/SubMentorsPage';
+import LeadMentorSubGroupsPage from '@/pages/lead-mentor/SubGroupsPage';
+import LeadMentorCalendarPage from '@/pages/lead-mentor/CalendarPage';
+import LeadMentorSubMentorProfilePage from '@/pages/lead-mentor/SubMentorProfilePage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { SetPasswordPage } from '@/pages/auth/SetPasswordPage';
 import { ProfilePage } from '@/pages/auth/ProfilePage';
@@ -43,21 +43,21 @@ import TasksPage from '@/pages/me/TasksPage';
 import TaskDetailPage from '@/pages/me/TaskDetailPage';
 import SubmissionsPage from '@/pages/me/SubmissionsPage';
 import DocumentsPage from '@/pages/me/DocumentsPage';
-import InstructorDashboardPage from '@/pages/instructor/DashboardPage';
-import InstructorCalendarPage from '@/pages/instructor/CalendarPage';
-import InstructorGroupsPage from '@/pages/instructor/GroupsPage';
-import InstructorGroupDetailPage from '@/pages/instructor/GroupDetailPage';
-import InstructorClassesPage from '@/pages/instructor/ClassesPage';
-import InstructorClassDetailPage from '@/pages/instructor/ClassDetailPage';
-import InstructorAttendancePage from '@/pages/instructor/AttendancePage';
-import InstructorAssignmentsPage from '@/pages/instructor/AssignmentsPage';
-import InstructorAssignmentDetailPage from '@/pages/instructor/AssignmentDetailPage';
-import InstructorSubmissionsPage from '@/pages/instructor/SubmissionsPage';
-import InstructorDocumentsPage from '@/pages/instructor/DocumentsPage';
-import InstructorSharedUploadsPage from '@/pages/instructor/SharedUploadsPage';
-import InstructorNotificationsPage from '@/pages/instructor/NotificationsPage';
-import InstructorAttendanceReportPage from '@/pages/instructor/AttendanceReportPage';
-import ParticipantProfilePage from '@/pages/instructor/ParticipantProfilePage';
+import SubMentorDashboardPage from '@/pages/sub-mentor/DashboardPage';
+import SubMentorCalendarPage from '@/pages/sub-mentor/CalendarPage';
+import SubMentorGroupsPage from '@/pages/sub-mentor/GroupsPage';
+import SubMentorGroupDetailPage from '@/pages/sub-mentor/GroupDetailPage';
+import SubMentorClassesPage from '@/pages/sub-mentor/ClassesPage';
+import SubMentorClassDetailPage from '@/pages/sub-mentor/ClassDetailPage';
+import SubMentorAttendancePage from '@/pages/sub-mentor/AttendancePage';
+import SubMentorAssignmentsPage from '@/pages/sub-mentor/AssignmentsPage';
+import SubMentorAssignmentDetailPage from '@/pages/sub-mentor/AssignmentDetailPage';
+import SubMentorSubmissionsPage from '@/pages/sub-mentor/SubmissionsPage';
+import SubMentorDocumentsPage from '@/pages/sub-mentor/DocumentsPage';
+import SubMentorSharedUploadsPage from '@/pages/sub-mentor/SharedUploadsPage';
+import SubMentorNotificationsPage from '@/pages/sub-mentor/NotificationsPage';
+import SubMentorAttendanceReportPage from '@/pages/sub-mentor/AttendanceReportPage';
+import ParticipantProfilePage from '@/pages/sub-mentor/ParticipantProfilePage';
 
 export const router = createBrowserRouter([
   { path: '/', element: <RootRedirect /> },
@@ -107,43 +107,43 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: '/instructor',
-    element: <MustChangePasswordGuard><InstructorLayout /></MustChangePasswordGuard>,
+    path: '/sub-mentor',
+    element: <MustChangePasswordGuard><SubMentorLayout /></MustChangePasswordGuard>,
     children: [
-      { path: 'dashboard', element: <InstructorDashboardPage /> },
-      { path: 'calendar', element: <InstructorCalendarPage /> },
-      { path: 'groups', element: <InstructorGroupsPage /> },
-      { path: 'groups/:id', element: <InstructorGroupDetailPage /> },
-      { path: 'classes', element: <InstructorClassesPage /> },
-      { path: 'classes/:id', element: <InstructorClassDetailPage /> },
-      { path: 'attendance', element: <InstructorAttendancePage /> },
-      { path: 'attendance/sessions/:id/report', element: <InstructorAttendanceReportPage /> },
-      { path: 'assignments', element: <InstructorAssignmentsPage /> },
-      { path: 'assignments/:id', element: <InstructorAssignmentDetailPage /> },
-      { path: 'submissions', element: <InstructorSubmissionsPage /> },
-      { path: 'documents', element: <InstructorDocumentsPage /> },
-      { path: 'shared-uploads', element: <InstructorSharedUploadsPage /> },
-      { path: 'notifications', element: <InstructorNotificationsPage /> },
+      { path: 'dashboard', element: <SubMentorDashboardPage /> },
+      { path: 'calendar', element: <SubMentorCalendarPage /> },
+      { path: 'groups', element: <SubMentorGroupsPage /> },
+      { path: 'groups/:id', element: <SubMentorGroupDetailPage /> },
+      { path: 'classes', element: <SubMentorClassesPage /> },
+      { path: 'classes/:id', element: <SubMentorClassDetailPage /> },
+      { path: 'attendance', element: <SubMentorAttendancePage /> },
+      { path: 'attendance/sessions/:id/report', element: <SubMentorAttendanceReportPage /> },
+      { path: 'assignments', element: <SubMentorAssignmentsPage /> },
+      { path: 'assignments/:id', element: <SubMentorAssignmentDetailPage /> },
+      { path: 'submissions', element: <SubMentorSubmissionsPage /> },
+      { path: 'documents', element: <SubMentorDocumentsPage /> },
+      { path: 'shared-uploads', element: <SubMentorSharedUploadsPage /> },
+      { path: 'notifications', element: <SubMentorNotificationsPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'participants/:id', element: <ParticipantProfilePage /> },
     ],
   },
   {
-    path: '/group-admin',
-    element: <MustChangePasswordGuard><GroupAdminLayout /></MustChangePasswordGuard>,
+    path: '/lead-mentor',
+    element: <MustChangePasswordGuard><LeadMentorLayout /></MustChangePasswordGuard>,
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
-      { path: 'dashboard', element: <GroupAdminDashboardPage /> },
-      { path: 'calendar', element: <GroupAdminCalendarPage /> },
-      { path: 'participants', element: <GroupAdminParticipantsPage /> },
-      { path: 'instructors', element: <GroupAdminInstructorsPage /> },
-      { path: 'analytics', element: <GroupAdminAnalyticsPage /> },
-      { path: 'sub-groups', element: <GroupAdminSubGroupsPage /> },
-      { path: 'sub-groups/:subGroupId', element: <GroupAdminSubGroupDetailPage /> },
+      { path: 'dashboard', element: <LeadMentorDashboardPage /> },
+      { path: 'calendar', element: <LeadMentorCalendarPage /> },
+      { path: 'participants', element: <LeadMentorParticipantsPage /> },
+      { path: 'sub-mentors', element: <LeadMentorSubMentorsPage /> },
+      { path: 'analytics', element: <LeadMentorAnalyticsPage /> },
+      { path: 'sub-groups', element: <LeadMentorSubGroupsPage /> },
+      { path: 'sub-groups/:subGroupId', element: <LeadMentorSubGroupDetailPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'notifications', element: <NotificationsPage /> },
       { path: 'participants/:id', element: <ParticipantProfilePage /> },
-      { path: 'instructors/:id', element: <GroupAdminInstructorProfilePage /> },
+      { path: 'sub-mentors/:id', element: <LeadMentorSubMentorProfilePage /> },
     ],
   },
   { path: '/change-password', element: <ForceChangePasswordPage /> },

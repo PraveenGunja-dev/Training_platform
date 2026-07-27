@@ -34,13 +34,13 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   ATTENDANCE_SESSION_ENDED:       CalendarDays,
   ATTENDANCE_CLOSING_SOON:        Clock,
   GROUP_ADDED:                    Users,
-  // Instructor notification icons
+  // SubMentor notification icons
   GROUP_ASSIGNED:                 Users,
   GROUP_UNASSIGNED:               UserMinus,
-  CO_INSTRUCTOR_ADDED:            Users,
+  CO_SUB_MENTOR_ADDED:            Users,
   CLASS_SCHEDULED_BY_ADMIN:       CalendarDays,
   CLASS_CANCELLED:                AlertCircle,
-  CO_INSTRUCTOR_EDITED_CLASS:     RefreshCw,
+  CO_SUB_MENTOR_EDITED_CLASS:     RefreshCw,
   ASSIGNMENT_CREATED_IN_GROUP:    ClipboardList,
   SUBMISSION_RECEIVED:            FileText,
   DEADLINE_APPROACHING:           Clock,
@@ -49,7 +49,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   PARTICIPANTS_REMOVED_FROM_GROUP: UserMinus,
   SHARED_UPLOAD_PENDING:          Upload,
   SUBMISSION_REVIEWED:            CheckCircle,
-  GROUP_ADMIN_ASSIGNED:           Users,
+  LEAD_MENTOR_ASSIGNED:           Users,
 };
 
 interface NotificationItemProps {

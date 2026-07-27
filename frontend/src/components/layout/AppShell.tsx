@@ -5,13 +5,13 @@ import { Topbar } from './Topbar';
 import { Sidebar } from './Sidebar';
 import { MobileSidebar } from './MobileSidebar';
 import { RoleGuard } from '@/router/RoleGuard';
-import { adminNav, participantNav, instructorNav, groupAdminNav } from './navConfigs';
+import { adminNav, participantNav, subMentorNav, leadMentorNav } from './navConfigs';
 import type { NavItem } from './navConfigs';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ForceChangePasswordDialog } from '@/features/auth/ForceChangePasswordDialog';
 import { useAuthStore } from '@/store/auth';
-import { isGroupAdmin } from '@/lib/types';
+import { isLeadMentor } from '@/lib/types';
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { ShieldAlert, LogOut } from 'lucide-react';
@@ -65,15 +65,15 @@ export function ParticipantLayout() {
   );
 }
 
-export function InstructorLayout() {
+export function SubMentorLayout() {
   return (
-    <RoleGuard role="INSTRUCTOR">
-      <AppShell navItems={instructorNav} />
+    <RoleGuard role="SUB_MENTOR">
+      <AppShell navItems={subMentorNav} />
     </RoleGuard>
   );
 }
 
-function GroupAdminNoGroupPage() {
+function LeadMentorNoGroupPage() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
@@ -135,11 +135,11 @@ function GroupAdminNoGroupPage() {
   );
 }
 
-export function GroupAdminLayout() {
+export function LeadMentorLayout() {
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (user.role !== 'GROUP_ADMIN') return <Navigate to="/403" replace />;
-  if (!isGroupAdmin(user)) return <GroupAdminNoGroupPage />;
-  return <AppShell navItems={groupAdminNav} />;
+  if (user.role !== 'LEAD_MENTOR') return <Navigate to="/403" replace />;
+  if (!isLeadMentor(user)) return <LeadMentorNoGroupPage />;
+  return <AppShell navItems={leadMentorNav} />;
 }

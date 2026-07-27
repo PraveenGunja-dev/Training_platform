@@ -9,7 +9,7 @@ export const settingsSchema = z.object({
   video_max_mb: z.number().int().min(1).max(2000),
   reminder_offsets: z.array(z.number().int().min(1)),
   session_lifetime_hours: z.number().int().min(1).max(720),
-  instructors_can_view_all_classes: z.boolean().optional().default(false),
+  sub_mentors_can_view_all_classes: z.boolean().optional().default(false),
 });
 
 export type SettingsFormValues = z.infer<typeof settingsSchema>;

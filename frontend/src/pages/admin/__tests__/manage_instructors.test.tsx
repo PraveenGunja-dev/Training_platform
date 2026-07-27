@@ -1,11 +1,11 @@
 /**
- * Chunk 7 — Admin Manage Instructors UI tests
+ * Chunk 7 — Admin Manage SubMentors UI tests
  *
  * Strategy:
  *   - Mock @tanstack/react-query (useQuery / useMutation / useQueryClient)
  *   - Mock heavy sub-components (dialogs, tables) where needed
  *   - Set auth store state before each test
- *   - Test InstructorsTab, UserDetailPage visibility card, SettingsForm toggle
+ *   - Test SubMentorsTab, UserDetailPage visibility card, SettingsForm toggle
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -47,10 +47,10 @@ function makeAdmin(): User {
     created_at: '2026-01-01T00:00:00Z',
   };
 }
-function makeInstructor(overrides: Partial<User> = {}): User {
+function makeSubMentor(overrides: Partial<User> = {}): User {
   return {
-    id: 'inst-1', email: 'inst@test.com', full_name: 'Test Instructor',
-    role: 'INSTRUCTOR', photo_url: null, is_active: true,
+    id: 'inst-1', email: 'inst@test.com', full_name: 'Test SubMentor',
+    role: 'SUB_MENTOR', photo_url: null, is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     can_view_all_classes: null,
     ...overrides,
@@ -89,79 +89,79 @@ function wrap(ui: React.ReactElement, path = '/') {
   );
 }
 
-const sampleInstructors = [
+const sampleSubMentors = [
   { id: 'inst-1', full_name: 'Alice Smith', email: 'alice@test.com', assigned_at: '2026-04-01T00:00:00Z' },
   { id: 'inst-2', full_name: 'Bob Jones',  email: 'bob@test.com',   assigned_at: '2026-04-10T00:00:00Z' },
 ];
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-/* InstructorsTab                                                            */
+/* SubMentorsTab                                                            */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-import { InstructorsTab } from '@/features/admin/group-instructors/InstructorsTab';
+import { SubMentorsTab } from '@/features/admin/group-instructors/InstructorsTab';
 
-describe('InstructorsTab', () => {
+describe('SubMentorsTab', () => {
   beforeEach(() => {
     vi.mocked(useQueryClient).mockReturnValue({ invalidateQueries: vi.fn() } as never);
     vi.mocked(useMutation).mockReturnValue(mockMut());
   });
   afterEach(() => { vi.clearAllMocks(); });
 
-  it('renders Instructors section with instructor list for admin', () => {
+  it('renders SubMentors section with subMentor list for admin', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     expect(screen.getByText('Bob Jones')).toBeInTheDocument();
     expect(screen.getByText('alice@test.com')).toBeInTheDocument();
   });
 
-  it('shows Add Instructors button for admin role', () => {
+  it('shows Add SubMentors button for admin role', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.getByRole('button', { name: /add instructors/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add sub_mentors/i })).toBeInTheDocument();
   });
 
-  it('hides Add Instructors button for non-admin (instructor role)', () => {
-    useAuthStore.setState({ user: makeInstructor(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+  it('hides Add SubMentors button for non-admin (subMentor role)', () => {
+    useAuthStore.setState({ user: makeSubMentor(), accessToken: 'tok' });
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.queryByRole('button', { name: /add instructors/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add sub_mentors/i })).not.toBeInTheDocument();
   });
 
-  it('shows empty state copy when no instructors assigned', () => {
+  it('shows empty state copy when no sub_mentors assigned', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
     vi.mocked(useQuery).mockReturnValue(qResult({ data: [] }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     expect(
-      screen.getByText('No instructors assigned. Admins are running this group.'),
+      screen.getByText('No sub_mentors assigned. Admins are running this group.'),
     ).toBeInTheDocument();
   });
 
-  it('links instructor name to user detail page', () => {
+  it('links subMentor name to user detail page', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     const link = screen.getByRole('link', { name: 'Alice Smith' });
     expect(link).toHaveAttribute('href', '/admin/users/inst-1');
   });
 
-  it('shows remove button for each instructor (admin only)', () => {
+  it('shows remove button for each subMentor (admin only)', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     expect(screen.getByRole('button', { name: /remove alice smith/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /remove bob jones/i })).toBeInTheDocument();
@@ -169,23 +169,23 @@ describe('InstructorsTab', () => {
 
   it('opens confirm dialog when remove button is clicked', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     fireEvent.click(screen.getByRole('button', { name: /remove alice smith/i }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/remove instructor/i)).toBeInTheDocument();
+    expect(screen.getByText(/remove subMentor/i)).toBeInTheDocument();
   });
 
   it('calls DELETE mutation when confirm remove is clicked', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
     const mutateFn = vi.fn();
     vi.mocked(useMutation).mockReturnValue(mockMut({ mutate: mutateFn }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
     fireEvent.click(screen.getByRole('button', { name: /remove alice smith/i }));
     fireEvent.click(screen.getByRole('button', { name: /^remove$/i }));
@@ -193,30 +193,30 @@ describe('InstructorsTab', () => {
     expect(mutateFn).toHaveBeenCalledWith('inst-1');
   });
 
-  it('opens Add Instructors dialog on button click', () => {
+  it('opens Add SubMentors dialog on button click', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
     vi.mocked(useQuery).mockReturnValue(qResult({ data: [] }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    fireEvent.click(screen.getByRole('button', { name: /add instructors/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add sub_mentors/i }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/search by name or email to find and assign/i)).toBeInTheDocument();
   });
 
-  it('shows instructor count in summary text', () => {
+  it('shows subMentor count in summary text', () => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
-    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleInstructors }));
+    vi.mocked(useQuery).mockReturnValue(qResult({ data: sampleSubMentors }));
 
-    render(wrap(<InstructorsTab groupId="g-1" />));
+    render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.getByText('2 instructors assigned')).toBeInTheDocument();
+    expect(screen.getByText('2 sub_mentors assigned')).toBeInTheDocument();
   });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-/* UserDetailPage — Instructor visibility card                               */
+/* UserDetailPage — SubMentor visibility card                               */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
 import AdminUserDetailPage from '@/pages/admin/UserDetailPage';
@@ -225,7 +225,7 @@ vi.mock('@/features/admin/audit/AuditTable', () => ({
   AuditTable: () => <div data-testid="audit-table" />,
 }));
 
-describe('UserDetailPage — Instructor visibility card', () => {
+describe('UserDetailPage — SubMentor visibility card', () => {
   beforeEach(() => {
     useAuthStore.setState({ user: makeAdmin(), accessToken: 'tok' });
     vi.mocked(useQueryClient).mockReturnValue({ invalidateQueries: vi.fn() } as never);
@@ -233,10 +233,10 @@ describe('UserDetailPage — Instructor visibility card', () => {
   });
   afterEach(() => { vi.clearAllMocks(); });
 
-  it('shows Calendar Visibility card when target user is INSTRUCTOR', () => {
+  it('shows Calendar Visibility card when target user is SUB_MENTOR', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor() });
+      if (key === 'user') return qResult({ data: makeSubMentor() });
       return qResult({ data: [] });
     });
 
@@ -273,7 +273,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
   it('radio defaults to "Inherit system default" when can_view_all_classes is null', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor({ can_view_all_classes: null }) });
+      if (key === 'user') return qResult({ data: makeSubMentor({ can_view_all_classes: null }) });
       return qResult({ data: [] });
     });
 
@@ -286,7 +286,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
   it('radio reflects "view all" when can_view_all_classes is true', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor({ can_view_all_classes: true }) });
+      if (key === 'user') return qResult({ data: makeSubMentor({ can_view_all_classes: true }) });
       return qResult({ data: [] });
     });
 
@@ -299,7 +299,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
   it('radio reflects "own only" when can_view_all_classes is false', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor({ can_view_all_classes: false }) });
+      if (key === 'user') return qResult({ data: makeSubMentor({ can_view_all_classes: false }) });
       return qResult({ data: [] });
     });
 
@@ -312,7 +312,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
   it('clicking "view all" radio calls PATCH mutation with can_view_all_classes=true', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor({ can_view_all_classes: null }) });
+      if (key === 'user') return qResult({ data: makeSubMentor({ can_view_all_classes: null }) });
       return qResult({ data: [] });
     });
     const mutateFn = vi.fn();
@@ -328,7 +328,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
   it('clicking "own only" radio calls PATCH mutation with can_view_all_classes=false', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor({ can_view_all_classes: null }) });
+      if (key === 'user') return qResult({ data: makeSubMentor({ can_view_all_classes: null }) });
       return qResult({ data: [] });
     });
     const mutateFn = vi.fn();
@@ -341,10 +341,10 @@ describe('UserDetailPage — Instructor visibility card', () => {
     expect(mutateFn).toHaveBeenCalledWith('own');
   });
 
-  it('shows Manage assigned groups link for INSTRUCTOR user', () => {
+  it('shows Manage assigned groups link for SUB_MENTOR user', () => {
     vi.mocked(useQuery).mockImplementation((opts: unknown) => {
       const key = (opts as { queryKey: unknown[] }).queryKey[0];
-      if (key === 'user') return qResult({ data: makeInstructor() });
+      if (key === 'user') return qResult({ data: makeSubMentor() });
       return qResult({ data: [] });
     });
 
@@ -356,7 +356,7 @@ describe('UserDetailPage — Instructor visibility card', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════ */
-/* SettingsForm — Instructor calendar visibility toggle                      */
+/* SettingsForm — SubMentor calendar visibility toggle                      */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
 import { SettingsForm } from '@/features/admin/settings/SettingsForm';
@@ -371,13 +371,13 @@ const baseSettings: SettingsFormValues = {
   video_max_mb: 500,
   reminder_offsets: [],
   session_lifetime_hours: 24,
-  instructors_can_view_all_classes: false,
+  sub_mentors_can_view_all_classes: false,
 };
 
-describe('SettingsForm — Instructor visibility toggle', () => {
+describe('SettingsForm — SubMentor visibility toggle', () => {
   afterEach(() => { vi.clearAllMocks(); });
 
-  it('renders Instructor Calendar Visibility section', () => {
+  it('renders SubMentor Calendar Visibility section', () => {
     render(
       wrap(
         <SettingsForm
@@ -390,17 +390,17 @@ describe('SettingsForm — Instructor visibility toggle', () => {
       ),
     );
 
-    expect(screen.getByText('Instructor Calendar Visibility')).toBeInTheDocument();
+    expect(screen.getByText('SubMentor Calendar Visibility')).toBeInTheDocument();
     expect(
-      screen.getByText(/allow instructors to view classes from all groups/i),
+      screen.getByText(/allow sub_mentors to view classes from all groups/i),
     ).toBeInTheDocument();
   });
 
-  it('toggle is off (aria-checked=false) when instructors_can_view_all_classes=false', () => {
+  it('toggle is off (aria-checked=false) when sub_mentors_can_view_all_classes=false', () => {
     render(
       wrap(
         <SettingsForm
-          initialValues={{ ...baseSettings, instructors_can_view_all_classes: false }}
+          initialValues={{ ...baseSettings, sub_mentors_can_view_all_classes: false }}
           onSubmit={vi.fn()}
           onForceLogout={vi.fn()}
           saving={false}
@@ -413,11 +413,11 @@ describe('SettingsForm — Instructor visibility toggle', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('toggle is on (aria-checked=true) when instructors_can_view_all_classes=true', () => {
+  it('toggle is on (aria-checked=true) when sub_mentors_can_view_all_classes=true', () => {
     render(
       wrap(
         <SettingsForm
-          initialValues={{ ...baseSettings, instructors_can_view_all_classes: true }}
+          initialValues={{ ...baseSettings, sub_mentors_can_view_all_classes: true }}
           onSubmit={vi.fn()}
           onForceLogout={vi.fn()}
           saving={false}
@@ -434,7 +434,7 @@ describe('SettingsForm — Instructor visibility toggle', () => {
     render(
       wrap(
         <SettingsForm
-          initialValues={{ ...baseSettings, instructors_can_view_all_classes: false }}
+          initialValues={{ ...baseSettings, sub_mentors_can_view_all_classes: false }}
           onSubmit={vi.fn()}
           onForceLogout={vi.fn()}
           saving={false}
@@ -450,13 +450,13 @@ describe('SettingsForm — Instructor visibility toggle', () => {
     expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
   });
 
-  it('form submit payload includes instructors_can_view_all_classes', async () => {
+  it('form submit payload includes sub_mentors_can_view_all_classes', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
     render(
       wrap(
         <SettingsForm
-          initialValues={{ ...baseSettings, instructors_can_view_all_classes: false }}
+          initialValues={{ ...baseSettings, sub_mentors_can_view_all_classes: false }}
           onSubmit={onSubmit}
           onForceLogout={vi.fn()}
           saving={false}
@@ -473,6 +473,6 @@ describe('SettingsForm — Instructor visibility toggle', () => {
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
 
     const payload = onSubmit.mock.calls[0][0] as SettingsFormValues;
-    expect(payload.instructors_can_view_all_classes).toBe(true);
+    expect(payload.sub_mentors_can_view_all_classes).toBe(true);
   });
 });
