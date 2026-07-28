@@ -20,9 +20,9 @@ import type { GroupSubMentor, User } from '@/lib/types';
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Admin',
-  SUB_MENTOR: 'SubMentor',
+  SUB_MENTOR: 'Sub-Mentor',
   PARTICIPANT: 'Participant',
-  LEAD_MENTOR: 'Group Admin',
+  LEAD_MENTOR: 'Lead Mentor',
 };
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPendin
           <DialogDescription className="text-left space-y-2">
             <span className="block">
               The following {participants.length === 1 ? 'user is' : 'users are'} currently a{' '}
-              <strong>Participant</strong>. Assigning them as sub_mentors will:
+              <strong>Participant</strong>. Assigning them as Sub-Mentors will:
             </span>
             <ul className="list-disc list-inside text-sm space-y-0.5 text-slate-600 bg-amber-50 rounded-lg p-3">
               {participants.map(p => (
@@ -58,7 +58,7 @@ function ConfirmParticipantsDialog({ participants, onConfirm, onCancel, isPendin
               ))}
             </ul>
             <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
-              <li>Change their role from Participant to SubMentor</li>
+              <li>Change their role from Participant to Sub-Mentor</li>
               <li>Remove access to participant features (assignments, submissions)</li>
               <li>Existing attendance records and submissions will be retained but inaccessible</li>
             </ul>
@@ -121,10 +121,10 @@ function AddSubMentorsDialog({ open, onClose, groupId, existingIds }: AddSubMent
       return groupsApi.assignSubMentors(groupId, users.map(u => u.id), hasParticipants || undefined);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', groupId] });
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', groupId] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
       toast.success(
-        `${selected.length} subMentor${selected.length !== 1 ? 's' : ''} assigned.`,
+        `${selected.length} Sub-Mentor${selected.length !== 1 ? 's' : ''} assigned.`,
       );
       setSelected([]);
       setQuery('');
@@ -132,7 +132,7 @@ function AddSubMentorsDialog({ open, onClose, groupId, existingIds }: AddSubMent
       setShowConfirm(false);
       onClose();
     },
-    onError: () => toast.error('Failed to assign sub_mentors.'),
+    onError: () => toast.error('Failed to assign Sub-Mentors.'),
   });
 
   function toggle(user: User) {
@@ -168,9 +168,9 @@ function AddSubMentorsDialog({ open, onClose, groupId, existingIds }: AddSubMent
       <Dialog open={open && !showConfirm} onOpenChange={v => { if (!v) handleClose(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add SubMentors</DialogTitle>
+            <DialogTitle>Add Sub-Mentors</DialogTitle>
             <DialogDescription>
-              Search all users to find and assign sub_mentors to this group.
+              Search all users to find and assign Sub-Mentors to this group.
             </DialogDescription>
           </DialogHeader>
 
@@ -286,7 +286,7 @@ function RemoveConfirmDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Remove SubMentor</DialogTitle>
+          <DialogTitle>Remove Sub-Mentor</DialogTitle>
           <DialogDescription>
             Remove <strong>{subMentorName}</strong> from this group? They will lose access to
             all group resources.
@@ -324,7 +324,7 @@ export function SubMentorsTab({ groupId }: SubMentorsTabProps) {
   const isAdmin = user?.role === 'ADMIN';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['group-sub_mentors', groupId],
+    queryKey: ['group-sub-mentors', groupId],
     queryFn: () => groupsApi.getSubMentors(groupId),
   });
 
@@ -333,11 +333,11 @@ export function SubMentorsTab({ groupId }: SubMentorsTabProps) {
   const removeMutation = useMutation({
     mutationFn: (userId: string) => groupsApi.unassignSubMentor(groupId, userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', groupId] });
-      toast.success('SubMentor removed.');
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', groupId] });
+      toast.success('Sub-Mentor removed.');
       setRemoveTarget(null);
     },
-    onError: () => toast.error('Failed to remove subMentor.'),
+    onError: () => toast.error('Failed to remove Sub-Mentor.'),
   });
 
   if (isLoading) {
@@ -355,15 +355,15 @@ export function SubMentorsTab({ groupId }: SubMentorsTabProps) {
 
         <div className="p-4 flex items-center justify-between border-b border-slate-100">
           <div>
-            <h3 className="font-semibold text-slate-800">SubMentors</h3>
+            <h3 className="font-semibold text-slate-800">Sub-Mentors</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {sub_mentors.length} subMentor{sub_mentors.length !== 1 ? 's' : ''} assigned
+              {sub_mentors.length} Sub-Mentor{sub_mentors.length !== 1 ? 's' : ''} assigned
             </p>
           </div>
           {isAdmin && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4 mr-1.5" />
-              Add SubMentors
+              Add Sub-Mentors
             </Button>
           )}
         </div>
@@ -371,7 +371,7 @@ export function SubMentorsTab({ groupId }: SubMentorsTabProps) {
         {sub_mentors.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground/70">
             <GraduationCap className="h-10 w-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No sub_mentors assigned. Admins are running this group.</p>
+            <p className="text-sm">No Sub-Mentors assigned. Admins are running this group.</p>
           </div>
         ) : (
           <Table>

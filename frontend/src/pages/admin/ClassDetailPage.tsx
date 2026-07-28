@@ -190,7 +190,7 @@ export default function AdminClassDetailPage() {
               <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
             </div>
             <div>
-              <p className="text-xs text-[#5A7A9A]">Group Admin</p>
+              <p className="text-xs text-[#5A7A9A]">Lead Mentor</p>
               {cls.lead_mentor ? (
                 <Link
                   to={`/admin/users/${cls.lead_mentor.id}`}
@@ -209,7 +209,7 @@ export default function AdminClassDetailPage() {
               <GraduationCap className="h-3.5 w-3.5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs text-[#5A7A9A]">SubMentors</p>
+              <p className="text-xs text-[#5A7A9A]">Sub-Mentors</p>
               {cls.sub_mentors && cls.sub_mentors.length > 0 ? (
                 <p className="font-semibold text-sm text-[#00285A] mt-0.5 leading-snug">
                   {cls.sub_mentors.map((inst, i) => (

@@ -36,13 +36,13 @@ export function SubMentorCalendar() {
   }));
 
   const { data: groupsData } = useQuery({
-    queryKey: ['subMentor', 'my-groups'],
+    queryKey: ['sub-mentor', 'my-groups'],
     queryFn:  () => subMentorApi.myGroups(),
     staleTime: 120_000,
   });
 
   const { data, isFetching, isPending } = useQuery({
-    queryKey: ['subMentor', 'calendar', dateRange.from, dateRange.to, selectedGroupId],
+    queryKey: ['sub-mentor', 'calendar', dateRange.from, dateRange.to, selectedGroupId],
     queryFn:  () => classesApi.list({
       from:      dateRange.from,
       to:        dateRange.to,
@@ -103,7 +103,7 @@ export function SubMentorCalendar() {
         >
           <Info className="h-4 w-4 shrink-0 text-[#0066BB]" />
           <span>
-            You're seeing classes from all sub_mentors. You can only edit your own.
+            You're seeing classes from all Sub-Mentors. You can only edit your own.
           </span>
         </div>
       )}
@@ -151,7 +151,7 @@ export function SubMentorCalendar() {
           <div className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-[#0066BB]" />
             <h2 className="font-semibold text-slate-800 text-sm">
-              {effectiveCanViewAll ? "All sub_mentors' classes" : 'Your assigned classes'}
+              {effectiveCanViewAll ? "All Sub-Mentors' classes" : 'Your assigned classes'}
             </h2>
             {isFetching && (
               <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />

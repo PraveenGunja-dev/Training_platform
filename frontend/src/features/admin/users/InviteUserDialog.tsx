@@ -85,7 +85,7 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
       try {
         await groupsApi.assignLeadMentor(values.lead_mentor_group_id, result.data.id);
       } catch {
-        toast.warning(`User "${values.email}" was created but could not be assigned as Group Admin. Please assign manually from the Group page.`);
+        toast.warning(`User "${values.email}" was created but could not be assigned as Lead Mentor. Please assign manually from the Group page.`);
         await qc.invalidateQueries({ queryKey: ['users'] });
         reset();
         onClose();
@@ -139,9 +139,9 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ADMIN">Super Admin</SelectItem>
-                <SelectItem value="SUB_MENTOR">SubMentor</SelectItem>
+                <SelectItem value="SUB_MENTOR">Sub-Mentor</SelectItem>
                 <SelectItem value="PARTICIPANT">Participant</SelectItem>
-                <SelectItem value="LEAD_MENTOR">Group Admin</SelectItem>
+                <SelectItem value="LEAD_MENTOR">Lead Mentor</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && (
@@ -152,7 +152,7 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
           {selectedRole === 'LEAD_MENTOR' && (
             <div className="space-y-1.5">
               <Label htmlFor="invite-admin-group">
-                Admin of Group <span className="text-red-500">*</span>
+                Lead Mentor Group <span className="text-red-500">*</span>
               </Label>
               <Select
                 onValueChange={v => setValue('lead_mentor_group_id', v)}

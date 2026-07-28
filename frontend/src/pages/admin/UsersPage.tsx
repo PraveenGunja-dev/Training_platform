@@ -37,9 +37,9 @@ const ROLE_CONFIG: Record<Role, {
   icon: typeof User;
 }> = {
   ADMIN:       { label: 'Super Admin',  badgeVariant: 'info',      avatarBg: 'bg-blue-100',    avatarText: 'text-[#0052A5]',  icon: ShieldCheck },
-  SUB_MENTOR:  { label: 'SubMentor',   badgeVariant: 'warning',   avatarBg: 'bg-amber-100',   avatarText: 'text-amber-700',  icon: User        },
+  SUB_MENTOR:  { label: 'Sub-Mentor',   badgeVariant: 'warning',   avatarBg: 'bg-amber-100',   avatarText: 'text-amber-700',  icon: User        },
   PARTICIPANT: { label: 'Participant',  badgeVariant: 'success',   avatarBg: 'bg-emerald-100', avatarText: 'text-emerald-700', icon: User       },
-  LEAD_MENTOR: { label: 'Group Admin',  badgeVariant: 'teal',      avatarBg: 'bg-teal-100',    avatarText: 'text-teal-700',   icon: ShieldCheck },
+  LEAD_MENTOR: { label: 'Lead Mentor',  badgeVariant: 'teal',      avatarBg: 'bg-teal-100',    avatarText: 'text-teal-700',   icon: ShieldCheck },
 };
 
 /* ── Stat pill ───────────────────────────────────────────────────────── */
@@ -155,9 +155,9 @@ export default function AdminUsersPage() {
         <div className="flex gap-3 flex-wrap">
           <StatPill label="Total"        count={stats.total}        color="bg-slate-50 text-slate-600 border-slate-200"       />
           <StatPill label="Super Admins" count={stats.admins}       color="bg-blue-50 text-[#0052A5] border-blue-200"         />
-          <StatPill label="SubMentors"  count={stats.sub_mentors}  color="bg-amber-50 text-amber-700 border-amber-200"       />
+          <StatPill label="Sub-Mentors"  count={stats.sub_mentors}  color="bg-amber-50 text-amber-700 border-amber-200"       />
           <StatPill label="Participants" count={stats.participants} color="bg-emerald-50 text-emerald-700 border-emerald-200" />
-          <StatPill label="Group Admins" count={stats.lead_mentors} color="bg-purple-50 text-purple-700 border-purple-200"   />
+          <StatPill label="Lead Mentors" count={stats.lead_mentors} color="bg-purple-50 text-purple-700 border-purple-200"   />
           <StatPill label="Active"       count={stats.active}       color="bg-teal-50 text-teal-700 border-teal-200"          />
         </div>
       )}
@@ -181,9 +181,9 @@ export default function AdminUsersPage() {
           <SelectContent>
             <SelectItem value="ALL">All Roles</SelectItem>
             <SelectItem value="ADMIN">Super Admin</SelectItem>
-            <SelectItem value="SUB_MENTOR">SubMentor</SelectItem>
+            <SelectItem value="SUB_MENTOR">Sub-Mentor</SelectItem>
             <SelectItem value="PARTICIPANT">Participant</SelectItem>
-            <SelectItem value="LEAD_MENTOR">Group Admin</SelectItem>
+            <SelectItem value="LEAD_MENTOR">Lead Mentor</SelectItem>
           </SelectContent>
         </Select>
 

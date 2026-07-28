@@ -114,7 +114,7 @@ describe('SubMentorCalendar — cross-visibility', () => {
     const { SubMentorCalendar } = await import('@/features/sub-mentor/calendar/SubMentorCalendar');
     vi.mocked(useQuery).mockImplementation((opts: Parameters<typeof useQuery>[0]) => {
       const key = (opts.queryKey as string[])[0];
-      if (key === 'subMentor') {
+      if (key === 'sub-mentor') {
         return qResult({ data: [{ id: 'g1', name: 'Group A', participant_count: 5 }], effective_can_view_all: true });
       }
       return qResult({ data: [] });
@@ -127,7 +127,7 @@ describe('SubMentorCalendar — cross-visibility', () => {
     const { SubMentorCalendar } = await import('@/features/sub-mentor/calendar/SubMentorCalendar');
     vi.mocked(useQuery).mockImplementation((opts: Parameters<typeof useQuery>[0]) => {
       const key = (opts.queryKey as string[])[0];
-      if (key === 'subMentor') {
+      if (key === 'sub-mentor') {
         return qResult({ data: [{ id: 'g1', name: 'Group A', participant_count: 5 }], effective_can_view_all: false });
       }
       return qResult({ data: [] });
@@ -140,13 +140,13 @@ describe('SubMentorCalendar — cross-visibility', () => {
     const { SubMentorCalendar } = await import('@/features/sub-mentor/calendar/SubMentorCalendar');
     vi.mocked(useQuery).mockImplementation((opts: Parameters<typeof useQuery>[0]) => {
       const key = (opts.queryKey as string[])[0];
-      if (key === 'subMentor') {
+      if (key === 'sub-mentor') {
         return qResult({ data: [], effective_can_view_all: true });
       }
       return qResult({ data: [] });
     });
     render(React.createElement(SubMentorCalendar));
-    expect(screen.getByText(/all sub_mentors' classes/i)).toBeTruthy();
+    expect(screen.getByText(/all sub-mentors' classes/i)).toBeTruthy();
   });
 });
 

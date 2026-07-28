@@ -91,7 +91,7 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
         )}
       </div>
 
-      {/* Group Admin */}
+      {/* Lead Mentor */}
       <div className="px-4 py-2.5 border-b border-slate-100 flex items-start gap-2">
         <ShieldCheck className="h-3.5 w-3.5 text-teal-600 flex-shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
@@ -108,12 +108,12 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
         </div>
       </div>
 
-      {/* SubMentors */}
+      {/* Sub-Mentors */}
       <div className="px-4 py-2.5 border-b border-slate-100">
         <div className="flex items-center gap-1 mb-1.5">
           <GraduationCap className="h-3 w-3 text-amber-600" />
           <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600">
-            SubMentors ({group.sub_mentors.length})
+            Sub-Mentors ({group.sub_mentors.length})
           </span>
         </div>
         {group.sub_mentors.length > 0 ? (
@@ -132,7 +132,7 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-400 italic">No sub_mentors assigned</p>
+          <p className="text-xs text-slate-400 italic">No Sub-Mentors assigned</p>
         )}
       </div>
 
@@ -264,7 +264,7 @@ function PageHeader() {
       </div>
       <div>
         <h1 className="text-xl font-bold text-[#00285A] leading-tight">Organisation Hierarchy</h1>
-        <p className="text-sm text-[#5A7A9A]">Super Admin → Groups → SubMentors → Participants</p>
+        <p className="text-sm text-[#5A7A9A]">Super Admin → Groups → Sub-Mentors → Participants</p>
       </div>
     </div>
   );
@@ -328,7 +328,7 @@ export default function AdminOrgChartPage() {
         <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Batch Admins"     value={orgData.stats.total_lead_mentors} accent="teal"    />
         <KpiCard icon={<Building2     className="h-4 w-4" />} label="Groups"           value={orgData.stats.total_groups}       accent="cyan"    />
         <KpiCard icon={<Layers        className="h-4 w-4" />} label="Total Sub-Groups" value={orgData.stats.total_sub_groups}   accent="violet"  />
-        <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="SubMentors"      value={orgData.stats.total_sub_mentors}  accent="default" />
+        <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="Sub-Mentors"    value={orgData.stats.total_sub_mentors}  accent="default" />
         <KpiCard icon={<Users         className="h-4 w-4" />} label="Participants"     value={orgData.stats.total_participants} accent="emerald" />
       </div>
 
@@ -337,7 +337,7 @@ export default function AdminOrgChartPage() {
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#5A7A9A]" />
           <Input
-            placeholder="Search groups, admins, sub_mentors..."
+            placeholder="Search groups, admins, sub-mentors..."
             className="pl-8 h-9 text-sm border-[#C5D8EC] bg-[#EBF3FB]/40 focus:bg-white"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -413,7 +413,7 @@ export default function AdminOrgChartPage() {
           <div className="flex items-center gap-3 mb-4">
             <div className="h-px flex-1 bg-blue-200" />
             <span className="text-xs font-bold tracking-widest uppercase text-[#0052A5] px-1">
-              Unassigned SubMentors
+              Unassigned Sub-Mentors
             </span>
             <div className="h-px flex-1 bg-blue-200" />
           </div>
@@ -421,7 +421,7 @@ export default function AdminOrgChartPage() {
             <div className="flex items-center gap-2 mb-3">
               <UserCheck className="h-4 w-4 text-[#0052A5]" />
               <p className="text-xs text-[#0052A5] font-medium">
-                {filteredUnassigned.length} subMentor{filteredUnassigned.length !== 1 ? 's' : ''} not yet assigned to any group
+                {filteredUnassigned.length} Sub-Mentor{filteredUnassigned.length !== 1 ? 's' : ''} not yet assigned to any group
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

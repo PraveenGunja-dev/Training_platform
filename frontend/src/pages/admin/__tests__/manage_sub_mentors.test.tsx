@@ -98,7 +98,7 @@ const sampleSubMentors = [
 /* SubMentorsTab                                                            */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-import { SubMentorsTab } from '@/features/admin/group-instructors/InstructorsTab';
+import { SubMentorsTab } from '@/features/admin/group-sub-mentors/SubMentorsTab';
 
 describe('SubMentorsTab', () => {
   beforeEach(() => {
@@ -124,7 +124,7 @@ describe('SubMentorsTab', () => {
 
     render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.getByRole('button', { name: /add sub_mentors/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add sub-mentors/i })).toBeInTheDocument();
   });
 
   it('hides Add SubMentors button for non-admin (subMentor role)', () => {
@@ -133,7 +133,7 @@ describe('SubMentorsTab', () => {
 
     render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.queryByRole('button', { name: /add sub_mentors/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add sub-mentors/i })).not.toBeInTheDocument();
   });
 
   it('shows empty state copy when no sub_mentors assigned', () => {
@@ -143,7 +143,7 @@ describe('SubMentorsTab', () => {
     render(wrap(<SubMentorsTab groupId="g-1" />));
 
     expect(
-      screen.getByText('No sub_mentors assigned. Admins are running this group.'),
+      screen.getByText('No Sub-Mentors assigned. Admins are running this group.'),
     ).toBeInTheDocument();
   });
 
@@ -176,7 +176,7 @@ describe('SubMentorsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: /remove alice smith/i }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/remove subMentor/i)).toBeInTheDocument();
+    expect(screen.getByText(/remove sub-mentor/i)).toBeInTheDocument();
   });
 
   it('calls DELETE mutation when confirm remove is clicked', () => {
@@ -199,10 +199,10 @@ describe('SubMentorsTab', () => {
 
     render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    fireEvent.click(screen.getByRole('button', { name: /add sub_mentors/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add sub-mentors/i }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/search by name or email to find and assign/i)).toBeInTheDocument();
+    expect(screen.getByText(/search all users to find and assign/i)).toBeInTheDocument();
   });
 
   it('shows subMentor count in summary text', () => {
@@ -211,7 +211,7 @@ describe('SubMentorsTab', () => {
 
     render(wrap(<SubMentorsTab groupId="g-1" />));
 
-    expect(screen.getByText('2 sub_mentors assigned')).toBeInTheDocument();
+    expect(screen.getByText('2 Sub-Mentors assigned')).toBeInTheDocument();
   });
 });
 

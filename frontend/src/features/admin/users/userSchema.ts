@@ -8,7 +8,7 @@ export const inviteSchema = z.object({
   lead_mentor_group_id: z.string().optional(),
 }).refine(
   data => data.role !== 'LEAD_MENTOR' || !!data.lead_mentor_group_id,
-  { message: 'Please select a group for the Group Admin', path: ['lead_mentor_group_id'] },
+  { message: 'Please select a group for the Lead Mentor', path: ['lead_mentor_group_id'] },
 );
 
 export type InviteFormValues = z.infer<typeof inviteSchema>;

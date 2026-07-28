@@ -45,7 +45,7 @@ export default function LeadMentorDashboardPage() {
     <div className="flex flex-col items-center justify-center h-64 text-slate-500">
       <p className="text-sm font-medium">No dashboard data available.</p>
       <p className="text-xs mt-1 text-slate-400">
-        Make sure you are assigned as a group admin and your group has activity.
+        Make sure you are assigned as a Lead Mentor and your group has activity.
       </p>
     </div>
   );

@@ -35,7 +35,7 @@ const ROLE_CONFIG: Record<Role, {
     icon: <ShieldCheck className="h-3 w-3" />,
   },
   SUB_MENTOR: {
-    label: 'SubMentor',
+    label: 'Sub-Mentor',
     variant: 'warning',
     gradient: 'linear-gradient(135deg, #0052A5 0%, #C41230 100%)',
     icon: <GraduationCap className="h-3 w-3" />,
@@ -47,7 +47,7 @@ const ROLE_CONFIG: Record<Role, {
     icon: <UserCircle className="h-3 w-3" />,
   },
   LEAD_MENTOR: {
-    label: 'Group Admin',
+    label: 'Lead Mentor',
     variant: 'secondary',
     gradient: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
     icon: <ShieldCheck className="h-3 w-3" />,
@@ -219,9 +219,9 @@ export default function AdminUserDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ADMIN">Super Admin</SelectItem>
-                    <SelectItem value="SUB_MENTOR">SubMentor</SelectItem>
+                    <SelectItem value="SUB_MENTOR">Sub-Mentor</SelectItem>
                     <SelectItem value="PARTICIPANT">Participant</SelectItem>
-                    <SelectItem value="LEAD_MENTOR">Group Admin</SelectItem>
+                    <SelectItem value="LEAD_MENTOR">Lead Mentor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -325,7 +325,7 @@ export default function AdminUserDetailPage() {
         </div>
       )}
 
-      {/* ── Group Admin — Assigned Batch ───────────────────────────────── */}
+      {/* ── Lead Mentor — Assigned Batch ───────────────────────────────── */}
       {user.role === 'LEAD_MENTOR' && (
         <div className="rounded-2xl overflow-hidden shadow-sm border border-[#C5D8EC] bg-white">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-[#EBF3FB]">
@@ -333,7 +333,7 @@ export default function AdminUserDetailPage() {
               <ShieldCheck className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-[#00285A] tracking-tight">Group Admin Assignment</h2>
+              <h2 className="text-sm font-bold text-[#00285A] tracking-tight">Lead Mentor Assignment</h2>
               <p className="text-[11px] text-[#5A7A9A]">The batch this user administers</p>
             </div>
           </div>

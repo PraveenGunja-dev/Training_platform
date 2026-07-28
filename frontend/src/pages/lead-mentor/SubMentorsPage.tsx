@@ -45,8 +45,8 @@ function AddSubMentorDialog({
     mutationFn: (user: SubMentor) => groupsApi.assignSubMentors(groupId, [user.id]),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group', groupId] });
-      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', groupId] });
-      toast.success('SubMentor assigned.');
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', groupId] });
+      toast.success('Sub-Mentor assigned.');
       handleClose();
     },
     onError: () => toast.error('Failed to assign subMentor.'),
@@ -60,8 +60,8 @@ function AddSubMentorDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add SubMentor</DialogTitle>
-          <DialogDescription>Search existing sub_mentors and assign one to your group.</DialogDescription>
+          <DialogTitle>Add Sub-Mentor</DialogTitle>
+          <DialogDescription>Search existing Sub-Mentors and assign one to your group.</DialogDescription>
         </DialogHeader>
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
@@ -72,14 +72,14 @@ function AddSubMentorDialog({
         <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
           {available.length === 0 && !isFetching ? (
             <p className="text-sm text-muted-foreground/70 p-4 text-center">
-              {search ? 'No matching sub_mentors found.' : 'No available sub_mentors to assign.'}
+              {search ? 'No matching Sub-Mentors found.' : 'No available Sub-Mentors to assign.'}
             </p>
           ) : available.map((u) => (
             <div key={u.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
-                  <Badge variant="teal" className="text-[10px] px-1.5 py-0 shrink-0">SubMentor</Badge>
+                  <Badge variant="teal" className="text-[10px] px-1.5 py-0 shrink-0">Sub-Mentor</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
               </div>
@@ -121,10 +121,10 @@ export default function LeadMentorSubMentorsPage() {
     mutationFn: (userId: string) => groupsApi.unassignSubMentor(selectedGroupId!, userId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group', selectedGroupId] });
-      void queryClient.invalidateQueries({ queryKey: ['group-sub_mentors', selectedGroupId] });
-      toast.success('SubMentor removed.');
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', selectedGroupId] });
+      toast.success('Sub-Mentor removed.');
     },
-    onError: () => toast.error('Failed to remove subMentor.'),
+    onError: () => toast.error('Failed to remove Sub-Mentor.'),
   });
 
   if (groupIds.length === 0) {
@@ -136,7 +136,7 @@ export default function LeadMentorSubMentorsPage() {
     );
   }
 
-  const sub_mentors = groupData?.data?.sub_mentors ?? [];
+  const subMentors = groupData?.data?.sub_mentors ?? [];
 
   return (
     <div className="p-6 space-y-6">
@@ -162,15 +162,15 @@ export default function LeadMentorSubMentorsPage() {
             <GraduationCap className="h-5 w-5 text-teal-700" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800">SubMentors</h1>
+            <h1 className="text-xl font-bold text-slate-800">Sub-Mentors</h1>
             <p className="text-sm text-slate-500">
-              {sub_mentors.length} subMentor{sub_mentors.length !== 1 ? 's' : ''} in your group
+              {subMentors.length} Sub-Mentor{subMentors.length !== 1 ? 's' : ''} in your group
             </p>
           </div>
         </div>
         <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
-          Add SubMentor
+          Add Sub-Mentor
         </Button>
       </div>
 
@@ -182,10 +182,10 @@ export default function LeadMentorSubMentorsPage() {
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
           </div>
-        ) : sub_mentors.length === 0 ? (
+        ) : subMentors.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <GraduationCap className="h-10 w-10 mb-2 opacity-30" />
-            <p className="text-sm">No sub_mentors assigned yet.</p>
+            <p className="text-sm">No Sub-Mentors assigned yet.</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add First SubMentor
@@ -201,7 +201,7 @@ export default function LeadMentorSubMentorsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sub_mentors.map(ins => {
+              {subMentors.map(ins => {
                 const groupName = groupData?.data?.name;
                 return (
                 <TableRow

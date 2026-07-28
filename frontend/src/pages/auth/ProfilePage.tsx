@@ -130,7 +130,7 @@ export function ProfilePage() {
   const accentText = isAdmin ? 'text-[#0052A5]' : isSubMentor ? 'text-emerald-700' : isLeadMentor ? 'text-teal-700' : 'text-[#E31837]';
   const accentBorder = isAdmin ? 'border-blue-200' : isSubMentor ? 'border-emerald-200' : isLeadMentor ? 'border-teal-200' : 'border-violet-200';
   const accentRing   = isAdmin ? 'ring-[#0052A5]' : isSubMentor ? 'ring-emerald-500' : isLeadMentor ? 'ring-teal-500' : 'ring-violet-500';
-  const roleLabel    = isAdmin ? 'Super Admin' : isSubMentor ? 'SubMentor' : isLeadMentor ? 'Group Admin' : 'Participant';
+  const roleLabel    = isAdmin ? 'Super Admin' : isSubMentor ? 'Sub-Mentor' : isLeadMentor ? 'Lead Mentor' : 'Participant';
 
   const photoSrc = preview ?? getFileUrl(user?.photo_url) ?? undefined;
   const userInitials = user ? initials(user.full_name) : '?';
