@@ -21,15 +21,24 @@ class TestUserModel:
         assert user.is_staff is True
         assert user.is_superuser is True
 
-    def test_role_choices_only_two(self):
+    def test_role_choices_has_four_roles(self):
         choices = [c[0] for c in User.ROLE_CHOICES]
-        assert choices == ["ADMIN", "INSTRUCTOR", "PARTICIPANT"]
-        assert "MANAGER" not in choices
+        assert "ADMIN" in choices
+        assert "SUB_MENTOR" in choices
+        assert "LEAD_MENTOR" in choices
+        assert "PARTICIPANT" in choices
+        assert "INSTRUCTOR" not in choices
+        assert "GROUP_ADMIN" not in choices
 
-    def test_role_choices_includes_instructor(self):
+    def test_role_choices_includes_sub_mentor(self):
         choices = [c[0] for c in User.ROLE_CHOICES]
-        assert "INSTRUCTOR" in choices
-        assert ("INSTRUCTOR", "Instructor") in User.ROLE_CHOICES
+        assert "SUB_MENTOR" in choices
+        assert ("SUB_MENTOR", "Sub-Mentor") in User.ROLE_CHOICES
+
+    def test_role_choices_includes_lead_mentor(self):
+        choices = [c[0] for c in User.ROLE_CHOICES]
+        assert "LEAD_MENTOR" in choices
+        assert ("LEAD_MENTOR", "Lead Mentor") in User.ROLE_CHOICES
 
     def test_user_can_view_all_classes_tri_state_default_none(self):
         user = User.objects.create_user(

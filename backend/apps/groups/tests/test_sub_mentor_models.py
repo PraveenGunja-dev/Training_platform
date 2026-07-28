@@ -66,7 +66,7 @@ class TestGroupSubMentorModel:
             )
 
     def test_group_sub_mentor_only_sub_mentor_role(self, group, participant_user, admin_user):
-        """Creating a GroupSubMentor row with a non-INSTRUCTOR user must fail validation.
+        """Creating a GroupSubMentor row with a non-SUB_MENTOR user must fail validation.
 
         The model uses limit_choices_to which is advisory at the ORM level. The serializer
         (chunk 3) enforces this hard. Here we verify the related_name wiring is correct and

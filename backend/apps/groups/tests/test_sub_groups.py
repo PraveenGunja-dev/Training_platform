@@ -31,7 +31,7 @@ def admin_user(db):
 @pytest.fixture
 def instructor_user(db):
     return User.objects.create_user(
-        email=f"ins{_uid()}@sg.test", password="pass", full_name="Instructor User", role="INSTRUCTOR"
+        email=f"ins{_uid()}@sg.test", password="pass", full_name="Instructor User", role="SUB_MENTOR"
     )
 
 
