@@ -223,7 +223,11 @@ class ClassGroupViewSet(ViewSet):
 
     @action(detail=True, methods=["post"], url_path="participants")
     def add_participants(self, request: Request, pk: str | None = None) -> Response:
-        if not self._check_lead_mentor_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
         serializer = BulkAddParticipantsSerializer(data=request.data)
@@ -237,7 +241,11 @@ class ClassGroupViewSet(ViewSet):
 
     @action(detail=True, methods=["delete"], url_path="participants/(?P<user_id>[^/.]+)")
     def remove_participant(self, request: Request, pk: str | None = None, user_id: str | None = None) -> Response:
-        if not self._check_lead_mentor_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
         services.remove_participant(group=group, user_id=user_id, actor=request.user)
@@ -260,10 +268,14 @@ class ClassGroupViewSet(ViewSet):
             qs = GroupSubMentor.objects.filter(group=group).select_related("sub_mentor")
             return Response({"data": GroupSubMentorSerializer(qs, many=True).data})
 
-        # POST — Admin or Lead Mentor of this group
-        if request.user.role != "ADMIN" and not _is_lead_mentor_of(request.user, group.pk):
+        # POST — Admin, Lead Mentor of this group, or Sub-Mentor assigned to this group
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, group.pk)
+        )
+        if request.user.role != "ADMIN" and not _is_lead_mentor_of(request.user, group.pk) and not is_assigned_sub_mentor:
             return Response(
-                {"errors": [{"code": "perm.forbidden", "message": "Only admins or the assigned Lead Mentor can assign Sub-Mentors."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Only admins, the Lead Mentor, or an assigned Sub-Mentor can assign Sub-Mentors."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         from django.db import transaction  # noqa: PLC0415
@@ -336,7 +348,11 @@ class ClassGroupViewSet(ViewSet):
 
     @action(detail=True, methods=["delete"], url_path="sub-mentors/(?P<user_id>[^/.]+)")
     def unassign_sub_mentor(self, request: Request, pk: str | None = None, user_id: str | None = None) -> Response:
-        if not self._check_lead_mentor_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
         gi = get_object_or_404(GroupSubMentor, group=group, sub_mentor_id=user_id)
@@ -367,7 +383,11 @@ class ClassGroupViewSet(ViewSet):
         """GET /groups/{id}/available-sub-mentors/ — list Sub-Mentors not yet in this group.
         Accessible to ADMIN or the LEAD_MENTOR of this group.
         """
-        if not self._check_lead_mentor_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             return Response(
                 {"errors": [{"code": "perm.forbidden", "message": "Forbidden."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
@@ -529,10 +549,14 @@ class SubGroupViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
 
     def _caller_has_write_access(self) -> bool:
-        """True if caller is Super Admin or Lead Mentor of the parent group."""
+        """True if caller is Admin, Lead Mentor of the group, or assigned Sub-Mentor."""
         user = self.request.user
         group_pk = self.kwargs.get("group_pk")
-        return user.role == "ADMIN" or _is_lead_mentor_of(user, group_pk)
+        if user.role == "ADMIN" or _is_lead_mentor_of(user, group_pk):
+            return True
+        if user.role == "SUB_MENTOR":
+            return sub_mentor_owns_group(user, group_pk)
+        return False
 
     def _get_group(self, group_pk: str) -> ClassGroup:
         return get_object_or_404(ClassGroup, pk=group_pk, is_archived=False)
@@ -649,23 +673,32 @@ class SubGroupViewSet(ViewSet):
 
 
 class MeGroupsView(APIView):
-    """GET /me/groups — returns groups assigned to the current Sub-Mentor."""
-
-    permission_classes = [IsAuthenticated, IsSubMentor]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
+        from apps.common.scoping import lead_mentor_group_qs  # noqa: PLC0415
         from apps.common.visibility import sub_mentor_can_view_all  # noqa: PLC0415
 
-        qs = sub_mentor_group_qs(request.user).prefetch_related("memberships")
-        data = [
-            {
-                "id": str(g.id),
-                "name": g.name,
-                "participant_count": g.memberships.count(),
-            }
-            for g in qs
-        ]
-        return Response({
-            "data": data,
-            "effective_can_view_all": sub_mentor_can_view_all(request.user),
-        })
+        if request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_group_qs(request.user).prefetch_related("memberships")
+            data = [
+                {"id": str(g.id), "name": g.name, "participant_count": g.memberships.count()}
+                for g in qs
+            ]
+            return Response({"data": data, "effective_can_view_all": False})
+
+        if request.user.role == "SUB_MENTOR":
+            qs = sub_mentor_group_qs(request.user).prefetch_related("memberships")
+            data = [
+                {"id": str(g.id), "name": g.name, "participant_count": g.memberships.count()}
+                for g in qs
+            ]
+            return Response({
+                "data": data,
+                "effective_can_view_all": sub_mentor_can_view_all(request.user),
+            })
+
+        return Response(
+            {"errors": [{"code": "perm.forbidden", "message": "Forbidden."}], "data": None},
+            status=403,
+        )
