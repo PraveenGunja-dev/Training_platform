@@ -13,8 +13,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
-from apps.common.permissions import IsAdminOrSubMentor
-from apps.common.scoping import sub_mentor_class_qs, sub_mentor_owns_group
+from apps.common.permissions import IsAdminOrLeadMentorOrSubMentor, IsAdminOrSubMentor
+from apps.common.scoping import lead_mentor_owns_group, sub_mentor_class_qs, sub_mentor_owns_group
 from apps.common.visibility import sub_mentor_can_view_all
 
 from .models import Class
@@ -42,7 +42,7 @@ class ClassViewSet(ViewSet):
 
     def get_permissions(self):
         if self.action in {"create", "partial_update", "destroy"}:
-            return [IsAdminOrSubMentor()]
+            return [IsAdminOrLeadMentorOrSubMentor()]
         return [IsAuthenticated()]
 
     def _base_queryset(self) -> object:
@@ -136,6 +136,13 @@ class ClassViewSet(ViewSet):
             group_id = request.data.get("group_id")
             if not group_id or not sub_mentor_owns_group(request.user, group_id):
                 return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "LEAD_MENTOR":
+            group_id = request.data.get("group_id")
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         serializer = ClassWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # Belt-and-suspenders: run model-level clean() before the DB write.
@@ -192,6 +199,11 @@ class ClassViewSet(ViewSet):
         cls = get_object_or_404(Class.objects.select_related("group", "created_by"), pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = ClassWriteSerializer(cls, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
@@ -291,6 +303,11 @@ class ClassViewSet(ViewSet):
         cls = get_object_or_404(Class.objects.select_related("group"), pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         title = cls.title
         class_id = cls.id
         group = cls.group
@@ -338,12 +355,22 @@ class ParticipantCalendarView(APIView):
 class ClassParticipantsView(APIView):
     """GET /classes/{pk}/participants — list participants in the class's group."""
 
-    permission_classes = [IsAdminOrSubMentor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def get(self, request: Request, pk: str) -> Response:
         from apps.groups.models import GroupMembership  # noqa: PLC0415
 
         cls = get_object_or_404(Class.objects.select_related("group"), pk=pk)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         members = (
             GroupMembership.objects
             .filter(group=cls.group, user__is_active=True)
@@ -366,7 +393,7 @@ class ClassParticipantsView(APIView):
 class RecurringClassView(APIView):
     """POST /classes/recurring — bulk-create classes for repeating weekdays in a date range."""
 
-    permission_classes = [IsAdminOrSubMentor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def post(self, request: Request) -> Response:
         from datetime import datetime, timedelta  # noqa: PLC0415
@@ -378,6 +405,13 @@ class RecurringClassView(APIView):
             if not group_id or not sub_mentor_owns_group(request.user, group_id):
                 return Response(
                     {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        elif request.user.role == "LEAD_MENTOR":
+            group_id = request.data.get("group_id")
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}]},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -480,7 +514,7 @@ class ClassActivityView(APIView):
         from apps.attendance.models import AttendanceSession  # noqa: PLC0415
         from apps.assignments.models import AssignmentTask  # noqa: PLC0415
 
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
                 {"errors": [{"code": "perm.denied", "message": "Access denied."}]},
                 status=status.HTTP_403_FORBIDDEN,
@@ -493,6 +527,12 @@ class ClassActivityView(APIView):
             if not sub_mentor_owns_group(request.user, cls.group_id) and not sub_mentor_can_view_all(request.user):
                 return Response(
                     {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "Not your group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        if request.user.role == "LEAD_MENTOR":
+            if not lead_mentor_owns_group(request.user, cls.group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}]},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
