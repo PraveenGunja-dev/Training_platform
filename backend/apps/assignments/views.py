@@ -14,7 +14,12 @@ from rest_framework.viewsets import ViewSet
 from apps.audit.services import log_action
 from apps.common.permissions import IsAdmin
 from apps.common.file_validation import FileValidationError, validate_file
-from apps.common.scoping import sub_mentor_assignment_qs, sub_mentor_owns_group
+from apps.common.scoping import (
+    sub_mentor_assignment_qs,
+    sub_mentor_owns_group,
+    lead_mentor_assignment_qs,
+    lead_mentor_owns_group,
+)
 from apps.groups.models import GroupMembership
 
 from .filters import apply_task_filters, participant_task_qs
@@ -71,6 +76,9 @@ class AssignmentTaskViewSet(ViewSet):
         elif request.user.role == "SUB_MENTOR":
             qs = sub_mentor_assignment_qs(request.user).select_related("group", "class_obj", "created_by")
             qs = apply_task_filters(qs, request.query_params)
+        elif request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_assignment_qs(request.user).select_related("group", "class_obj", "created_by")
+            qs = apply_task_filters(qs, request.query_params)
         else:
             qs = participant_task_qs(request.user)
             qs = apply_task_filters(qs, request.query_params)
@@ -79,9 +87,9 @@ class AssignmentTaskViewSet(ViewSet):
 
     # POST /assignments (Admin or Sub-Mentor on assigned group)
     def create(self, request: Request) -> Response:
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         ser = AssignmentTaskWriteSerializer(data=request.data)
@@ -95,6 +103,14 @@ class AssignmentTaskViewSet(ViewSet):
             group_id = group.pk if group else None
             if not group_id or not sub_mentor_owns_group(request.user, group_id):
                 return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "LEAD_MENTOR":
+            group = ser.validated_data.get("group")
+            group_id = group.pk if group else None
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         task = AssignmentTask.objects.create(
             created_by=request.user,
             **ser.validated_data,
@@ -171,6 +187,12 @@ class AssignmentTaskViewSet(ViewSet):
         elif request.user.role == "SUB_MENTOR":
             if not sub_mentor_owns_group(request.user, task.group_id):
                 return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "LEAD_MENTOR":
+            if not lead_mentor_owns_group(request.user, task.group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         else:
             # Participants can only see tasks that are open or whose window has started
             in_group = GroupMembership.objects.filter(
@@ -187,14 +209,19 @@ class AssignmentTaskViewSet(ViewSet):
 
     # PATCH /assignments/:id (Admin or Sub-Mentor on assigned group)
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         task = get_object_or_404(self._base_qs(), pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         ser = AssignmentTaskWriteSerializer(data=request.data, partial=True)
         if not ser.is_valid():
             return Response(
@@ -222,14 +249,19 @@ class AssignmentTaskViewSet(ViewSet):
 
     # DELETE /assignments/:id (Admin or Sub-Mentor on assigned group)
     def destroy(self, request: Request, pk: str | None = None) -> Response:
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         task = get_object_or_404(AssignmentTask, pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         task_id = task.id
         task.delete()
         log_action(
@@ -321,14 +353,19 @@ class AssignmentTaskViewSet(ViewSet):
 
     # POST /assignments/:id/close (Admin or Sub-Mentor on assigned group)
     def close(self, request: Request, pk: str | None = None) -> Response:
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         task = get_object_or_404(self._base_qs(), pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if task.is_closed:
             return Response(
                 {"errors": [{"code": "assignment.already_closed", "detail": "This assignment is already closed."}], "data": None},
@@ -349,14 +386,19 @@ class AssignmentTaskViewSet(ViewSet):
     # POST /assignments/:id/question-file — upload/replace question file
     def question_file_upload(self, request: Request, pk: str | None = None) -> Response:
         """POST /assignments/{id}/question-file — upload/replace question file."""
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         task = get_object_or_404(self._base_qs(), pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         file = request.FILES.get('file')
         if not file:
             return _validation_error('file', 'This field is required.')
@@ -385,6 +427,11 @@ class AssignmentTaskViewSet(ViewSet):
         # Verify access
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not task.question_file_data:
             return Response(
                 {"errors": [{"code": "not_found", "message": "No question file attached."}], "data": None},
@@ -400,14 +447,19 @@ class AssignmentTaskViewSet(ViewSet):
 
     # GET /assignments/:id/submissions (Admin or Sub-Mentor on assigned group)
     def list_submissions(self, request: Request, pk: str | None = None) -> Response:
-        if request.user.role not in ("ADMIN", "SUB_MENTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_or_sub_mentor_required", "message": "Admin or Sub-Mentor access required."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         task = get_object_or_404(AssignmentTask, pk=pk)
         if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, task.group_id):
             return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, task.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         subs = (
             Submission.objects.filter(task=task)
             .select_related("user", "submitted_by")
@@ -476,6 +528,12 @@ class SubmissionFileView(APIView):
                     {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+        elif request.user.role == "LEAD_MENTOR":
+            if not lead_mentor_owns_group(request.user, sub.task.group_id):
+                return Response(
+                    {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         elif request.user.role != "ADMIN" and sub.user_id != request.user.id:
             return Response(
                 {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
@@ -511,11 +569,13 @@ class SubmissionReviewView(APIView):
             return None
 
     def _can_review(self, submission, user) -> bool:
-        """Admin: any group. Sub-Mentor: only assigned groups."""
+        """Admin: any group. Sub-Mentor/Lead-Mentor: only assigned groups."""
         if user.role == "ADMIN":
             return True
         if user.role == "SUB_MENTOR":
             return sub_mentor_owns_group(user, submission.task.group_id)
+        if user.role == "LEAD_MENTOR":
+            return lead_mentor_owns_group(user, submission.task.group_id)
         return False
 
     def get(self, request: Request, submission_id) -> Response:
@@ -531,7 +591,7 @@ class SubmissionReviewView(APIView):
                 {"errors": [{"code": "permission_denied", "message": "Not your submission."}]},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if user.role == "SUB_MENTOR" and not self._can_review(submission, user):
+        if user.role in ("SUB_MENTOR", "LEAD_MENTOR") and not self._can_review(submission, user):
             return Response(
                 {"errors": [{"code": "permission_denied", "message": "Not in your group."}]},
                 status=status.HTTP_403_FORBIDDEN,
