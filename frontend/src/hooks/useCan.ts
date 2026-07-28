@@ -20,10 +20,13 @@ export interface CanResourceData {
  * Returns true if the current user can perform action on a resource.
  *
  * ADMIN: always true.
- * SUB_MENTOR: true when the resource's group_id is one of their assigned groups.
- *   For 'document' + 'delete'/'edit': also requires uploaded_by_id === current user id.
- *   When read_only=true (cross-visibility non-assigned class), always false for writes.
- * PARTICIPANT: always false for write actions on this surface.
+ * LEAD_MENTOR and SUB_MENTOR: identical logic, scoped to their assigned groups.
+ *   Both roles:
+ *   - read_only=true blocks all write actions
+ *   - create requires at least 1 assigned group
+ *   - all other actions require group_id to be in their assigned groups
+ *   - document delete/edit additionally requires uploaded_by_id === user.id
+ * PARTICIPANT and others: always false for write actions.
  */
 export function useCan(
   action: CanAction,
@@ -64,12 +67,24 @@ export function useCan(
     return true;
   }
 
-  // LEAD_MENTOR can manage participants, sub_mentors, and sub-groups within their assigned group
-  if (user?.role === 'LEAD_MENTOR' && user.lead_mentor_of_group_ids && user.lead_mentor_of_group_ids.length > 0) {
-    const adminGroupIds = new Set(user.lead_mentor_of_group_ids);
-    if (action === 'create') return true;
+  if (user?.role === 'LEAD_MENTOR') {
+    const leadGroupIds = user.lead_mentor_of_group_ids;
+    if (!leadGroupIds || leadGroupIds.length === 0) return false;
+
+    // Cross-visibility read-only: never allow writes on non-assigned classes
+    if (resourceData?.read_only === true) return false;
+
+    if (action === 'create') return leadGroupIds.length > 0;
+
     if (!resourceData?.group_id) return false;
-    return adminGroupIds.has(resourceData.group_id);
+    const inGroup = new Set(leadGroupIds).has(resourceData.group_id);
+    if (!inGroup) return false;
+
+    // Delete/edit on documents: same restriction as Sub-Mentor — own uploads only
+    if (_resource === 'document' && (action === 'delete' || action === 'edit')) {
+      return resourceData?.uploaded_by_id === user.id;
+    }
+    return true;
   }
 
   return false;
