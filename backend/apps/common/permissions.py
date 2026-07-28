@@ -78,3 +78,25 @@ class IsParticipantInGroup(BasePermission):
         return GroupMembership.objects.filter(
             user=request.user, group_id=group_id
         ).exists()
+
+
+class IsAdminOrLeadMentorOrSubMentor(BasePermission):
+    """Allow access to ADMIN, LEAD_MENTOR, or SUB_MENTOR. Scoping enforced in the view."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("ADMIN", "LEAD_MENTOR", "SUB_MENTOR")
+        )
+
+
+class IsLeadMentorOrSubMentor(BasePermission):
+    """Allow access to LEAD_MENTOR or SUB_MENTOR only (no admin implied)."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("LEAD_MENTOR", "SUB_MENTOR")
+        )
