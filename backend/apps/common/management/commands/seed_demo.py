@@ -38,7 +38,7 @@ class Command(BaseCommand):
 
         now = timezone.now()
         admins = self._seed_admins()
-        self._seed_instructor()
+        self._seed_sub_mentor()
         participants = self._seed_participants()
         groups = self._seed_groups(admins[0])
         self._seed_memberships(groups, participants)
@@ -55,12 +55,12 @@ class Command(BaseCommand):
     # Users
     # ------------------------------------------------------------------
 
-    def _seed_instructor(self) -> User:
+    def _seed_sub_mentor(self) -> User:
         user, created = User.objects.update_or_create(
-            email="dev-instructor@example.com",
+            email="dev-sub-mentor@example.com",
             defaults={
-                "full_name": "Dev Instructor",
-                "role": "INSTRUCTOR",
+                "full_name": "Dev Sub-Mentor",
+                "role": "SUB_MENTOR",
                 "is_active": True,
                 "is_staff": False,
             },
@@ -68,7 +68,7 @@ class Command(BaseCommand):
         user.set_password("password123")
         user.save(update_fields=["password"])
         status = "created" if created else "updated"
-        self.stdout.write(f"  Instructor {status}: dev-instructor@example.com")
+        self.stdout.write(f"  Sub-Mentor {status}: dev-sub-mentor@example.com")
         return user
 
     def _seed_admins(self) -> list[User]:

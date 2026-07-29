@@ -1,7 +1,7 @@
 from django.urls import path
 
 from apps.accounts.views import UserPhotoView
-from .views import InstructorListView, UserViewSet, UserVisibilityView
+from .views import SubMentorListView, UserViewSet, UserVisibilityView
 
 # Explicit URL patterns to avoid DRF router collision: both GET (list) and
 # POST (invite) need to live at /users — the router would create two separate
@@ -17,7 +17,7 @@ users_resend = UserViewSet.as_view({"post": "resend_invite"})
 
 urlpatterns = [
     # specific paths BEFORE parameterised ones
-    path("instructors", InstructorListView.as_view(), name="instructors-list"),
+    path("sub-mentors", SubMentorListView.as_view(), name="sub-mentors-list"),
     path("users/bulk-invite", users_bulk, name="users-bulk-invite"),
     path("users/stats", users_stats, name="users-stats"),
     path("users/business-units", users_business_units, name="users-business-units"),

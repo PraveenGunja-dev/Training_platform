@@ -12,50 +12,50 @@ class IsAdmin(BasePermission):
         )
 
 
-class IsInstructor(BasePermission):
-    """Allow access only to users with role == 'INSTRUCTOR'."""
+class IsSubMentor(BasePermission):
+    """Allow access only to users with role == 'SUB_MENTOR'."""
 
     def has_permission(self, request, view) -> bool:
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.role == "INSTRUCTOR"
+            and request.user.role == "SUB_MENTOR"
         )
 
 
-class IsAdminOrInstructor(BasePermission):
-    """Allow access to ADMIN or INSTRUCTOR users. Scoping is enforced in the viewset."""
+class IsAdminOrSubMentor(BasePermission):
+    """Allow access to ADMIN or SUB_MENTOR users. Scoping is enforced in the viewset."""
 
     def has_permission(self, request, view) -> bool:
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.role in ("ADMIN", "INSTRUCTOR")
+            and request.user.role in ("ADMIN", "SUB_MENTOR")
         )
 
 
-class IsInstructorOfGroup(BasePermission):
-    """Object-level: allow if the instructor is assigned to the object's group.
+class IsSubMentorOfGroup(BasePermission):
+    """Object-level: allow if the Sub-Mentor is assigned to the object's group.
 
     The object must expose a `group` or `group_id` attribute.
-    Uses a function-local import of GroupInstructor to avoid circular imports.
+    Uses a function-local import of GroupSubMentor to avoid circular imports.
     """
 
     def has_permission(self, request, view) -> bool:
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.role == "INSTRUCTOR"
+            and request.user.role == "SUB_MENTOR"
         )
 
     def has_object_permission(self, request, view, obj) -> bool:
-        from apps.groups.models import GroupInstructor  # noqa: PLC0415
+        from apps.groups.models import GroupSubMentor  # noqa: PLC0415
 
         group_id = getattr(obj, "group_id", None) or getattr(obj, "id", None)
         if group_id is None:
             return False
-        return GroupInstructor.objects.filter(
-            instructor=request.user, group_id=group_id
+        return GroupSubMentor.objects.filter(
+            sub_mentor=request.user, group_id=group_id
         ).exists()
 
 
@@ -78,3 +78,25 @@ class IsParticipantInGroup(BasePermission):
         return GroupMembership.objects.filter(
             user=request.user, group_id=group_id
         ).exists()
+
+
+class IsAdminOrLeadMentorOrSubMentor(BasePermission):
+    """Allow access to ADMIN, LEAD_MENTOR, or SUB_MENTOR. Scoping enforced in the view."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("ADMIN", "LEAD_MENTOR", "SUB_MENTOR")
+        )
+
+
+class IsLeadMentorOrSubMentor(BasePermission):
+    """Allow access to LEAD_MENTOR or SUB_MENTOR only (no admin implied)."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("LEAD_MENTOR", "SUB_MENTOR")
+        )

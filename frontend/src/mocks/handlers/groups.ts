@@ -129,7 +129,7 @@ export const groupsHandlers = [
     const membership = groupMemberships[group.id];
     const participants = enrichParticipants(group.id, membership?.participant_ids ?? []);
 
-    return HttpResponse.json({ data: { ...group, participants } });
+    return HttpResponse.json({ data: { ...group, participants, lead_mentor: null } });
   }),
 
   http.post('*/api/v1/groups', async ({ request }) => {
@@ -138,7 +138,7 @@ export const groupsHandlers = [
       id: 'g-' + Math.random().toString(36).slice(2, 8),
       name: body.name, description: body.description ?? '',
       participants_count: 0,
-      is_archived: false, created_at: new Date().toISOString(), instructors: [],
+      is_archived: false, created_at: new Date().toISOString(), sub_mentors: [],
     };
     groupsData.push(newGroup);
     groupMemberships[newGroup.id] = { participant_ids: [] };

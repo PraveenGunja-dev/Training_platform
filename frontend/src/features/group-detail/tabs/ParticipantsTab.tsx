@@ -171,11 +171,11 @@ export function ParticipantsTab({ groupId, participants, groupName }: Participan
 
   function handleParticipantClick(p: GroupParticipant) {
     if (user?.role === 'ADMIN') {
-      navigate(`/admin/users/${p.id}`);
-    } else if (user?.role === 'INSTRUCTOR') {
-      navigate(`/instructor/participants/${p.id}`, { state: { participant: p, groupName } });
-    } else if (user?.role === 'GROUP_ADMIN') {
-      navigate(`/group-admin/participants/${p.id}`, { state: { participant: p, groupName } });
+      navigate(`/lead-mentor/users/${p.id}`);
+    } else if (user?.role === 'SUB_MENTOR') {
+      navigate(`/sub-mentor/participants/${p.id}`, { state: { participant: p, groupName } });
+    } else if (user?.role === 'LEAD_MENTOR') {
+      navigate(`/lead-mentor/participants/${p.id}`, { state: { participant: p, groupName } });
     }
   }
 

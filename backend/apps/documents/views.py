@@ -12,8 +12,15 @@ from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
 from apps.common.file_validation import FileValidationError, validate_file
-from apps.common.scoping import instructor_document_qs, instructor_owns_group, instructor_shared_upload_qs
-from apps.groups.models import ClassGroup, GroupAdmin, GroupMembership
+from apps.common.scoping import (
+    sub_mentor_document_qs,
+    sub_mentor_owns_group,
+    sub_mentor_shared_upload_qs,
+    lead_mentor_document_qs,
+    lead_mentor_owns_group,
+    lead_mentor_shared_upload_qs,
+)
+from apps.groups.models import ClassGroup, GroupLeadMentor, GroupMembership
 
 from .models import Document, ParticipantSharedDoc, ParticipantUploadPermission
 from .serializers import (
@@ -30,8 +37,8 @@ from .services import approve_shared, document_visible_to, reject_shared
 User = get_user_model()
 
 
-_INSTRUCTOR_DENIED = {
-    "errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}],
+_SUB_MENTOR_DENIED = {
+    "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
     "data": None,
 }
 
@@ -39,17 +46,17 @@ _INSTRUCTOR_DENIED = {
 def _admin_required(request: Request) -> Response | None:
     if request.user.role != "ADMIN":
         return Response(
-            {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
+            {"errors": [{"code": "perm.lead_mentor_required", "message": "Admin access required."}], "data": None},
             status=status.HTTP_403_FORBIDDEN,
         )
     return None
 
 
 def _staff_required(request: Request) -> Response | None:
-    """Allow ADMIN or INSTRUCTOR; deny everyone else."""
-    if request.user.role not in ("ADMIN", "INSTRUCTOR"):
+    """Allow ADMIN, SUB_MENTOR, or LEAD_MENTOR; deny everyone else. Callers enforce group-level scoping."""
+    if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
         return Response(
-            {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
+            {"errors": [{"code": "perm.forbidden", "message": "Access required."}], "data": None},
             status=status.HTTP_403_FORBIDDEN,
         )
     return None
@@ -82,8 +89,13 @@ class DocumentViewSet(ViewSet):
             qs = qs.filter(group_id=group_id)
         if request.user.role == "ADMIN":
             return Response({"data": DocumentSerializer(qs, many=True).data})
-        if request.user.role == "INSTRUCTOR":
-            qs = instructor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
+        if request.user.role == "SUB_MENTOR":
+            qs = sub_mentor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
+            if group_id:
+                qs = qs.filter(group_id=group_id)
+            return Response({"data": DocumentSerializer(qs, many=True).data})
+        if request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
             if group_id:
                 qs = qs.filter(group_id=group_id)
             return Response({"data": DocumentSerializer(qs, many=True).data})
@@ -105,7 +117,7 @@ class DocumentViewSet(ViewSet):
                     visible.append(doc)
         return Response({"data": DocumentSerializer(visible, many=True).data})
 
-    # POST /documents (Admin or Instructor on assigned group)
+    # POST /documents (Admin or Sub-Mentor on assigned group)
     def create(self, request: Request) -> Response:
         err = _staff_required(request)
         if err:
@@ -131,10 +143,17 @@ class DocumentViewSet(ViewSet):
         if not ser.is_valid():
             return _validation_error(ser.errors)
         d = ser.validated_data
-        if request.user.role == "INSTRUCTOR":
+        if request.user.role == "SUB_MENTOR":
             group_id = d["group"].pk if d.get("group") else None
-            if not group_id or not instructor_owns_group(request.user, group_id):
-                return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            if not group_id or not sub_mentor_owns_group(request.user, group_id):
+                return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "LEAD_MENTOR":
+            group_id = d["group"].pk if d.get("group") else None
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         doc = Document.objects.create(
             group=d["group"],
             class_obj=d.get("class_obj"),
@@ -258,14 +277,19 @@ class DocumentViewSet(ViewSet):
             )
         return Response({"data": DocumentSerializer(doc).data})
 
-    # PATCH /documents/:id (Admin or Instructor on assigned group)
+    # PATCH /documents/:id (Admin or Sub-Mentor on assigned group)
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
         err = _staff_required(request)
         if err:
             return err
         doc = get_object_or_404(Document, pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, doc.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, doc.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, doc.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         ser = DocumentWriteSerializer(data=request.data, partial=True)
         if not ser.is_valid():
             return _validation_error(ser.errors)
@@ -282,20 +306,20 @@ class DocumentViewSet(ViewSet):
         )
         return Response({"data": DocumentSerializer(doc).data})
 
-    # DELETE /documents/:id (Admin, Instructor on assigned group, or Group Admin of group)
+    # DELETE /documents/:id (Admin, Sub-Mentor on assigned group, or Lead Mentor of group)
     def destroy(self, request: Request, pk: str | None = None) -> Response:
         role = request.user.role
-        if role not in ("ADMIN", "INSTRUCTOR", "GROUP_ADMIN"):
+        if role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_required", "message": "Access denied."}], "data": None},
+                {"errors": [{"code": "perm.lead_mentor_required", "message": "Access denied."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         doc = get_object_or_404(Document, pk=pk)
-        if role == "INSTRUCTOR" and not instructor_owns_group(request.user, doc.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
-        if role == "GROUP_ADMIN" and not GroupAdmin.objects.filter(admin=request.user, group_id=doc.group_id).exists():
+        if role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, doc.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if role == "LEAD_MENTOR" and not GroupLeadMentor.objects.filter(lead_mentor=request.user, group_id=doc.group_id).exists():
             return Response(
-                {"errors": [{"code": "perm.not_group_admin", "message": "You are not the admin of this group."}], "data": None},
+                {"errors": [{"code": "perm.not_lead_mentor", "message": "You are not the Lead Mentor of this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         doc_id = doc.id
@@ -515,14 +539,14 @@ class GroupSharedUploadView(APIView):
             target_id=shared.id,
             metadata={"group_id": str(group.id), "title": shared.title},
         )
-        from apps.notifications.services import notify_instructors as _ni_doc  # noqa: PLC0415
+        from apps.notifications.services import notify_sub_mentors as _ni_doc  # noqa: PLC0415
         uploader_name = request.user.full_name or request.user.email
         _ni_doc(
             group=group,
             notification_type="SHARED_UPLOAD_PENDING",
             title=f"Shared upload pending approval: {shared.title}",
             body=f"{uploader_name} is requesting approval for a shared upload in {group.name}.",
-            link="/instructor/shared-uploads",
+            link="/sub-mentor/shared-uploads",
             payload={"shared_doc_id": str(shared.id), "group_id": str(group.id)},
             dedupe_suffix=str(shared.id),
         )
@@ -543,8 +567,12 @@ class AdminSharedUploadListView(APIView):
         err = _staff_required(request)
         if err:
             return err
-        if request.user.role == "INSTRUCTOR":
-            qs = instructor_shared_upload_qs(request.user).filter(
+        if request.user.role == "SUB_MENTOR":
+            qs = sub_mentor_shared_upload_qs(request.user).filter(
+                status=ParticipantSharedDoc.STATUS_PENDING
+            ).select_related("group", "uploaded_by").order_by("created_at")
+        elif request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_shared_upload_qs(request.user).filter(
                 status=ParticipantSharedDoc.STATUS_PENDING
             ).select_related("group", "uploaded_by").order_by("created_at")
         else:
@@ -568,8 +596,13 @@ class AdminSharedUploadApproveView(APIView):
         shared = get_object_or_404(
             ParticipantSharedDoc.objects.select_related("group", "uploaded_by"), pk=pk
         )
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, shared.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, shared.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, shared.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if shared.uploaded_by_id == request.user.id:
             return Response(
                 {"errors": [{"code": "shared_doc.self_approval", "message": "You cannot approve your own shared upload."}], "data": None},
@@ -617,8 +650,13 @@ class AdminSharedUploadRejectView(APIView):
         shared = get_object_or_404(
             ParticipantSharedDoc.objects.select_related("group", "uploaded_by"), pk=pk
         )
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, shared.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, shared.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, shared.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if shared.uploaded_by_id == request.user.id:
             return Response(
                 {"errors": [{"code": "shared_doc.self_reject", "message": "You cannot reject your own shared upload."}], "data": None},
@@ -654,17 +692,17 @@ class AdminSharedUploadDeleteView(APIView):
     # DELETE /admin/shared-uploads/:id
     def delete(self, request: Request, pk: str) -> Response:
         role = request.user.role
-        if role not in ("ADMIN", "INSTRUCTOR", "GROUP_ADMIN"):
+        if role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
-                {"errors": [{"code": "perm.admin_required", "message": "Access denied."}], "data": None},
+                {"errors": [{"code": "perm.lead_mentor_required", "message": "Access denied."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         upload = get_object_or_404(ParticipantSharedDoc, pk=pk)
-        if role == "INSTRUCTOR" and not instructor_owns_group(request.user, upload.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
-        if role == "GROUP_ADMIN" and not GroupAdmin.objects.filter(admin=request.user, group_id=upload.group_id).exists():
+        if role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, upload.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if role == "LEAD_MENTOR" and not GroupLeadMentor.objects.filter(lead_mentor=request.user, group_id=upload.group_id).exists():
             return Response(
-                {"errors": [{"code": "perm.not_group_admin", "message": "You are not the admin of this group."}], "data": None},
+                {"errors": [{"code": "perm.not_lead_mentor", "message": "You are not the Lead Mentor of this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         upload_id = upload.id
@@ -685,14 +723,19 @@ class SharedDocFileView(APIView):
 
     def get(self, request: Request, pk: str) -> Response:
         shared = get_object_or_404(ParticipantSharedDoc, pk=pk)
-        # Permission: uploader, admin, or instructor of the group
+        # Permission: uploader, admin, or sub_mentor of the group
         if request.user.role == "PARTICIPANT" and shared.uploaded_by_id != request.user.id:
             return Response(
                 {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, shared.group_id):
-            return Response(_INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, shared.group_id):
+            return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, shared.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not shared.file_data:
             return Response(
                 {"errors": [{"code": "not_found", "message": "File not available."}], "data": None},

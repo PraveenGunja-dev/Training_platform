@@ -224,7 +224,7 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
 export default function AdminGroupsPage() {
   const navigate    = useNavigate();
   const [search, setSearch]           = useState('');
-  const [instructorFilter, setInstructorFilter] = useState('ALL');
+  const [subMentorFilter, setSubMentorFilter] = useState('ALL');
   const [createOpen, setCreateOpen]   = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -234,17 +234,17 @@ export default function AdminGroupsPage() {
 
   const allGroups = data?.data ?? [];
 
-  const instructorOptions = Array.from(
+  const subMentorOptions = Array.from(
     new Map(
-      allGroups.flatMap(g => g.instructors ?? []).map(i => [i.id, i.full_name])
+      allGroups.flatMap(g => g.sub_mentors ?? []).map(i => [i.id, i.full_name])
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
   const groups = allGroups
     .filter(g => search === '' || g.name.toLowerCase().includes(search.toLowerCase()))
     .filter(g =>
-      instructorFilter === 'ALL' ||
-      (g.instructors ?? []).some(i => i.id === instructorFilter)
+      subMentorFilter === 'ALL' ||
+      (g.sub_mentors ?? []).some(i => i.id === subMentorFilter)
     )
     .sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -264,7 +264,7 @@ export default function AdminGroupsPage() {
         </Button>
       </div>
 
-      {/* Search + Instructor filter */}
+      {/* Search + SubMentor filter */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/70" />
@@ -276,23 +276,23 @@ export default function AdminGroupsPage() {
           />
         </div>
 
-        <Select value={instructorFilter} onValueChange={setInstructorFilter}>
+        <Select value={subMentorFilter} onValueChange={setSubMentorFilter}>
           <SelectTrigger className="w-52">
-            <SelectValue placeholder="All Instructors" />
+            <SelectValue placeholder="All SubMentors" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All Instructors</SelectItem>
-            {instructorOptions.map(([id, name]) => (
+            <SelectItem value="ALL">All SubMentors</SelectItem>
+            {subMentorOptions.map(([id, name]) => (
               <SelectItem key={id} value={id}>{name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {instructorFilter !== 'ALL' && (
+        {subMentorFilter !== 'ALL' && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setInstructorFilter('ALL')}
+            onClick={() => setSubMentorFilter('ALL')}
             className="text-xs h-9 px-3 border-slate-300 text-slate-600 hover:text-slate-900"
           >
             ✕ Clear filter

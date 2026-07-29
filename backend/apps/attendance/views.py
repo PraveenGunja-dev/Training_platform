@@ -13,8 +13,13 @@ from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
 from apps.common.pagination import AuditCursorPagination
-from apps.common.permissions import IsAdminOrInstructor
-from apps.common.scoping import instructor_owns_group, instructor_session_qs
+from apps.common.permissions import IsAdminOrSubMentor, IsAdminOrLeadMentorOrSubMentor
+from apps.common.scoping import (
+    sub_mentor_owns_group,
+    sub_mentor_session_qs,
+    lead_mentor_owns_group,
+    lead_mentor_session_qs,
+)
 from apps.groups.models import GroupMembership
 from apps.scheduling.models import Class
 
@@ -36,13 +41,13 @@ def _error_response(exc: AttendanceError) -> Response:
 
 
 class AdminSessionViewSet(ViewSet):
-    """Admin / Instructor CRUD + actions on AttendanceSessions."""
+    """Admin / Sub-Mentor / Lead-Mentor CRUD + actions on AttendanceSessions."""
 
-    permission_classes = [IsAdminOrInstructor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
     serializer_class = AttendanceSessionSerializer
 
-    _INSTRUCTOR_DENIED = {
-        "errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}],
+    _SUB_MENTOR_DENIED = {
+        "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
         "data": None,
     }
 
@@ -52,8 +57,12 @@ class AdminSessionViewSet(ViewSet):
         )
 
     def list(self, request: Request) -> Response:
-        if request.user.role == "INSTRUCTOR":
-            qs = instructor_session_qs(request.user).select_related(
+        if request.user.role == "SUB_MENTOR":
+            qs = sub_mentor_session_qs(request.user).select_related(
+                "class_obj__group", "started_by", "ended_by"
+            )
+        elif request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_session_qs(request.user).select_related(
                 "class_obj__group", "started_by", "ended_by"
             )
         else:
@@ -115,8 +124,13 @@ class AdminSessionViewSet(ViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         class_obj = get_object_or_404(Class.objects.select_related("group"), pk=class_id)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, class_obj.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, class_obj.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, class_obj.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         try:
             session = start_session(class_obj=class_obj, actor=request.user, duration_minutes=duration_minutes)
         except AttendanceError as exc:
@@ -129,14 +143,24 @@ class AdminSessionViewSet(ViewSet):
 
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         session = get_object_or_404(self._base_qs(), pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, session.class_obj.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return Response({"data": AttendanceSessionSerializer(session).data})
 
     def end(self, request: Request, pk: str | None = None) -> Response:
         session = get_object_or_404(self._base_qs(), pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, session.class_obj.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         try:
             session = end_session(session=session, actor=request.user)
         except AttendanceError as exc:
@@ -146,8 +170,13 @@ class AdminSessionViewSet(ViewSet):
 
     def report(self, request: Request, pk: str | None = None) -> Response:
         session = get_object_or_404(self._base_qs(), pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, session.class_obj.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, session.class_obj.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         data = build_report(session=session)
         records_payload = [
             {
@@ -181,10 +210,10 @@ class AdminSessionViewSet(ViewSet):
 class AdminRecordOverrideView(APIView):
     """PATCH /api/v1/admin/attendance/records/:id — manual status override."""
 
-    permission_classes = [IsAdminOrInstructor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
-    _INSTRUCTOR_DENIED = {
-        "errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}],
+    _SUB_MENTOR_DENIED = {
+        "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
         "data": None,
     }
 
@@ -192,10 +221,17 @@ class AdminRecordOverrideView(APIView):
         record = get_object_or_404(
             AttendanceRecord.objects.select_related("session__class_obj", "user"), pk=pk
         )
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(
             request.user, record.session.class_obj.group_id
         ):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(
+            request.user, record.session.class_obj.group_id
+        ):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         new_status = request.data.get("status")
         if new_status not in dict(AttendanceRecord.STATUS_CHOICES):
             return Response(

@@ -67,7 +67,7 @@ function DeleteDocDialog({
 export function DocumentsTab({ groupId }: { groupId: string }) {
   const { user } = useAuthStore();
   const qc = useQueryClient();
-  const canManageDocs = ['ADMIN', 'INSTRUCTOR', 'GROUP_ADMIN'].includes(user?.role ?? '');
+  const canManageDocs = ['ADMIN', 'SUB_MENTOR', 'LEAD_MENTOR'].includes(user?.role ?? '');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
   const [subGroupFilter, setSubGroupFilter] = useState('__all__');

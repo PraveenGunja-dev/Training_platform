@@ -55,7 +55,7 @@ class Command(BaseCommand):
             self._log("Dashboard snapshots", n)
 
             # 4. Groups — one delete cascades everything linked:
-            #      GroupMembership, GroupInstructor
+            #      GroupMembership, GroupSubMentor
             #      Class → AttendanceSession → AttendanceRecord
             #      AssignmentTask → Submission → SubmissionReview
             #      Document, ParticipantUploadPermission, ParticipantSharedDoc

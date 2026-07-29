@@ -15,15 +15,15 @@ import {
 import { groupsApi } from '@/api/groups';
 import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/store/auth';
-import type { GroupDetail, GroupInstructor, User } from '@/lib/types';
+import type { GroupDetail, GroupSubMentor, User } from '@/lib/types';
 
 const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Admin', INSTRUCTOR: 'Instructor', PARTICIPANT: 'Participant', GROUP_ADMIN: 'Group Admin',
+  ADMIN: 'Admin', SUB_MENTOR: 'Sub-Mentor', PARTICIPANT: 'Participant', LEAD_MENTOR: 'Lead Mentor',
 };
 
-// ── Add Instructors dialog ────────────────────────────────────────────────────
+// ── Add Sub-Mentors dialog ────────────────────────────────────────────────────
 
-function AddInstructorsDialog({
+function AddSubMentorsDialog({
   open, onClose, groupId, existingIds,
 }: {
   open: boolean; onClose: () => void; groupId: string; existingIds: string[];
@@ -40,7 +40,7 @@ function AddInstructorsDialog({
   }, [query]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ['users', 'instructor-search', debouncedQuery],
+    queryKey: ['users', 'sub-mentor-search', debouncedQuery],
     queryFn: () => usersApi.list({ search: debouncedQuery || undefined, page_size: 50 }),
     enabled: open,
     staleTime: 10_000,
@@ -48,7 +48,7 @@ function AddInstructorsDialog({
   });
 
   const results = (data?.data ?? []).filter(
-    u => !existingIds.includes(u.id) && u.is_active && u.role !== 'ADMIN' && u.role !== 'GROUP_ADMIN',
+    u => !existingIds.includes(u.id) && u.is_active && u.role !== 'ADMIN' && u.role !== 'LEAD_MENTOR',
   );
 
   const participantsInSelection = selected.filter(u => u.role === 'PARTICIPANT');
@@ -56,15 +56,15 @@ function AddInstructorsDialog({
   const mutation = useMutation({
     mutationFn: (users: User[]) => {
       const hasParticipants = users.some(u => u.role === 'PARTICIPANT');
-      return groupsApi.assignInstructors(groupId, users.map(u => u.id), hasParticipants || undefined);
+      return groupsApi.assignSubMentors(groupId, users.map(u => u.id), hasParticipants || undefined);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-instructors', groupId] });
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', groupId] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
-      toast.success(`${selected.length} instructor${selected.length !== 1 ? 's' : ''} assigned.`);
+      toast.success(`${selected.length} Sub-Mentor${selected.length !== 1 ? 's' : ''} assigned.`);
       setSelected([]); setQuery(''); setDebouncedQuery(''); setShowConfirm(false); onClose();
     },
-    onError: () => toast.error('Failed to assign instructors.'),
+    onError: () => toast.error('Failed to assign Sub-Mentors.'),
   });
 
   function toggle(u: User) {
@@ -90,8 +90,8 @@ function AddInstructorsDialog({
       <Dialog open={open && !showConfirm} onOpenChange={v => { if (!v) handleClose(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Instructors</DialogTitle>
-            <DialogDescription>Search all users to find and assign instructors to this group.</DialogDescription>
+            <DialogTitle>Add Sub-Mentors</DialogTitle>
+            <DialogDescription>Search all users to find and assign Sub-Mentors to this group.</DialogDescription>
           </DialogHeader>
 
           <div className="relative">
@@ -115,7 +115,7 @@ function AddInstructorsDialog({
                     <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${
                       u.role === 'PARTICIPANT' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                      u.role === 'INSTRUCTOR'  ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                      u.role === 'SUB_MENTOR'  ? 'bg-teal-50 text-teal-700 border-teal-200' :
                                                   'bg-blue-50 text-blue-700 border-blue-200'
                     }`}>
                       {ROLE_LABEL[u.role] ?? u.role}
@@ -163,7 +163,7 @@ function AddInstructorsDialog({
               <DialogDescription className="text-left space-y-2">
                 <span className="block">
                   The following {participantsInSelection.length === 1 ? 'user is' : 'users are'} currently a{' '}
-                  <strong>Participant</strong>. Assigning them as instructors will:
+                  <strong>Participant</strong>. Assigning them as Sub-Mentors will:
                 </span>
                 <ul className="list-disc list-inside text-sm space-y-0.5 text-slate-600 bg-amber-50 rounded-lg p-3">
                   {participantsInSelection.map(p => (
@@ -171,7 +171,7 @@ function AddInstructorsDialog({
                   ))}
                 </ul>
                 <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
-                  <li>Change their role from Participant to Instructor</li>
+                  <li>Change their role from Participant to Sub-Mentor</li>
                   <li>Remove their group memberships and sub-group assignments</li>
                   <li>Existing attendance records and submissions will be retained but inaccessible</li>
                 </ul>
@@ -206,7 +206,7 @@ function RemoveConfirmDialog({
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Remove Instructor</DialogTitle>
+          <DialogTitle>Remove SubMentor</DialogTitle>
           <DialogDescription>
             Remove <strong>{name}</strong> from this group? They will lose access to all group resources.
           </DialogDescription>
@@ -222,9 +222,9 @@ function RemoveConfirmDialog({
   );
 }
 
-// ── Assign Group Admin dialog ─────────────────────────────────────────────────
+// ── Assign Lead Mentor dialog ─────────────────────────────────────────────────
 
-function AssignGroupAdminDialog({
+function AssignLeadMentorDialog({
   open, onClose, groupId, currentAdminId,
 }: {
   open: boolean; onClose: () => void; groupId: string; currentAdminId?: string;
@@ -242,16 +242,16 @@ function AssignGroupAdminDialog({
   });
 
   const mutation = useMutation({
-    mutationFn: (userId: string) => groupsApi.assignGroupAdmin(groupId, userId),
+    mutationFn: (userId: string) => groupsApi.assignLeadMentor(groupId, userId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group', groupId] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
-      toast.success('Group admin assigned.');
+      toast.success('Lead Mentor assigned.');
       setSearch('');
       setPendingUser(null);
       onClose();
     },
-    onError: () => toast.error('Failed to assign group admin.'),
+    onError: () => toast.error('Failed to assign Lead Mentor.'),
   });
 
   const users = (usersData?.data ?? []).filter(u => u.id !== currentAdminId && u.is_active);
@@ -271,8 +271,8 @@ function AssignGroupAdminDialog({
       <Dialog open={open && !pendingUser} onOpenChange={v => { if (!v) handleClose(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Group Admin</DialogTitle>
-            <DialogDescription>Search and select any user to assign as Group Admin for this group.</DialogDescription>
+            <DialogTitle>Assign Lead Mentor</DialogTitle>
+            <DialogDescription>Search and select any user to assign as Lead Mentor for this group.</DialogDescription>
           </DialogHeader>
 
           <div className="relative">
@@ -299,7 +299,7 @@ function AssignGroupAdminDialog({
                     <p className="text-sm font-medium text-foreground truncate">{u.full_name}</p>
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border shrink-0 ${
                       u.role === 'PARTICIPANT' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                      u.role === 'INSTRUCTOR'  ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                      u.role === 'SUB_MENTOR'  ? 'bg-teal-50 text-teal-700 border-teal-200' :
                       u.role === 'ADMIN'        ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                                   'bg-violet-50 text-violet-700 border-violet-200'
                     }`}>
@@ -334,15 +334,15 @@ function AssignGroupAdminDialog({
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 shrink-0">
                   <AlertTriangle className="h-5 w-5 text-amber-600" />
                 </div>
-                <DialogTitle className="text-left">Change Role to Group Admin?</DialogTitle>
+                <DialogTitle className="text-left">Change Role to Lead Mentor?</DialogTitle>
               </div>
               <DialogDescription className="text-left space-y-2 pt-1">
                 <span className="block">
                   <strong>{pendingUser.full_name}</strong> is currently a <strong>Participant</strong>.
-                  Assigning them as Group Admin will:
+                  Assigning them as Lead Mentor will:
                 </span>
                 <ul className="list-disc list-inside text-sm space-y-1 text-slate-600">
-                  <li>Change their role from Participant to Group Admin</li>
+                  <li>Change their role from Participant to Lead Mentor</li>
                   <li>Remove access to participant features (assignments, submissions, attendance)</li>
                   <li>Existing data will be retained but inaccessible to them</li>
                   <li>They will receive a notification about their new role</li>
@@ -361,7 +361,7 @@ function AssignGroupAdminDialog({
                 onClick={() => mutation.mutate(pendingUser.id)}
                 disabled={mutation.isPending}
               >
-                {mutation.isPending ? 'Assigning...' : 'Yes, Make Group Admin'}
+                {mutation.isPending ? 'Assigning...' : 'Yes, Make Lead Mentor'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -383,41 +383,41 @@ export function GroupHeader({
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const isAdmin = user?.role === 'ADMIN';
-  const canRename = user?.role === 'ADMIN' || user?.role === 'GROUP_ADMIN' || user?.role === 'INSTRUCTOR';
+  const canRename = user?.role === 'ADMIN' || user?.role === 'LEAD_MENTOR' || user?.role === 'SUB_MENTOR';
 
   const [addOpen, setAddOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<GroupInstructor | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<GroupSubMentor | null>(null);
   const [assignAdminOpen, setAssignAdminOpen] = useState(false);
   const [removeAdminConfirmOpen, setRemoveAdminConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameName, setRenameName] = useState('');
 
   const removeAdminMutation = useMutation({
-    mutationFn: () => groupsApi.removeGroupAdmin(group.id),
+    mutationFn: () => groupsApi.removeLeadMentor(group.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group', group.id] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
-      toast.success('Group admin removed.');
+      toast.success('Lead Mentor removed.');
     },
-    onError: () => toast.error('Failed to remove group admin.'),
+    onError: () => toast.error('Failed to remove Lead Mentor.'),
   });
 
   const { data: instData } = useQuery({
-    queryKey: ['group-instructors', group.id],
-    queryFn: () => groupsApi.getInstructors(group.id),
+    queryKey: ['group-sub-mentors', group.id],
+    queryFn: () => groupsApi.getSubMentors(group.id),
     staleTime: 30_000,
   });
-  const instructors: GroupInstructor[] = instData?.data ?? [];
+  const sub_mentors: GroupSubMentor[] = instData?.data ?? [];
 
   const removeMutation = useMutation({
-    mutationFn: (userId: string) => groupsApi.unassignInstructor(group.id, userId),
+    mutationFn: (userId: string) => groupsApi.unassignSubMentor(group.id, userId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['group-instructors', group.id] });
+      void queryClient.invalidateQueries({ queryKey: ['group-sub-mentors', group.id] });
       void queryClient.invalidateQueries({ queryKey: ['admin', 'org-chart'] });
-      toast.success('Instructor removed.');
+      toast.success('Sub-Mentor removed.');
       setRemoveTarget(null);
     },
-    onError: () => toast.error('Failed to remove instructor.'),
+    onError: () => toast.error('Failed to remove Sub-Mentor.'),
   });
 
   const renameMutation = useMutation({
@@ -478,25 +478,25 @@ export function GroupHeader({
                 </span>
               </div>
 
-              {/* Group Admin row — same layout/style as Instructors row */}
-              {(group.group_admin || isAdmin) && (
+              {/* Lead Mentor row — same layout/style as SubMentors row */}
+              {(group.lead_mentor || isAdmin) && (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Admin:
+                    Lead Mentor:
                   </span>
 
-                  {group.group_admin ? (
+                  {group.lead_mentor ? (
                     <span className="inline-flex items-center gap-2 text-sm font-bold text-teal-800 bg-teal-100 border border-teal-300 px-3 py-1.5 rounded-lg shadow-sm">
                       <ShieldCheck className="h-4 w-4 shrink-0 text-teal-600" />
-                      <Link to={`/admin/users/${group.group_admin.admin_id}`} className="hover:underline leading-none">
-                        {group.group_admin.full_name}
+                      <Link to={`/admin/users/${group.lead_mentor.lead_mentor_id}`} className="hover:underline leading-none">
+                        {group.lead_mentor.full_name}
                       </Link>
                       {isAdmin && (
                         <>
                           <button
                             onClick={() => setAssignAdminOpen(true)}
                             className="rounded-full hover:bg-teal-200 p-0.5 transition-colors text-teal-600 ml-0.5"
-                            aria-label="Change group admin"
+                            aria-label="Change Lead Mentor"
                           >
                             <Pencil className="h-2.5 w-2.5" />
                           </button>
@@ -504,7 +504,7 @@ export function GroupHeader({
                             onClick={() => setRemoveAdminConfirmOpen(true)}
                             disabled={removeAdminMutation.isPending}
                             className="rounded-full hover:bg-teal-200 p-0.5 transition-colors text-teal-600"
-                            aria-label="Remove group admin"
+                            aria-label="Remove Lead Mentor"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -517,20 +517,20 @@ export function GroupHeader({
                       className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0052A5] bg-white border border-dashed border-[#A8C8E8] px-3 py-1.5 rounded-lg hover:border-[#0052A5] hover:bg-[#EBF3FB] transition-colors"
                     >
                       <ShieldCheck className="h-4 w-4" />
-                      Assign Admin
+                      Assign Lead Mentor
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Instructors row */}
-              {(instructors.length > 0 || isAdmin) && (
+              {/* SubMentors row */}
+              {(sub_mentors.length > 0 || isAdmin) && (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Instructors:
+                    Sub-Mentors:
                   </span>
 
-                  {instructors.map(inst => (
+                  {sub_mentors.map(inst => (
                     <span
                       key={inst.id}
                       className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg shadow-sm"
@@ -551,7 +551,7 @@ export function GroupHeader({
                     </span>
                   ))}
 
-                  {instructors.length === 0 && !isAdmin && (
+                  {sub_mentors.length === 0 && !isAdmin && (
                     <span className="text-sm text-slate-400 italic">None assigned</span>
                   )}
 
@@ -561,7 +561,7 @@ export function GroupHeader({
                       className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0052A5] bg-white border border-dashed border-[#A8C8E8] px-3 py-1.5 rounded-lg hover:border-[#0052A5] hover:bg-[#EBF3FB] transition-colors"
                     >
                       <UserPlus className="h-4 w-4" />
-                      Add Instructor
+                      Add Sub-Mentor
                     </button>
                   )}
                 </div>
@@ -584,20 +584,20 @@ export function GroupHeader({
       </div>
 
       {isAdmin && (
-        <AddInstructorsDialog
+        <AddSubMentorsDialog
           open={addOpen}
           onClose={() => setAddOpen(false)}
           groupId={group.id}
-          existingIds={instructors.map(i => i.id)}
+          existingIds={sub_mentors.map(i => i.id)}
         />
       )}
 
       {isAdmin && (
-        <AssignGroupAdminDialog
+        <AssignLeadMentorDialog
           open={assignAdminOpen}
           onClose={() => setAssignAdminOpen(false)}
           groupId={group.id}
-          currentAdminId={group.group_admin?.admin_id}
+          currentAdminId={group.lead_mentor?.lead_mentor_id}
         />
       )}
 
@@ -642,7 +642,7 @@ export function GroupHeader({
         </DialogContent>
       </Dialog>
 
-      {/* Remove group admin confirmation */}
+      {/* Remove Lead Mentor confirmation */}
       <Dialog open={removeAdminConfirmOpen} onOpenChange={v => { if (!v) setRemoveAdminConfirmOpen(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -650,19 +650,19 @@ export function GroupHeader({
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 shrink-0">
                 <Trash2 className="h-5 w-5 text-red-600" />
               </div>
-              <DialogTitle className="text-left">Remove Group Admin</DialogTitle>
+              <DialogTitle className="text-left">Remove Lead Mentor</DialogTitle>
             </div>
             <DialogDescription asChild>
               <div className="space-y-3 text-left">
                 <p className="text-sm text-slate-700">
                   You are about to remove{' '}
-                  <strong className="text-slate-900">{group.group_admin?.full_name}</strong> as
-                  Group Admin of <strong className="text-slate-900">{group.name}</strong>.
+                  <strong className="text-slate-900">{group.lead_mentor?.full_name}</strong> as
+                  Lead Mentor of <strong className="text-slate-900">{group.name}</strong>.
                 </p>
                 <div className="bg-red-50 border border-red-100 rounded-lg p-3 space-y-1.5">
                   <p className="text-xs font-semibold text-red-700 uppercase tracking-wider">What will happen</p>
                   <ul className="space-y-1 text-sm text-red-600">
-                    <li>• They will immediately lose Group Admin access</li>
+                    <li>• They will immediately lose Lead Mentor access</li>
                     <li>• The batch will have no designated admin</li>
                   </ul>
                 </div>

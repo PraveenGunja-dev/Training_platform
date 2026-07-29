@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.assignments.models import AssignmentTask, Submission, SubmissionReview
-from apps.groups.models import ClassGroup, GroupInstructor, GroupMembership
+from apps.groups.models import ClassGroup, GroupSubMentor, GroupMembership
 
 User = get_user_model()
 
@@ -17,7 +17,7 @@ User = get_user_model()
 
 
 def _url(submission_id):
-    return f"/api/v1/assignments/submissions/{submission_id}/review"
+    return f"/training/api/v1/assignments/submissions/{submission_id}/review"
 
 
 def _auth(user):
@@ -37,8 +37,8 @@ def admin(db):
 
 
 @pytest.fixture
-def instructor(db):
-    return User.objects.create_user(email="inst_rev@test.com", password="pass", role="INSTRUCTOR")
+def sub_mentor(db):
+    return User.objects.create_user(email="inst_rev@test.com", password="pass", role="SUB_MENTOR")
 
 
 @pytest.fixture
@@ -124,13 +124,13 @@ class TestGetReview:
         assert r.status_code == 200
         assert r.data["data"]["comment"] == "Initial comment"
 
-    def test_instructor_in_group_can_read_review(self, submission, existing_review, instructor, group):
-        GroupInstructor.objects.create(group=group, instructor=instructor)
-        r = _auth(instructor).get(_url(submission.id))
+    def test_sub_mentor_in_group_can_read_review(self, submission, existing_review, sub_mentor, group):
+        GroupSubMentor.objects.create(group=group, sub_mentor=sub_mentor)
+        r = _auth(sub_mentor).get(_url(submission.id))
         assert r.status_code == 200
 
-    def test_instructor_outside_group_cannot_read_review(self, submission, existing_review, instructor):
-        r = _auth(instructor).get(_url(submission.id))
+    def test_sub_mentor_outside_group_cannot_read_review(self, submission, existing_review, sub_mentor):
+        r = _auth(sub_mentor).get(_url(submission.id))
         assert r.status_code == 403
 
     def test_participant_can_read_own_review(self, submission, existing_review, participant):
@@ -199,13 +199,13 @@ class TestPostReview:
         assert r.status_code == 200
         assert r.data["data"]["comment"] == "Updated comment"
 
-    def test_instructor_in_group_can_create_review(self, submission, instructor, group):
-        GroupInstructor.objects.create(group=group, instructor=instructor)
-        r = _auth(instructor).post(_url(submission.id), {"comment": "Nice work"}, format="json")
+    def test_sub_mentor_in_group_can_create_review(self, submission, sub_mentor, group):
+        GroupSubMentor.objects.create(group=group, sub_mentor=sub_mentor)
+        r = _auth(sub_mentor).post(_url(submission.id), {"comment": "Nice work"}, format="json")
         assert r.status_code == 201
 
-    def test_instructor_outside_group_cannot_review(self, submission, instructor):
-        r = _auth(instructor).post(_url(submission.id), {"comment": "Nice"}, format="json")
+    def test_sub_mentor_outside_group_cannot_review(self, submission, sub_mentor):
+        r = _auth(sub_mentor).post(_url(submission.id), {"comment": "Nice"}, format="json")
         assert r.status_code == 403
 
     def test_participant_cannot_post_review(self, submission, participant):

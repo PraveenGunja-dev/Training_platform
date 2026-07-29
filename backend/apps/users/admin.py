@@ -1,1 +1,1 @@
-# User model is registered in apps.accounts.admin — nothing to register here.
+# User model is registered in apps.accounts.lead_mentor — nothing to register here.

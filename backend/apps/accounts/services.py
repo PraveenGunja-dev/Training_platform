@@ -19,7 +19,8 @@ INVITE_TOKEN_MAX_AGE = 60 * 60 * 48  # 48 hours in seconds
 
 _ROLE_DISPLAY = {
     "ADMIN": "Administrator",
-    "INSTRUCTOR": "Instructor",
+    "LEAD_MENTOR": "Lead Mentor",
+    "SUB_MENTOR": "Sub-Mentor",
     "PARTICIPANT": "Participant",
 }
 

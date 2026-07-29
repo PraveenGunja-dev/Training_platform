@@ -10,7 +10,7 @@ export function FeedbackCard({ review }: FeedbackCardProps) {
     <div className="rounded-xl border border-indigo-100 bg-blue-50 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <MessageSquare className="h-4 w-4 text-[#0066BB]" />
-        <span className="text-sm font-semibold text-[#0052A5]">Instructor Feedback</span>
+        <span className="text-sm font-semibold text-[#0052A5]">SubMentor Feedback</span>
       </div>
 
       {review.grade_numeric !== null && (
@@ -42,7 +42,7 @@ export function FeedbackCard({ review }: FeedbackCardProps) {
       )}
 
       <p className="text-xs text-slate-400">
-        Reviewed by {review.reviewer_name ?? 'Instructor'} ·{' '}
+        Reviewed by {review.reviewer_name ?? 'SubMentor'} ·{' '}
         {new Date(review.reviewed_at).toLocaleDateString('en-US', {
           day: 'numeric', month: 'short', year: 'numeric',
         })}

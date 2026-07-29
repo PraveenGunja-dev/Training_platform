@@ -62,15 +62,15 @@ def add_participants(
                 dedupe_key=f"group_added:{group.id}:{user.id}",
                 payload={"group_id": str(group.id), "group_name": group.name},
             )
-        # Notify instructors that new participants joined
-        from apps.notifications.services import notify_instructors  # noqa: PLC0415
+        # Notify Sub-Mentors that new participants joined.
+        from apps.notifications.services import notify_sub_mentors  # noqa: PLC0415
         count = len(added)
-        notify_instructors(
+        notify_sub_mentors(
             group=group,
             notification_type="PARTICIPANTS_ADDED_TO_GROUP",
             title=f"New participants in {group.name}",
             body=f"{count} new participant(s) joined {group.name}.",
-            link=f"/instructor/groups/{group.id}",
+            link=f"/sub-mentor/groups/{group.id}",
             payload={"group_id": str(group.id), "added_count": count},
             actor=actor,
             dedupe_suffix=f"add:{_uuid.uuid4()}",
@@ -100,13 +100,13 @@ def remove_participant(
         target_id=group.id,
         metadata={"user_id": str(user_id)},
     )
-    from apps.notifications.services import notify_instructors  # noqa: PLC0415
-    notify_instructors(
+    from apps.notifications.services import notify_sub_mentors  # noqa: PLC0415
+    notify_sub_mentors(
         group=group,
         notification_type="PARTICIPANTS_REMOVED_FROM_GROUP",
         title=f"Participant removed from {group.name}",
         body=f"A participant has been removed from {group.name}.",
-        link=f"/instructor/groups/{group.id}",
+        link=f"/sub-mentor/groups/{group.id}",
         payload={"group_id": str(group.id), "user_id": str(user_id)},
         actor=actor,
         dedupe_suffix=f"rem:{_uuid.uuid4()}",

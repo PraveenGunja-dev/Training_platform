@@ -91,16 +91,16 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
         )}
       </div>
 
-      {/* Group Admin */}
+      {/* Lead Mentor */}
       <div className="px-4 py-2.5 border-b border-slate-100 flex items-start gap-2">
         <ShieldCheck className="h-3.5 w-3.5 text-teal-600 flex-shrink-0 mt-0.5" />
         <div className="min-w-0 flex-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-teal-600 block">
-            Batch Admin
+            Lead Mentor
           </span>
-          {group.group_admin ? (
-            <p className="text-xs text-slate-700 font-medium truncate" title={group.group_admin.email}>
-              {group.group_admin.name}
+          {group.lead_mentor ? (
+            <p className="text-xs text-slate-700 font-medium truncate" title={group.lead_mentor.email}>
+              {group.lead_mentor.name}
             </p>
           ) : (
             <p className="text-xs text-slate-400 italic">Not assigned</p>
@@ -108,17 +108,17 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
         </div>
       </div>
 
-      {/* Instructors */}
+      {/* Sub-Mentors */}
       <div className="px-4 py-2.5 border-b border-slate-100">
         <div className="flex items-center gap-1 mb-1.5">
           <GraduationCap className="h-3 w-3 text-amber-600" />
           <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600">
-            Instructors ({group.instructors.length})
+            Sub-Mentors ({group.sub_mentors.length})
           </span>
         </div>
-        {group.instructors.length > 0 ? (
+        {group.sub_mentors.length > 0 ? (
           <div className="flex flex-wrap gap-1">
-            {group.instructors.map(inst => (
+            {group.sub_mentors.map(inst => (
               <span
                 key={inst.id}
                 title={inst.email}
@@ -132,7 +132,7 @@ function GroupHierarchyCard({ group }: { group: OrgChartGroup }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-400 italic">No instructors assigned</p>
+          <p className="text-xs text-slate-400 italic">No Sub-Mentors assigned</p>
         )}
       </div>
 
@@ -264,7 +264,7 @@ function PageHeader() {
       </div>
       <div>
         <h1 className="text-xl font-bold text-[#00285A] leading-tight">Organisation Hierarchy</h1>
-        <p className="text-sm text-[#5A7A9A]">Super Admin → Groups → Instructors → Participants</p>
+        <p className="text-sm text-[#5A7A9A]">Super Admin → Groups → Lead Mentor / Sub-Mentors → Participants</p>
       </div>
     </div>
   );
@@ -291,8 +291,8 @@ export default function AdminOrgChartPage() {
     if (!search) return [...orgData.groups].sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
     return orgData.groups.filter(g =>
       g.name.toLowerCase().includes(q) ||
-      g.group_admin?.name.toLowerCase().includes(q) ||
-      g.instructors.some(i => i.name.toLowerCase().includes(q)) ||
+      g.lead_mentor?.name.toLowerCase().includes(q) ||
+      g.sub_mentors.some(i => i.name.toLowerCase().includes(q)) ||
       g.participants.some(p => p.name.toLowerCase().includes(q))
     ).sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
   }, [orgData, search]);
@@ -300,7 +300,15 @@ export default function AdminOrgChartPage() {
   const filteredUnassigned = useMemo(() => {
     if (!orgData) return [];
     const q = search.toLowerCase();
-    return orgData.unassigned_instructors.filter(p =>
+    return orgData.unassigned_sub_mentors.filter(p =>
+      !search || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+    );
+  }, [orgData, search]);
+
+  const filteredUnassignedLeadMentors = useMemo(() => {
+    if (!orgData) return [];
+    const q = search.toLowerCase();
+    return (orgData.unassigned_lead_mentors ?? []).filter(p =>
       !search || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
     );
   }, [orgData, search]);
@@ -314,7 +322,7 @@ export default function AdminOrgChartPage() {
   );
   if (!orgData) return null;
 
-  const hasResults = filteredGroups.length > 0 || filteredUnassigned.length > 0;
+  const hasResults = filteredGroups.length > 0 || filteredUnassigned.length > 0 || filteredUnassignedLeadMentors.length > 0;
 
   return (
     <div className="space-y-8">
@@ -325,10 +333,10 @@ export default function AdminOrgChartPage() {
       {/* ── Stats ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Super Admins"     value={orgData.stats.total_admins}       accent="indigo"  />
-        <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Batch Admins"     value={orgData.stats.total_group_admins} accent="teal"    />
+        <KpiCard icon={<ShieldCheck   className="h-4 w-4" />} label="Lead Mentors"     value={orgData.stats.total_lead_mentors} accent="teal"    />
         <KpiCard icon={<Building2     className="h-4 w-4" />} label="Groups"           value={orgData.stats.total_groups}       accent="cyan"    />
         <KpiCard icon={<Layers        className="h-4 w-4" />} label="Total Sub-Groups" value={orgData.stats.total_sub_groups}   accent="violet"  />
-        <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="Instructors"      value={orgData.stats.total_instructors}  accent="default" />
+        <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="Sub-Mentors"    value={orgData.stats.total_sub_mentors}  accent="default" />
         <KpiCard icon={<Users         className="h-4 w-4" />} label="Participants"     value={orgData.stats.total_participants} accent="emerald" />
       </div>
 
@@ -337,7 +345,7 @@ export default function AdminOrgChartPage() {
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#5A7A9A]" />
           <Input
-            placeholder="Search groups, admins, instructors..."
+            placeholder="Search groups, admins, sub-mentors..."
             className="pl-8 h-9 text-sm border-[#C5D8EC] bg-[#EBF3FB]/40 focus:bg-white"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -407,13 +415,13 @@ export default function AdminOrgChartPage() {
         ) : null}
       </div>
 
-      {/* ── Unassigned instructors ───────────────────────────────────── */}
+      {/* ── Unassigned Sub-Mentors ───────────────────────────────────── */}
       {filteredUnassigned.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-4">
             <div className="h-px flex-1 bg-blue-200" />
             <span className="text-xs font-bold tracking-widest uppercase text-[#0052A5] px-1">
-              Unassigned Instructors
+              Unassigned Sub-Mentors
             </span>
             <div className="h-px flex-1 bg-blue-200" />
           </div>
@@ -421,7 +429,7 @@ export default function AdminOrgChartPage() {
             <div className="flex items-center gap-2 mb-3">
               <UserCheck className="h-4 w-4 text-[#0052A5]" />
               <p className="text-xs text-[#0052A5] font-medium">
-                {filteredUnassigned.length} instructor{filteredUnassigned.length !== 1 ? 's' : ''} not yet assigned to any group
+                {filteredUnassigned.length} Sub-Mentor{filteredUnassigned.length !== 1 ? 's' : ''} not yet assigned to any group
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -437,6 +445,43 @@ export default function AdminOrgChartPage() {
                     {getInitials(inst.name)}
                   </span>
                   {inst.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Unassigned Lead Mentors ──────────────────────────────────── */}
+      {filteredUnassignedLeadMentors.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-px flex-1 bg-teal-200" />
+            <span className="text-xs font-bold tracking-widest uppercase text-teal-600 px-1">
+              Unassigned Lead Mentors
+            </span>
+            <div className="h-px flex-1 bg-teal-200" />
+          </div>
+          <div className="bg-teal-50 border border-teal-200 rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <UserCheck className="h-4 w-4 text-teal-600" />
+              <p className="text-xs text-teal-700 font-medium">
+                {filteredUnassignedLeadMentors.length} Lead Mentor{filteredUnassignedLeadMentors.length !== 1 ? 's' : ''} not yet assigned to any group
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {filteredUnassignedLeadMentors.map(lm => (
+                <span
+                  key={lm.id}
+                  title={lm.email}
+                  className="inline-flex items-center gap-2 bg-white border border-teal-200
+                    text-teal-800 text-sm font-medium px-3 py-1.5 rounded-full shadow-sm"
+                >
+                  <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 text-[9px]
+                    font-bold flex items-center justify-center flex-shrink-0">
+                    {getInitials(lm.name)}
+                  </span>
+                  {lm.name}
                 </span>
               ))}
             </div>

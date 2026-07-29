@@ -89,3 +89,11 @@ REQUIREMENTS.md
 
 Bug_fix/
 22-06-change(class-adding)/
+/ACLP Project Structure/
+
+.gitignore
+temp/
+/backend/ACLP_ENV/
+/Rename_Role_Name/
+Permission_Equalization/
+Bugs_fixed/

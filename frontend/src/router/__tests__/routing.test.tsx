@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RoleGuard } from '@/router/RoleGuard';
 import { RootRedirect } from '@/router/RootRedirect';
-import { instructorNav } from '@/components/layout/navConfigs';
+import { subMentorNav } from '@/components/layout/navConfigs';
 import { useAuthStore } from '@/store/auth';
 import type { User } from '@/lib/types';
 
@@ -25,16 +25,16 @@ beforeEach(() => {
 });
 
 describe('RoleGuard', () => {
-  it('blocks PARTICIPANT from instructor routes (redirects to /403)', () => {
+  it('blocks PARTICIPANT from subMentor routes (redirects to /403)', () => {
     useAuthStore.setState({ user: makeUser('PARTICIPANT'), accessToken: 'tok' });
     render(
-      <MemoryRouter initialEntries={['/instructor/dashboard']}>
+      <MemoryRouter initialEntries={['/sub-mentor/dashboard']}>
         <Routes>
           <Route
-            path="/instructor/*"
+            path="/sub-mentor/*"
             element={
-              <RoleGuard role="INSTRUCTOR">
-                <div>instructor content</div>
+              <RoleGuard role="SUB_MENTOR">
+                <div>subMentor content</div>
               </RoleGuard>
             }
           />
@@ -42,20 +42,20 @@ describe('RoleGuard', () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.queryByText('instructor content')).not.toBeInTheDocument();
+    expect(screen.queryByText('subMentor content')).not.toBeInTheDocument();
     expect(screen.getByText('forbidden')).toBeInTheDocument();
   });
 
-  it('blocks ADMIN from instructor routes (redirects to /403)', () => {
+  it('blocks ADMIN from subMentor routes (redirects to /403)', () => {
     useAuthStore.setState({ user: makeUser('ADMIN'), accessToken: 'tok' });
     render(
-      <MemoryRouter initialEntries={['/instructor/dashboard']}>
+      <MemoryRouter initialEntries={['/sub-mentor/dashboard']}>
         <Routes>
           <Route
-            path="/instructor/*"
+            path="/sub-mentor/*"
             element={
-              <RoleGuard role="INSTRUCTOR">
-                <div>instructor content</div>
+              <RoleGuard role="SUB_MENTOR">
+                <div>subMentor content</div>
               </RoleGuard>
             }
           />
@@ -63,20 +63,20 @@ describe('RoleGuard', () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.queryByText('instructor content')).not.toBeInTheDocument();
+    expect(screen.queryByText('subMentor content')).not.toBeInTheDocument();
     expect(screen.getByText('forbidden')).toBeInTheDocument();
   });
 
-  it('allows INSTRUCTOR through', () => {
-    useAuthStore.setState({ user: makeUser('INSTRUCTOR'), accessToken: 'tok' });
+  it('allows SUB_MENTOR through', () => {
+    useAuthStore.setState({ user: makeUser('SUB_MENTOR'), accessToken: 'tok' });
     render(
-      <MemoryRouter initialEntries={['/instructor/dashboard']}>
+      <MemoryRouter initialEntries={['/sub-mentor/dashboard']}>
         <Routes>
           <Route
-            path="/instructor/*"
+            path="/sub-mentor/*"
             element={
-              <RoleGuard role="INSTRUCTOR">
-                <div>instructor content</div>
+              <RoleGuard role="SUB_MENTOR">
+                <div>subMentor content</div>
               </RoleGuard>
             }
           />
@@ -84,22 +84,22 @@ describe('RoleGuard', () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.getByText('instructor content')).toBeInTheDocument();
+    expect(screen.getByText('subMentor content')).toBeInTheDocument();
   });
 });
 
 describe('RootRedirect', () => {
-  it('redirects INSTRUCTOR to /instructor/dashboard', () => {
-    useAuthStore.setState({ user: makeUser('INSTRUCTOR'), accessToken: 'tok' });
+  it('redirects SUB_MENTOR to /subMentor/dashboard', () => {
+    useAuthStore.setState({ user: makeUser('SUB_MENTOR'), accessToken: 'tok' });
     render(
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
-          <Route path="/instructor/dashboard" element={<div>instructor dashboard</div>} />
+          <Route path="/sub-mentor/dashboard" element={<div>subMentor dashboard</div>} />
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.getByText('instructor dashboard')).toBeInTheDocument();
+    expect(screen.getByText('subMentor dashboard')).toBeInTheDocument();
   });
 
   it('redirects unknown role to /login and clears auth state', () => {
@@ -121,11 +121,11 @@ describe('RootRedirect', () => {
 });
 
 describe('useLogin rolePrefix guard', () => {
-  it('INSTRUCTOR landing on /me/* route gets redirected to /403 by RoleGuard', () => {
+  it('SUB_MENTOR landing on /me/* route gets redirected to /403 by RoleGuard', () => {
     // This test verifies the bug that was fixed: before the fix, useLogin resolved
-    // rolePrefix to '/me/' for INSTRUCTOR, so a stale `from` of '/me/dashboard'
-    // would be honoured and the instructor would land on a PARTICIPANT-only route.
-    useAuthStore.setState({ user: makeUser('INSTRUCTOR'), accessToken: 'tok' });
+    // rolePrefix to '/me/' for SUB_MENTOR, so a stale `from` of '/me/dashboard'
+    // would be honoured and the subMentor would land on a PARTICIPANT-only route.
+    useAuthStore.setState({ user: makeUser('SUB_MENTOR'), accessToken: 'tok' });
     render(
       <MemoryRouter initialEntries={['/me/dashboard']}>
         <Routes>
@@ -146,9 +146,9 @@ describe('useLogin rolePrefix guard', () => {
   });
 });
 
-describe('instructorNav', () => {
+describe('subMentorNav', () => {
   it('contains required sidebar items', () => {
-    const labels = instructorNav.map((item) => item.label);
+    const labels = subMentorNav.map((item) => item.label);
     expect(labels).toContain('Dashboard');
     expect(labels).toContain('Groups');
     expect(labels).toContain('Classes');
@@ -160,9 +160,29 @@ describe('instructorNav', () => {
   });
 
   it('excludes admin-only items (Users, Settings, Audit Log)', () => {
-    const labels = instructorNav.map((item) => item.label);
+    const labels = subMentorNav.map((item) => item.label);
     expect(labels).not.toContain('Users');
     expect(labels).not.toContain('Settings');
     expect(labels).not.toContain('Audit Log');
+  });
+});
+
+describe('all canonical role landings', () => {
+  it.each([
+    ['ADMIN', '/admin/dashboard'],
+    ['PARTICIPANT', '/me/dashboard'],
+    ['SUB_MENTOR', '/sub-mentor/dashboard'],
+    ['LEAD_MENTOR', '/lead-mentor/dashboard'],
+  ])('redirects %s to %s', (role, path) => {
+    useAuthStore.setState({ user: makeUser(role), accessToken: 'tok' });
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path={path} element={<div>canonical landing</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByText('canonical landing')).toBeInTheDocument();
   });
 });

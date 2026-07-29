@@ -11,20 +11,20 @@ class UserListSerializer(serializers.ModelSerializer):
 
 class UserDetailSerializer(serializers.ModelSerializer):
     groups = serializers.SerializerMethodField()
-    admin_of_group = serializers.SerializerMethodField()
+    lead_mentor_of_group = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "role", "is_active", "created_at", "last_login", "must_change_password", "groups", "admin_of_group", "business_unit", "grade_code", "department", "employee_code", "can_view_all_classes"]
+        fields = ["id", "email", "full_name", "role", "is_active", "created_at", "last_login", "must_change_password", "groups", "lead_mentor_of_group", "business_unit", "grade_code", "department", "employee_code", "can_view_all_classes"]
 
     def get_groups(self, obj: User) -> list:
         return list(
             obj.group_memberships.select_related("group").values("group__id", "group__name")
         )
 
-    def get_admin_of_group(self, obj: User) -> dict | None:
-        from apps.groups.models import GroupAdmin  # noqa: PLC0415
-        ga = GroupAdmin.objects.filter(admin=obj).select_related("group").first()
+    def get_lead_mentor_of_group(self, obj: User) -> dict | None:
+        from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
+        ga = GroupLeadMentor.objects.filter(lead_mentor=obj).select_related("group").first()
         if ga is None:
             return None
         return {"id": str(ga.group_id), "name": ga.group.name}
@@ -39,7 +39,7 @@ class UserWriteSerializer(serializers.ModelSerializer):
 class InviteSerializer(serializers.Serializer):
     email = serializers.EmailField()
     full_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
-    role = serializers.ChoiceField(choices=["ADMIN", "INSTRUCTOR", "PARTICIPANT", "GROUP_ADMIN"])
+    role = serializers.ChoiceField(choices=["ADMIN", "LEAD_MENTOR", "SUB_MENTOR", "PARTICIPANT"])
 
     def validate_email(self, value: str) -> str:
         return value.lower()
@@ -51,7 +51,7 @@ class BulkInviteRowSerializer(serializers.Serializer):
 
     def validate_email(self, value: str) -> str:
         return value.lower()
-    role = serializers.ChoiceField(choices=["ADMIN", "INSTRUCTOR", "PARTICIPANT", "GROUP_ADMIN"])
+    role = serializers.ChoiceField(choices=["ADMIN", "LEAD_MENTOR", "SUB_MENTOR", "PARTICIPANT"])
 
 
 class BulkInviteSerializer(serializers.Serializer):
@@ -65,8 +65,8 @@ class BulkInviteSerializer(serializers.Serializer):
         return value
 
 
-class InstructorListSerializer(serializers.ModelSerializer):
-    """Minimal serializer for the instructor picker (GET /instructors)."""
+class SubMentorListSerializer(serializers.ModelSerializer):
+    """Minimal serializer for the Sub-Mentor picker (GET /sub-mentors)."""
 
     class Meta:
         model = User

@@ -168,7 +168,7 @@ export default function AdminClassDetailPage() {
           </div>
         </div>
 
-        {/* Batch / Admin / Instructors row */}
+        {/* Batch / Admin / SubMentors row */}
         <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-b border-[#EBF3FB]">
           <div className="flex items-start gap-2">
             <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 flex-shrink-0 mt-0.5">
@@ -190,13 +190,13 @@ export default function AdminClassDetailPage() {
               <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
             </div>
             <div>
-              <p className="text-xs text-[#5A7A9A]">Group Admin</p>
-              {cls.group_admin ? (
+              <p className="text-xs text-[#5A7A9A]">Lead Mentor</p>
+              {cls.lead_mentor ? (
                 <Link
-                  to={`/admin/users/${cls.group_admin.id}`}
+                  to={`/admin/users/${cls.lead_mentor.id}`}
                   className="font-semibold text-[#00285A] hover:underline"
                 >
-                  {cls.group_admin.full_name}
+                  {cls.lead_mentor.full_name}
                 </Link>
               ) : (
                 <p className="font-semibold text-slate-400 italic">Not assigned</p>
@@ -209,15 +209,15 @@ export default function AdminClassDetailPage() {
               <GraduationCap className="h-3.5 w-3.5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs text-[#5A7A9A]">Instructors</p>
-              {cls.instructors && cls.instructors.length > 0 ? (
+              <p className="text-xs text-[#5A7A9A]">Sub-Mentors</p>
+              {cls.sub_mentors && cls.sub_mentors.length > 0 ? (
                 <p className="font-semibold text-sm text-[#00285A] mt-0.5 leading-snug">
-                  {cls.instructors.map((inst, i) => (
+                  {cls.sub_mentors.map((inst, i) => (
                     <span key={inst.id}>
                       <Link to={`/admin/users/${inst.id}`} className="hover:underline">
                         {inst.full_name}
                       </Link>
-                      {i < cls.instructors!.length - 1 && <span className="text-slate-400">, </span>}
+                      {i < cls.sub_mentors!.length - 1 && <span className="text-slate-400">, </span>}
                     </span>
                   ))}
                 </p>
@@ -377,7 +377,7 @@ export default function AdminClassDetailPage() {
       <CreateAssignmentDialog
         open={allocateOpen}
         onClose={() => setAllocateOpen(false)}
-        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '', instructors: [] }]}
+        groups={[{ id: cls.group_id, name: cls.group_name, description: '', participants_count: 0, is_archived: false, created_at: '', sub_mentors: [] }]}
         defaultGroupId={cls.group_id}
         defaultClassId={cls.id}
       />

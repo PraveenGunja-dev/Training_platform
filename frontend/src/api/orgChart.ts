@@ -18,10 +18,10 @@ export interface OrgChartGroup {
   id: string;
   name: string;
   is_archived: boolean;
-  instructors: OrgChartPerson[];
+  sub_mentors: OrgChartPerson[];
   participants: OrgChartPerson[];
   sub_groups: OrgChartSubGroup[];
-  group_admin: {
+  lead_mentor: {
     id: string;
     name: string;
     email: string;
@@ -32,14 +32,15 @@ export interface OrgChartData {
   stats: {
     total_admins: number;
     total_groups: number;
-    total_instructors: number;
+    total_sub_mentors: number;
     total_participants: number;
-    total_group_admins: number;
+    total_lead_mentors: number;
     total_sub_groups: number;
   };
   admins: OrgChartPerson[];
   groups: OrgChartGroup[];
-  unassigned_instructors: OrgChartPerson[];
+  unassigned_sub_mentors: OrgChartPerson[];
+  unassigned_lead_mentors: OrgChartPerson[];
 }
 
 export const orgChartApi = {

@@ -51,26 +51,26 @@ export const participantNav: NavItem[] = [
   { to: '/me/notifications', label: 'Notifications',   icon: Bell            },
 ];
 
-export const instructorNav: NavItem[] = [
-  { to: '/instructor/dashboard',      label: 'Dashboard',     icon: LayoutDashboard, section: 'Overview'  },
-  { to: '/instructor/calendar',       label: 'Calendar',      icon: CalendarRange                         },
-  { to: '/instructor/groups',         label: 'Groups',        icon: FolderKanban,    section: 'Teaching'  },
-  { to: '/instructor/classes',        label: 'Classes',       icon: CalendarDays                          },
-  { to: '/instructor/attendance',     label: 'Attendance',    icon: CheckSquare                           },
-  { to: '/instructor/assignments',    label: 'Assignments',   icon: ListChecks,      section: 'Content'   },
-  { to: '/instructor/submissions',    label: 'Submissions',   icon: ClipboardCheck                        },
-  { to: '/instructor/documents',      label: 'Documents',     icon: FileText                              },
-  { to: '/instructor/shared-uploads', label: 'Shared Uploads',icon: Upload                                },
-  { to: '/instructor/notifications',  label: 'Notifications', icon: Bell,            section: 'Account'   },
-  { to: '/instructor/profile',        label: 'Profile',       icon: User                                  },
+export const subMentorNav: NavItem[] = [
+  { to: '/sub-mentor/dashboard',      label: 'Dashboard',     icon: LayoutDashboard, section: 'Overview'  },
+  { to: '/sub-mentor/calendar',       label: 'Calendar',      icon: CalendarRange                         },
+  { to: '/sub-mentor/groups',         label: 'Groups',        icon: FolderKanban,    section: 'Teaching'  },
+  { to: '/sub-mentor/classes',        label: 'Classes',       icon: CalendarDays                          },
+  { to: '/sub-mentor/attendance',     label: 'Attendance',    icon: CheckSquare                           },
+  { to: '/sub-mentor/assignments',    label: 'Assignments',   icon: ListChecks,      section: 'Content'   },
+  { to: '/sub-mentor/submissions',    label: 'Submissions',   icon: ClipboardCheck                        },
+  { to: '/sub-mentor/documents',      label: 'Documents',     icon: FileText                              },
+  { to: '/sub-mentor/shared-uploads', label: 'Shared Uploads',icon: Upload                                },
+  { to: '/sub-mentor/notifications',  label: 'Notifications', icon: Bell,            section: 'Account'   },
+  { to: '/sub-mentor/profile',        label: 'Profile',       icon: User                                  },
 ];
 
-export const groupAdminNav: NavItem[] = [
-  { to: '/group-admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
-  { to: '/group-admin/calendar',     label: 'Calendar',     icon: CalendarRange,   section: 'Training' },
-  { to: '/group-admin/participants', label: 'Participants', icon: Users,           section: 'People'   },
-  { to: '/group-admin/instructors',  label: 'Instructors',  icon: GraduationCap                        },
-  { to: '/group-admin/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },
-  { to: '/group-admin/analytics',    label: 'Analytics',    icon: BarChart2,       section: 'Reports'  },
-  { to: '/group-admin/profile',      label: 'Profile',      icon: User,            section: 'Account'  },
+export const leadMentorNav: NavItem[] = [
+  { to: '/lead-mentor/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
+  { to: '/lead-mentor/calendar',     label: 'Calendar',     icon: CalendarRange,   section: 'Training' },
+  { to: '/lead-mentor/participants', label: 'Participants', icon: Users,           section: 'People'   },
+  { to: '/lead-mentor/sub-mentors',  label: 'Sub-Mentors',  icon: GraduationCap                        },
+  { to: '/lead-mentor/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },
+  { to: '/lead-mentor/analytics',    label: 'Analytics',    icon: BarChart2,       section: 'Reports'  },
+  { to: '/lead-mentor/profile',      label: 'Profile',      icon: User,            section: 'Account'  },
 ];

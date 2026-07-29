@@ -26,8 +26,8 @@ const STATUS_VARIANTS: Record<string, 'success' | 'info' | 'secondary'> = {
 export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGroup }) {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
-  const isInstructor = user?.role === 'INSTRUCTOR';
-  const isStaff = isAdmin || isInstructor;
+  const isSubMentor = user?.role === 'SUB_MENTOR';
+  const isStaff = isAdmin || isSubMentor;
   const navigate = useNavigate();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [subGroupFilter, setSubGroupFilter] = useState('__all__');
@@ -112,8 +112,8 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
                   key={c.id}
                   className={`${isStaff ? 'cursor-pointer' : ''} ${isPastUpcoming(c) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'}`}
                   onClick={() => {
-                    if (isAdmin) navigate(`/admin/classes/${c.id}`);
-                    else if (isInstructor) navigate(`/instructor/classes/${c.id}`);
+                    if (isAdmin) navigate(`/lead-mentor/classes/${c.id}`);
+                    else if (isSubMentor) navigate(`/sub-mentor/classes/${c.id}`);
                   }}
                 >
                   <TableCell className="font-medium">{c.title}</TableCell>

@@ -7,11 +7,40 @@ interface AuthState {
   accessToken: string | null;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
-  mockLogin: (role: Role | 'GROUP_ADMIN') => void;
+  mockLogin: (role: Role) => void;
 }
 
-const VALID_ROLES: (Role | 'GROUP_ADMIN')[] = ['ADMIN', 'INSTRUCTOR', 'PARTICIPANT', 'GROUP_ADMIN'];
 
+export function migrateAuthState(persisted: unknown): { user?: User | null } {
+  const state = persisted as {
+    user?: (Record<string, unknown> & { role?: string }) | null;
+    accessToken?: unknown;
+  } | null;
+  if (!state?.user) return {};
+
+  const roleMap: Record<string, Role> = {
+    MANAGER: 'ADMIN',
+    GROUP_ADMIN: 'LEAD_MENTOR',
+    INSTRUCTOR: 'SUB_MENTOR',
+    ADMIN: 'ADMIN',
+    LEAD_MENTOR: 'LEAD_MENTOR',
+    SUB_MENTOR: 'SUB_MENTOR',
+    PARTICIPANT: 'PARTICIPANT',
+  };
+  const role = state.user.role ? roleMap[state.user.role] : undefined;
+  if (!role) return { user: null };
+
+  const { admin_of_group_ids, accessToken: _dropped, ...user } = state.user;
+  return {
+    user: {
+      ...user,
+      role,
+      ...(admin_of_group_ids === undefined
+        ? {}
+        : { lead_mentor_of_group_ids: admin_of_group_ids }),
+    } as User,
+  };
+}
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -21,7 +50,7 @@ export const useAuthStore = create<AuthState>()(
       logout: () => set({ user: null, accessToken: null }),
       mockLogin: (role) => {
         if (import.meta.env.DEV) {
-          const mockUsers: Record<Role | 'GROUP_ADMIN', User> = {
+          const mockUsers: Record<Role, User> = {
             ADMIN: {
               id: 'u-admin',
               email: 'kiran.kr@adani.com',
@@ -35,11 +64,11 @@ export const useAuthStore = create<AuthState>()(
               grade_code: 'M5',
               employee_code: 'AGC-HR-0007',
             },
-            INSTRUCTOR: {
-              id: 'u-instructor',
-              email: 'dev-instructor@example.com',
-              full_name: 'Dev Instructor',
-              role: 'INSTRUCTOR',
+            SUB_MENTOR: {
+              id: 'u-subMentor',
+              email: 'dev-sub-mentor@example.com',
+              full_name: 'Dev Sub-Mentor',
+              role: 'SUB_MENTOR',
               photo_url: null,
               is_active: true,
               created_at: '2026-01-15T00:00:00Z',
@@ -61,12 +90,12 @@ export const useAuthStore = create<AuthState>()(
               grade_code: 'E2',
               employee_code: 'AEL-ENG-1197',
             },
-            GROUP_ADMIN: {
-              id: 'u-group-admin',
-              email: 'group-admin@example.com',
-              full_name: 'Dev Group Admin',
-              role: 'INSTRUCTOR' as Role,
-              admin_of_group_ids: ['g-00000000-0000-0000-0000-000000000001'],
+            LEAD_MENTOR: {
+              id: 'u-lead-mentor',
+              email: 'lead-mentor@example.com',
+              full_name: 'Dev Lead Mentor',
+              role: 'LEAD_MENTOR',
+              lead_mentor_of_group_ids: ['g-00000000-0000-0000-0000-000000000001'],
               photo_url: null,
               is_active: true,
               created_at: '2026-01-15T00:00:00Z',
@@ -82,23 +111,8 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ems-auth',
-      version: 3,
-      // v0→v1: MANAGER role removed, converted to ADMIN.
-      // v1→v2: INSTRUCTOR role added; unknown roles force re-login.
-      // v2→v3: accessToken removed from persisted state; refreshed on page load.
-      migrate: (persisted: unknown) => {
-        const s = persisted as { user?: { role?: string } | null; accessToken?: unknown } | null;
-        if (!s) return {};
-        if (s.user?.role === 'MANAGER') {
-          return { user: { ...s.user, role: 'ADMIN' as Role } };
-        }
-        if (s.user?.role && !(VALID_ROLES as string[]).includes(s.user.role)) {
-          return { user: null };
-        }
-        // Drop accessToken from persisted state (v2 → v3)
-        const { accessToken: _dropped, ...rest } = s as { accessToken?: unknown; user?: unknown };
-        return rest;
-      },
+      version: 4,
+      migrate: migrateAuthState,
       partialize: (state) => ({ user: state.user }),
     }
   )

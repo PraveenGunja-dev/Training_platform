@@ -4,16 +4,16 @@ import type { Role } from '@/lib/types';
 
 const paths: Record<Role, string> = {
   ADMIN: '/admin/dashboard',
-  INSTRUCTOR: '/instructor/dashboard',
+  SUB_MENTOR: '/sub-mentor/dashboard',
   PARTICIPANT: '/me/dashboard',
-  GROUP_ADMIN: '/group-admin/dashboard',
+  LEAD_MENTOR: '/lead-mentor/dashboard',
 };
 
 export function RootRedirect() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'GROUP_ADMIN') return <Navigate to="/group-admin/dashboard" replace />;
+  if (user.role === 'LEAD_MENTOR') return <Navigate to="/lead-mentor/dashboard" replace />;
   const path = paths[user.role];
   if (!path) {
     // Unknown role (e.g. stale localStorage value) — clear state and force re-login.

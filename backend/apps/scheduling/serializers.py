@@ -21,8 +21,8 @@ class ClassSerializer(serializers.ModelSerializer):
     my_record = serializers.SerializerMethodField()
     last_session = serializers.SerializerMethodField()
     related_tasks = serializers.SerializerMethodField()
-    instructors = serializers.SerializerMethodField()
-    group_admin = serializers.SerializerMethodField()
+    sub_mentors = serializers.SerializerMethodField()
+    lead_mentor = serializers.SerializerMethodField()
 
     class Meta:
         model = Class
@@ -46,8 +46,8 @@ class ClassSerializer(serializers.ModelSerializer):
             "my_record",
             "last_session",
             "related_tasks",
-            "instructors",
-            "group_admin",
+            "sub_mentors",
+            "lead_mentor",
         ]
 
     def get_participants_count(self, obj: Class) -> int:
@@ -158,32 +158,32 @@ class ClassSerializer(serializers.ModelSerializer):
             "scheduled_end_at": session.scheduled_end_at.isoformat() if session.scheduled_end_at else None,
         }
 
-    def get_instructors(self, obj: Class) -> list:
+    def get_sub_mentors(self, obj: Class) -> list:
         return [
             {
-                "id": str(gi.instructor_id),
-                "full_name": gi.instructor.full_name,
-                "email": gi.instructor.email,
+                "id": str(gi.sub_mentor_id),
+                "full_name": gi.sub_mentor.full_name,
+                "email": gi.sub_mentor.email,
             }
-            for gi in obj.group.instructors.all()
+            for gi in obj.group.sub_mentors.all()
         ]
 
-    def get_group_admin(self, obj: Class) -> dict | None:
-        from apps.groups.models import GroupAdmin  # noqa: PLC0415
-        ga = GroupAdmin.objects.filter(group=obj.group).select_related("admin").first()
+    def get_lead_mentor(self, obj: Class) -> dict | None:
+        from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
+        ga = GroupLeadMentor.objects.filter(group=obj.group).select_related("lead_mentor").first()
         if ga is None:
             return None
         return {
-            "id": str(ga.admin_id),
-            "full_name": ga.admin.full_name,
-            "email": ga.admin.email,
+            "id": str(ga.lead_mentor_id),
+            "full_name": ga.lead_mentor.full_name,
+            "email": ga.lead_mentor.email,
         }
 
     def to_representation(self, instance: Class) -> dict:
         data = super().to_representation(instance)
         # Cross-visibility: inject read_only flag computed from context.
         # assigned_group_ids is a frozenset of string group IDs set by ClassViewSet
-        # for INSTRUCTOR users. Absent (Admin/Participant path) → always False.
+        # for SUB_MENTOR users. Absent (Admin/Participant path) → always False.
         assigned_ids = self.context.get("assigned_group_ids")
         data["read_only"] = False if assigned_ids is None else str(instance.group_id) not in assigned_ids
         return data

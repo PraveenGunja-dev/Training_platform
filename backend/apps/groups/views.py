@@ -12,23 +12,23 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
-from apps.audit.actions import INSTRUCTOR_ASSIGNED, INSTRUCTOR_UNASSIGNED
+from apps.audit.actions import SUB_MENTOR_ASSIGNED, SUB_MENTOR_UNASSIGNED
 from apps.audit.services import log_action
-from apps.common.permissions import IsAdmin, IsInstructor
-from apps.common.scoping import instructor_group_qs, instructor_owns_group
+from apps.common.permissions import IsAdmin, IsSubMentor
+from apps.common.scoping import sub_mentor_group_qs, sub_mentor_owns_group
 
 from . import services
 from .filters import apply_group_filters
-from .models import ClassGroup, GroupAdmin, GroupInstructor, GroupMembership, SubGroup, SubGroupMembership
+from .models import ClassGroup, GroupLeadMentor, GroupSubMentor, GroupMembership, SubGroup, SubGroupMembership
 from .serializers import (
     BulkAddParticipantsSerializer,
     ClassGroupDetailSerializer,
     ClassGroupListSerializer,
     ClassGroupWriteSerializer,
-    GroupAdminSerializer,
-    GroupAdminWriteSerializer,
-    GroupInstructorAssignSerializer,
-    GroupInstructorSerializer,
+    GroupLeadMentorSerializer,
+    GroupLeadMentorWriteSerializer,
+    GroupSubMentorAssignSerializer,
+    GroupSubMentorSerializer,
     SubGroupSerializer,
     SubGroupWriteSerializer,
 )
@@ -36,55 +36,55 @@ from .serializers import (
 User = get_user_model()
 
 
-def _is_group_admin_of(user, group_pk) -> bool:
-    """Return True if user is the designated Group Admin of the given group."""
-    return GroupAdmin.objects.filter(admin=user, group_id=group_pk).exists()
+def _is_lead_mentor_of(user, group_pk) -> bool:
+    """Return True if user is the designated Lead Mentor of the given group."""
+    return GroupLeadMentor.objects.filter(lead_mentor=user, group_id=group_pk).exists()
 
 
 class ClassGroupViewSet(ViewSet):
     serializer_class = ClassGroupListSerializer
 
     def get_permissions(self):
-        # add_participants, remove_participant, unassign_instructor, group_instructors (POST)
-        # are no longer statically admin-only: group admins also need access (runtime checks below).
-        # partial_update is no longer in admin_only_actions — GROUP_ADMIN
+        # add_participants, remove_participant, unassign_sub_mentor, group_sub_mentors (POST)
+        # are no longer statically admin-only: Lead Mentors also need access (runtime checks below).
+        # partial_update is no longer in admin_only_actions — LEAD_MENTOR
         # needs to edit their own group. Ownership is enforced at runtime below.
         admin_only_actions = {
             "create",
             "destroy",
-            "group_admin",
+            "lead_mentor",
         }
         if self.action in admin_only_actions:
             return [IsAdmin()]
         return [IsAuthenticated()]
 
-    def _check_group_admin_or_super_admin(self, request, group_pk) -> bool:
-        """True if caller is Super Admin or Group Admin of the given group."""
-        return request.user.role == "ADMIN" or _is_group_admin_of(request.user, group_pk)
+    def _check_lead_mentor_or_super_admin(self, request, group_pk) -> bool:
+        """True if caller is Super Admin or Lead Mentor of the given group."""
+        return request.user.role == "ADMIN" or _is_lead_mentor_of(request.user, group_pk)
 
-    _INSTRUCTOR_DENIED = {
-        "errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}],
+    _SUB_MENTOR_DENIED = {
+        "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
         "data": None,
     }
 
     def _list_queryset(self, request: Request):
-        qs = ClassGroup.objects.select_related("created_by").prefetch_related("instructors__instructor")
+        qs = ClassGroup.objects.select_related("created_by").prefetch_related("sub_mentors__sub_mentor")
         if request.user.role == "PARTICIPANT":
             qs = qs.filter(memberships__user=request.user).distinct()
             qs = apply_group_filters(qs, request.query_params)
-        elif request.user.role == "INSTRUCTOR":
-            from apps.common.scoping import instructor_group_qs  # noqa: PLC0415
-            qs = instructor_group_qs(request.user).select_related("created_by")
+        elif request.user.role == "SUB_MENTOR":
+            from apps.common.scoping import sub_mentor_group_qs  # noqa: PLC0415
+            qs = sub_mentor_group_qs(request.user).select_related("created_by")
             qs = apply_group_filters(qs, request.query_params)
         else:
             qs = apply_group_filters(qs, request.query_params)
 
-        # Group admins always see their assigned groups (merged by PK to avoid distinct conflicts)
-        admin_group_ids = list(GroupAdmin.objects.filter(admin=request.user).values_list("group_id", flat=True))
-        if admin_group_ids:
+        # Lead Mentors always see their assigned groups (merged by PK to avoid distinct conflicts).
+        lead_mentor_group_ids = list(GroupLeadMentor.objects.filter(lead_mentor=request.user).values_list("group_id", flat=True))
+        if lead_mentor_group_ids:
             existing_pks = set(qs.values_list("pk", flat=True))
-            combined_pks = existing_pks | set(admin_group_ids)
-            qs = ClassGroup.objects.filter(pk__in=combined_pks).select_related("created_by").prefetch_related("instructors__instructor")
+            combined_pks = existing_pks | set(lead_mentor_group_ids)
+            qs = ClassGroup.objects.filter(pk__in=combined_pks).select_related("created_by").prefetch_related("sub_mentors__sub_mentor")
 
         return qs
 
@@ -117,8 +117,8 @@ class ClassGroupViewSet(ViewSet):
         detail = get_object_or_404(
             ClassGroup.objects.select_related("created_by").prefetch_related(
                 "memberships__user",
-                "group_admin__admin",
-                "instructors__instructor",
+                "lead_mentor_assignment__lead_mentor",
+                "sub_mentors__sub_mentor",
             ),
             pk=group.pk,
         )
@@ -131,13 +131,13 @@ class ClassGroupViewSet(ViewSet):
         group = get_object_or_404(
             ClassGroup.objects.select_related("created_by").prefetch_related(
                 "memberships__user",
-                "group_admin__admin",
-                "instructors__instructor",
+                "lead_mentor_assignment__lead_mentor",
+                "sub_mentors__sub_mentor",
             ),
             pk=pk,
         )
-        # Group admins can always read their own group
-        if _is_group_admin_of(request.user, group.pk):
+        # Lead Mentors can always read their own group.
+        if _is_lead_mentor_of(request.user, group.pk):
             return Response({"data": ClassGroupDetailSerializer(group).data})
         if request.user.role == "PARTICIPANT":
             if not group.memberships.filter(user=request.user).exists():
@@ -148,22 +148,22 @@ class ClassGroupViewSet(ViewSet):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
-        elif request.user.role == "INSTRUCTOR":
-            from apps.common.visibility import instructor_can_view_all  # noqa: PLC0415
-            if not instructor_owns_group(request.user, group.pk) and not instructor_can_view_all(request.user):
-                return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "SUB_MENTOR":
+            from apps.common.visibility import sub_mentor_can_view_all  # noqa: PLC0415
+            if not sub_mentor_owns_group(request.user, group.pk) and not sub_mentor_can_view_all(request.user):
+                return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
         return Response({"data": ClassGroupDetailSerializer(group).data})
 
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
-        # Allow Super Admin, Group Admin of this group, or any Instructor assigned to this group.
+        # Allow Super Admin, Lead Mentor of this group, or any assigned Sub-Mentor.
         user = request.user
-        is_assigned_instructor = (
-            user.role == "INSTRUCTOR"
-            and GroupInstructor.objects.filter(instructor=user, group_id=pk).exists()
+        is_assigned_sub_mentor = (
+            user.role == "SUB_MENTOR"
+            and GroupSubMentor.objects.filter(sub_mentor=user, group_id=pk).exists()
         )
-        if not self._check_group_admin_or_super_admin(request, pk) and not is_assigned_instructor:
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             return Response(
-                {"errors": [{"code": "perm.admin_required", "message": "Only an admin, group admin, or assigned instructor can edit this group."}], "data": None},
+                {"errors": [{"code": "perm.lead_mentor_required", "message": "Only an admin, Lead Mentor, or assigned Sub-Mentor can edit this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         group = get_object_or_404(ClassGroup.objects.select_related("created_by"), pk=pk)
@@ -180,8 +180,8 @@ class ClassGroupViewSet(ViewSet):
         detail = get_object_or_404(
             ClassGroup.objects.select_related("created_by").prefetch_related(
                 "memberships__user",
-                "group_admin__admin",
-                "instructors__instructor",
+                "lead_mentor_assignment__lead_mentor",
+                "sub_mentors__sub_mentor",
             ),
             pk=group.pk,
         )
@@ -223,7 +223,11 @@ class ClassGroupViewSet(ViewSet):
 
     @action(detail=True, methods=["post"], url_path="participants")
     def add_participants(self, request: Request, pk: str | None = None) -> Response:
-        if not self._check_group_admin_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
         serializer = BulkAddParticipantsSerializer(data=request.data)
@@ -237,37 +241,45 @@ class ClassGroupViewSet(ViewSet):
 
     @action(detail=True, methods=["delete"], url_path="participants/(?P<user_id>[^/.]+)")
     def remove_participant(self, request: Request, pk: str | None = None, user_id: str | None = None) -> Response:
-        if not self._check_group_admin_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
         services.remove_participant(group=group, user_id=user_id, actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["get", "post"], url_path="instructors")
-    def group_instructors(self, request: Request, pk: str | None = None) -> Response:
+    @action(detail=True, methods=["get", "post"], url_path="sub-mentors")
+    def group_sub_mentors(self, request: Request, pk: str | None = None) -> Response:
         group = get_object_or_404(ClassGroup, pk=pk)
 
         if request.method == "GET":
-            if request.user.role == "INSTRUCTOR":
-                if not instructor_owns_group(request.user, group.pk):
-                    return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            if request.user.role == "SUB_MENTOR":
+                if not sub_mentor_owns_group(request.user, group.pk):
+                    return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
             elif request.user.role not in ("ADMIN",):
-                if not _is_group_admin_of(request.user, group.pk):
+                if not _is_lead_mentor_of(request.user, group.pk):
                     return Response(
                         {"errors": [{"code": "perm.forbidden", "message": "Forbidden."}], "data": None},
                         status=status.HTTP_403_FORBIDDEN,
                     )
-            qs = GroupInstructor.objects.filter(group=group).select_related("instructor")
-            return Response({"data": GroupInstructorSerializer(qs, many=True).data})
+            qs = GroupSubMentor.objects.filter(group=group).select_related("sub_mentor")
+            return Response({"data": GroupSubMentorSerializer(qs, many=True).data})
 
-        # POST — Admin or Group Admin of this group
-        if request.user.role != "ADMIN" and not _is_group_admin_of(request.user, group.pk):
+        # POST — Admin, Lead Mentor of this group, or Sub-Mentor assigned to this group
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, group.pk)
+        )
+        if request.user.role != "ADMIN" and not _is_lead_mentor_of(request.user, group.pk) and not is_assigned_sub_mentor:
             return Response(
-                {"errors": [{"code": "perm.forbidden", "message": "Only admins can assign instructors."}], "data": None},
+                {"errors": [{"code": "perm.forbidden", "message": "Only admins, the Lead Mentor, or an assigned Sub-Mentor can assign Sub-Mentors."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         from django.db import transaction  # noqa: PLC0415
-        ser = GroupInstructorAssignSerializer(data=request.data)
+        ser = GroupSubMentorAssignSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         promote = ser.validated_data.get("promote_participants", False)
         assigned_count = 0
@@ -277,74 +289,78 @@ class ClassGroupViewSet(ViewSet):
                     user_obj = User.objects.select_for_update().get(pk=uid)
                 except User.DoesNotExist:
                     continue
-                if user_obj.role == "INSTRUCTOR":
+                if user_obj.role == "SUB_MENTOR":
                     pass
                 elif user_obj.role == "PARTICIPANT" and promote:
                     GroupMembership.objects.filter(user=user_obj).delete()
                     SubGroupMembership.objects.filter(user=user_obj).delete()
-                    user_obj.role = "INSTRUCTOR"
+                    user_obj.role = "SUB_MENTOR"
                     user_obj.save(update_fields=["role"])
                 else:
                     continue
-                gi, created = GroupInstructor.objects.get_or_create(
+                gi, created = GroupSubMentor.objects.get_or_create(
                     group=group,
-                    instructor_id=uid,
+                    sub_mentor_id=uid,
                     defaults={"assigned_by": request.user},
                 )
                 if created:
                     assigned_count += 1
                     log_action(
                         actor=request.user,
-                        action=INSTRUCTOR_ASSIGNED,
+                        action=SUB_MENTOR_ASSIGNED,
                         target_type="User",
                         target_id=uid,
                         metadata={"group_id": str(group.id), "group_title": group.name},
                     )
-                    new_instructor = gi.instructor
-                    from apps.notifications.services import create_inapp, notify_instructors  # noqa: PLC0415
+                    new_sub_mentor = gi.sub_mentor
+                    from apps.notifications.services import create_inapp, notify_sub_mentors  # noqa: PLC0415
                     create_inapp(
-                        user=new_instructor,
+                        user=new_sub_mentor,
                         type="GROUP_ASSIGNED",
                         title=f"Assigned to group: {group.name}",
-                        body=f"You have been assigned as an instructor for group {group.name}.",
-                        link=f"/instructor/groups/{group.id}",
-                        dedupe_key=f"group_assigned:{group.id}:{new_instructor.id}",
+                        body=f"You have been assigned as a Sub-Mentor for group {group.name}.",
+                        link=f"/sub-mentor/groups/{group.id}",
+                        dedupe_key=f"group_assigned:{group.id}:{new_sub_mentor.id}",
                         payload={
                             "group_id": str(group.id),
                             "group_title": group.name,
                             "assigned_by": str(request.user.id),
                         },
                     )
-                    notify_instructors(
+                    notify_sub_mentors(
                         group=group,
-                        notification_type="CO_INSTRUCTOR_ADDED",
-                        title=f"New co-instructor on {group.name}",
+                        notification_type="CO_SUB_MENTOR_ADDED",
+                        title=f"New co-Sub-Mentor on {group.name}",
                         body=(
-                            f"{new_instructor.full_name or new_instructor.email} has joined "
-                            f"you as an instructor on {group.name}."
+                            f"{new_sub_mentor.full_name or new_sub_mentor.email} has joined "
+                            f"you as a Sub-Mentor on {group.name}."
                         ),
-                        link=f"/instructor/groups/{group.id}",
+                        link=f"/sub-mentor/groups/{group.id}",
                         payload={
                             "group_id": str(group.id),
-                            "new_instructor_id": str(new_instructor.id),
+                            "new_sub_mentor_id": str(new_sub_mentor.id),
                         },
-                        actor=new_instructor,
-                        dedupe_suffix=str(new_instructor.id),
+                        actor=new_sub_mentor,
+                        dedupe_suffix=str(new_sub_mentor.id),
                     )
         skipped_count = len(ser.validated_data["user_ids"]) - assigned_count
         return Response({"data": {"assigned": assigned_count, "skipped": skipped_count}})
 
-    @action(detail=True, methods=["delete"], url_path="instructors/(?P<user_id>[^/.]+)")
-    def unassign_instructor(self, request: Request, pk: str | None = None, user_id: str | None = None) -> Response:
-        if not self._check_group_admin_or_super_admin(request, pk):
+    @action(detail=True, methods=["delete"], url_path="sub-mentors/(?P<user_id>[^/.]+)")
+    def unassign_sub_mentor(self, request: Request, pk: str | None = None, user_id: str | None = None) -> Response:
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             raise PermissionDenied
         group = get_object_or_404(ClassGroup, pk=pk)
-        gi = get_object_or_404(GroupInstructor, group=group, instructor_id=user_id)
-        removed_instructor = gi.instructor
+        gi = get_object_or_404(GroupSubMentor, group=group, sub_mentor_id=user_id)
+        removed_sub_mentor = gi.sub_mentor
         gi.delete()
         log_action(
             actor=request.user,
-            action=INSTRUCTOR_UNASSIGNED,
+            action=SUB_MENTOR_UNASSIGNED,
             target_type="User",
             target_id=user_id,
             metadata={"group_id": str(group.id), "group_title": group.name},
@@ -352,78 +368,82 @@ class ClassGroupViewSet(ViewSet):
         from apps.notifications.services import create_inapp  # noqa: PLC0415
         now_ts = timezone.now().strftime("%Y%m%d%H%M")
         create_inapp(
-            user=removed_instructor,
+            user=removed_sub_mentor,
             type="GROUP_UNASSIGNED",
             title=f"Removed from group: {group.name}",
-            body=f"You have been removed as an instructor from group {group.name}.",
-            link="/instructor/groups",
-            dedupe_key=f"group_unassigned:{group.id}:{removed_instructor.id}:{now_ts}",
+            body=f"You have been removed as a Sub-Mentor from group {group.name}.",
+            link="/sub-mentor/groups",
+            dedupe_key=f"group_unassigned:{group.id}:{removed_sub_mentor.id}:{now_ts}",
             payload={"group_id": str(group.id), "group_title": group.name},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["get"], url_path="available-instructors")
-    def available_instructors(self, request: Request, pk: str | None = None) -> Response:
-        """GET /groups/{id}/available-instructors/ — list instructors not yet in this group.
-        Accessible to ADMIN or the GROUP_ADMIN of this group.
+    @action(detail=True, methods=["get"], url_path="available-sub-mentors")
+    def available_sub_mentors(self, request: Request, pk: str | None = None) -> Response:
+        """GET /groups/{id}/available-sub-mentors/ — list Sub-Mentors not yet in this group.
+        Accessible to ADMIN or the LEAD_MENTOR of this group.
         """
-        if not self._check_group_admin_or_super_admin(request, pk):
+        is_assigned_sub_mentor = (
+            request.user.role == "SUB_MENTOR"
+            and sub_mentor_owns_group(request.user, pk)
+        )
+        if not self._check_lead_mentor_or_super_admin(request, pk) and not is_assigned_sub_mentor:
             return Response(
                 {"errors": [{"code": "perm.forbidden", "message": "Forbidden."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
         group = get_object_or_404(ClassGroup, pk=pk)
-        already_assigned = GroupInstructor.objects.filter(group=group).values_list("instructor_id", flat=True)
+        already_assigned = GroupSubMentor.objects.filter(group=group).values_list("sub_mentor_id", flat=True)
         q = request.query_params.get("search", "").strip()
-        qs = User.objects.filter(role="INSTRUCTOR", is_active=True).exclude(id__in=already_assigned)
+        qs = User.objects.filter(role="SUB_MENTOR", is_active=True).exclude(id__in=already_assigned)
         if q:
             from django.db.models import Q  # noqa: PLC0415
             qs = qs.filter(Q(full_name__icontains=q) | Q(email__icontains=q))
         data = [{"id": str(u.id), "full_name": u.full_name, "email": u.email} for u in qs.order_by("full_name")]
         return Response({"data": data})
 
-    @action(detail=True, methods=["get", "put", "delete"], url_path="admin")
-    def group_admin(self, request: Request, pk: str | None = None) -> Response:
-        """GET/PUT/DELETE the admin of a specific group."""
+    @action(detail=True, methods=["get", "put", "delete"], url_path="lead-mentor")
+    def lead_mentor(self, request: Request, pk: str | None = None) -> Response:
+        """GET/PUT/DELETE the Lead Mentor of a specific group."""
         group = get_object_or_404(ClassGroup, pk=pk)
 
         if request.method == "GET":
             try:
-                ga = group.group_admin
-                return Response({"data": GroupAdminSerializer(ga).data})
-            except GroupAdmin.DoesNotExist:
+                ga = group.lead_mentor_assignment
+                return Response({"data": GroupLeadMentorSerializer(ga).data})
+            except GroupLeadMentor.DoesNotExist:
                 return Response({"data": None})
 
         if request.method == "PUT":
-            write_ser = GroupAdminWriteSerializer(data=request.data)
+            write_ser = GroupLeadMentorWriteSerializer(data=request.data)
             write_ser.is_valid(raise_exception=True)
             user = User.objects.get(id=write_ser.validated_data["user_id"])
-            ga, _ = GroupAdmin.objects.update_or_create(
+            ga, _ = GroupLeadMentor.objects.update_or_create(
                 group=group,
-                defaults={"admin": user, "assigned_by": request.user},
+                defaults={"lead_mentor": user, "assigned_by": request.user},
             )
-            # Promote to GROUP_ADMIN role if they had a different role
-            if user.role != "GROUP_ADMIN":
-                user.role = "GROUP_ADMIN"
+            # Promote to LEAD_MENTOR role if they had a different role
+            if user.role != "LEAD_MENTOR":
+                user.role = "LEAD_MENTOR"
                 user.save(update_fields=["role"])
             # Send congratulations notification
             from apps.notifications.services import create_inapp  # noqa: PLC0415
             create_inapp(
                 user=user,
-                type="GROUP_ADMIN_ASSIGNED",
-                title=f"Congratulations! You are now Group Admin of {group.name}",
+                type="LEAD_MENTOR_ASSIGNED",
+                title=f"Congratulations! You are now Lead Mentor of {group.name}",
                 body=(
-                    f"You have been assigned as the Group Admin of {group.name}. "
-                    f"You can now manage participants, instructors, and monitor analytics for your batch."
+                    f"You have been assigned as the Lead Mentor of {group.name}. "
+                    f"You can now manage participants, Sub-Mentors, and monitor analytics for your batch."
                 ),
-                link="/group-admin/dashboard",
-                dedupe_key=f"group_admin_assigned:{group.id}:{user.id}",
+                link="/lead-mentor/dashboard",
+                dedupe_key=f"lead_mentor_assigned:{group.id}:{user.id}",
                 payload={"group_id": str(group.id), "group_name": group.name},
             )
-            return Response({"data": GroupAdminSerializer(ga).data})
+            return Response({"data": GroupLeadMentorSerializer(ga).data})
 
         if request.method == "DELETE":
-            GroupAdmin.objects.filter(group=group).delete()
+            GroupLeadMentor.objects.filter(group=group).delete()
             return Response(status=204)
 
     @action(detail=True, methods=["get"], url_path="analytics")
@@ -433,7 +453,7 @@ class ClassGroupViewSet(ViewSet):
 
         group = get_object_or_404(ClassGroup, pk=pk)
         user = request.user
-        if user.role == "ADMIN" or _is_group_admin_of(user, group.pk):
+        if user.role == "ADMIN" or _is_lead_mentor_of(user, group.pk):
             pass  # allowed
         elif user.role == "PARTICIPANT":
             if not GroupMembership.objects.filter(group=group, user=user).exists():
@@ -441,9 +461,9 @@ class ClassGroupViewSet(ViewSet):
                     {"errors": [{"code": "perm.not_in_group", "message": "Not a member of this group"}], "data": None},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-        elif user.role == "INSTRUCTOR":
-            if not instructor_owns_group(user, group.pk):
-                return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif user.role == "SUB_MENTOR":
+            if not sub_mentor_owns_group(user, group.pk):
+                return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
         else:
             raise PermissionDenied
 
@@ -524,15 +544,19 @@ class SubGroupViewSet(ViewSet):
     """
     CRUD for sub-groups nested under a parent ClassGroup.
     URLs: /groups/<group_pk>/sub-groups/ and /groups/<group_pk>/sub-groups/<pk>/
-    Write actions (create, partial_update, destroy) are admin or group-admin only.
+    Write actions (create, partial_update, destroy) are Admin or Lead Mentor only.
     """
     permission_classes = [IsAuthenticated]
 
     def _caller_has_write_access(self) -> bool:
-        """True if caller is Super Admin or Group Admin of the parent group."""
+        """True if caller is Admin, Lead Mentor of the group, or assigned Sub-Mentor."""
         user = self.request.user
         group_pk = self.kwargs.get("group_pk")
-        return user.role == "ADMIN" or _is_group_admin_of(user, group_pk)
+        if user.role == "ADMIN" or _is_lead_mentor_of(user, group_pk):
+            return True
+        if user.role == "SUB_MENTOR":
+            return sub_mentor_owns_group(user, group_pk)
+        return False
 
     def _get_group(self, group_pk: str) -> ClassGroup:
         return get_object_or_404(ClassGroup, pk=group_pk, is_archived=False)
@@ -649,23 +673,32 @@ class SubGroupViewSet(ViewSet):
 
 
 class MeGroupsView(APIView):
-    """GET /me/groups — returns groups assigned to the current instructor."""
-
-    permission_classes = [IsAuthenticated, IsInstructor]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        from apps.common.visibility import instructor_can_view_all  # noqa: PLC0415
+        from apps.common.scoping import lead_mentor_group_qs  # noqa: PLC0415
+        from apps.common.visibility import sub_mentor_can_view_all  # noqa: PLC0415
 
-        qs = instructor_group_qs(request.user).prefetch_related("memberships")
-        data = [
-            {
-                "id": str(g.id),
-                "name": g.name,
-                "participant_count": g.memberships.count(),
-            }
-            for g in qs
-        ]
-        return Response({
-            "data": data,
-            "effective_can_view_all": instructor_can_view_all(request.user),
-        })
+        if request.user.role == "LEAD_MENTOR":
+            qs = lead_mentor_group_qs(request.user).prefetch_related("memberships")
+            data = [
+                {"id": str(g.id), "name": g.name, "participant_count": g.memberships.count()}
+                for g in qs
+            ]
+            return Response({"data": data, "effective_can_view_all": False})
+
+        if request.user.role == "SUB_MENTOR":
+            qs = sub_mentor_group_qs(request.user).prefetch_related("memberships")
+            data = [
+                {"id": str(g.id), "name": g.name, "participant_count": g.memberships.count()}
+                for g in qs
+            ]
+            return Response({
+                "data": data,
+                "effective_can_view_all": sub_mentor_can_view_all(request.user),
+            })
+
+        return Response(
+            {"errors": [{"code": "perm.forbidden", "message": "Forbidden."}], "data": None},
+            status=403,
+        )

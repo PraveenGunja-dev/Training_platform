@@ -7,7 +7,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.audit.actions import INSTRUCTOR_VISIBILITY_CHANGED
+from apps.audit.actions import SUB_MENTOR_VISIBILITY_CHANGED
 from apps.audit.services import log_action
 from apps.common.permissions import IsAdmin
 
@@ -25,16 +25,16 @@ class AdminSettingsView(APIView):
 
     def patch(self, request: Request) -> Response:
         settings_obj = SystemSettings.get_solo()
-        old_visibility = settings_obj.instructors_can_view_all_classes
+        old_visibility = settings_obj.sub_mentors_can_view_all_classes
         ser = SystemSettingsSerializer(settings_obj, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
-        if "instructors_can_view_all_classes" in request.data:
-            new_visibility = settings_obj.instructors_can_view_all_classes
+        if "sub_mentors_can_view_all_classes" in request.data:
+            new_visibility = settings_obj.sub_mentors_can_view_all_classes
             if old_visibility != new_visibility:
                 log_action(
                     actor=request.user,
-                    action=INSTRUCTOR_VISIBILITY_CHANGED,
+                    action=SUB_MENTOR_VISIBILITY_CHANGED,
                     target_type="SystemSettings",
                     target_id=1,
                     metadata={"scope": "system", "old": old_visibility, "new": new_visibility},

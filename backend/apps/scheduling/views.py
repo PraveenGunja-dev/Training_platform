@@ -13,49 +13,49 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
-from apps.common.permissions import IsAdminOrInstructor
-from apps.common.scoping import instructor_class_qs, instructor_owns_group
-from apps.common.visibility import instructor_can_view_all
+from apps.common.permissions import IsAdminOrLeadMentorOrSubMentor, IsAdminOrSubMentor
+from apps.common.scoping import lead_mentor_owns_group, sub_mentor_class_qs, sub_mentor_owns_group
+from apps.common.visibility import sub_mentor_can_view_all
 
 from .models import Class
 from .serializers import ClassSerializer, ClassWriteSerializer, RecurringClassSerializer
 from .services import apply_class_filters
 
 
-def _instructor_assigned_ids(user) -> frozenset:
-    """Return frozenset of string group IDs assigned to this instructor."""
-    from apps.groups.models import GroupInstructor  # noqa: PLC0415
+def _sub_mentor_assigned_ids(user) -> frozenset:
+    """Return frozenset of string group IDs assigned to this Sub-Mentor."""
+    from apps.groups.models import GroupSubMentor  # noqa: PLC0415
 
     return frozenset(
         str(pk)
-        for pk in GroupInstructor.objects.filter(instructor=user).values_list("group_id", flat=True)
+        for pk in GroupSubMentor.objects.filter(sub_mentor=user).values_list("group_id", flat=True)
     )
 
 
 class ClassViewSet(ViewSet):
     serializer_class = ClassSerializer
 
-    _INSTRUCTOR_DENIED = {
-        "errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}],
+    _SUB_MENTOR_DENIED = {
+        "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
         "data": None,
     }
 
     def get_permissions(self):
         if self.action in {"create", "partial_update", "destroy"}:
-            return [IsAdminOrInstructor()]
+            return [IsAdminOrLeadMentorOrSubMentor()]
         return [IsAuthenticated()]
 
     def _base_queryset(self) -> object:
         from django.db.models import Prefetch  # noqa: PLC0415
         from apps.assignments.models import AssignmentTask  # noqa: PLC0415
-        from apps.groups.models import GroupInstructor  # noqa: PLC0415
+        from apps.groups.models import GroupSubMentor  # noqa: PLC0415
         return (
             Class.objects
             .select_related("group", "created_by")
             .prefetch_related(
                 Prefetch(
-                    "group__instructors",
-                    queryset=GroupInstructor.objects.select_related("instructor"),
+                    "group__sub_mentors",
+                    queryset=GroupSubMentor.objects.select_related("sub_mentor"),
                 ),
                 Prefetch(
                     "tasks",
@@ -69,20 +69,20 @@ class ClassViewSet(ViewSet):
         qs = self._base_queryset()
         if request.user.role == "PARTICIPANT":
             qs = qs.filter(group__memberships__user=request.user).distinct()
-        elif request.user.role == "INSTRUCTOR":
-            if instructor_can_view_all(request.user):
+        elif request.user.role == "SUB_MENTOR":
+            if sub_mentor_can_view_all(request.user):
                 pass  # full superset; read_only flag computed per-row in serializer
             else:
                 from django.db.models import Prefetch  # noqa: PLC0415
                 from apps.assignments.models import AssignmentTask  # noqa: PLC0415
-                from apps.groups.models import GroupInstructor  # noqa: PLC0415
+                from apps.groups.models import GroupSubMentor  # noqa: PLC0415
                 qs = (
-                    instructor_class_qs(request.user)
+                    sub_mentor_class_qs(request.user)
                     .select_related("group", "created_by")
                     .prefetch_related(
                         Prefetch(
-                            "group__instructors",
-                            queryset=GroupInstructor.objects.select_related("instructor"),
+                            "group__sub_mentors",
+                            queryset=GroupSubMentor.objects.select_related("sub_mentor"),
                         ),
                         Prefetch(
                             "tasks",
@@ -91,9 +91,9 @@ class ClassViewSet(ViewSet):
                         ),
                     )
                 )
-        elif request.user.role == "GROUP_ADMIN":
-            from apps.groups.models import GroupAdmin  # noqa: PLC0415
-            managed_ids = GroupAdmin.objects.filter(admin=request.user).values_list("group_id", flat=True)
+        elif request.user.role == "LEAD_MENTOR":
+            from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
+            managed_ids = GroupLeadMentor.objects.filter(lead_mentor=request.user).values_list("group_id", flat=True)
             qs = qs.filter(group_id__in=managed_ids)
         return qs
 
@@ -116,8 +116,8 @@ class ClassViewSet(ViewSet):
         qs = self._scoped_queryset(request)
         qs = apply_class_filters(qs, request.query_params)
         context: dict = {"request": request}
-        if request.user.role == "INSTRUCTOR":
-            context["assigned_group_ids"] = _instructor_assigned_ids(request.user)
+        if request.user.role == "SUB_MENTOR":
+            context["assigned_group_ids"] = _sub_mentor_assigned_ids(request.user)
         try:
             page_size = min(int(request.query_params.get("page_size", 50)), 1000)
             page = max(int(request.query_params.get("page", 1)), 1)
@@ -132,10 +132,17 @@ class ClassViewSet(ViewSet):
         })
 
     def create(self, request: Request) -> Response:
-        if request.user.role == "INSTRUCTOR":
+        if request.user.role == "SUB_MENTOR":
             group_id = request.data.get("group_id")
-            if not group_id or not instructor_owns_group(request.user, group_id):
-                return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            if not group_id or not sub_mentor_owns_group(request.user, group_id):
+                return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        elif request.user.role == "LEAD_MENTOR":
+            group_id = request.data.get("group_id")
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         serializer = ClassWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # Belt-and-suspenders: run model-level clean() before the DB write.
@@ -159,10 +166,10 @@ class ClassViewSet(ViewSet):
         cls_fresh = get_object_or_404(Class.objects.select_related("group", "created_by"), pk=cls.pk)
         from .tasks import notify_class_scheduled
         notify_class_scheduled(cls_fresh)
-        # Notify instructors assigned to this group (exclude the creator)
-        from apps.notifications.services import notify_instructors as _notify_instructors  # noqa: PLC0415
+        # Notify Sub-Mentors assigned to this group (exclude the creator)
+        from apps.notifications.services import notify_sub_mentors as _notify_sub_mentors  # noqa: PLC0415
         _starts_str = cls_fresh.starts_at.strftime("%d %b %Y, %I:%M %p")
-        _notify_instructors(
+        _notify_sub_mentors(
             group=cls_fresh.group,
             notification_type="CLASS_SCHEDULED_BY_ADMIN",
             title=f"New class scheduled: {cls_fresh.title}",
@@ -170,7 +177,7 @@ class ClassViewSet(ViewSet):
                 f"{request.user.full_name or request.user.email} scheduled"
                 f' "{cls_fresh.title}" in {cls_fresh.group.name} on {_starts_str}.'
             ),
-            link=f"/instructor/classes/{cls_fresh.id}",
+            link=f"/sub-mentor/classes/{cls_fresh.id}",
             payload={"class_id": str(cls_fresh.id), "group_id": str(cls_fresh.group_id)},
             actor=request.user,
             dedupe_suffix=str(cls_fresh.id),
@@ -184,14 +191,19 @@ class ClassViewSet(ViewSet):
         qs = self._scoped_queryset(request)
         cls = get_object_or_404(qs, pk=pk)
         context: dict = {"request": request}
-        if request.user.role == "INSTRUCTOR":
-            context["assigned_group_ids"] = _instructor_assigned_ids(request.user)
+        if request.user.role == "SUB_MENTOR":
+            context["assigned_group_ids"] = _sub_mentor_assigned_ids(request.user)
         return Response({"data": ClassSerializer(cls, context=context).data})
 
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
         cls = get_object_or_404(Class.objects.select_related("group", "created_by"), pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, cls.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = ClassWriteSerializer(cls, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
@@ -229,7 +241,7 @@ class ClassViewSet(ViewSet):
 
         # Notify group members when the class is rescheduled
         from django.utils import timezone as _tz2  # noqa: PLC0415
-        from apps.notifications.services import notify_instructors as _ni2  # noqa: PLC0415
+        from apps.notifications.services import notify_sub_mentors as _ni2  # noqa: PLC0415
         if time_changed:
             from apps.groups.models import GroupMembership
             from apps.notifications.models import Notification
@@ -256,30 +268,30 @@ class ClassViewSet(ViewSet):
                 ignore_conflicts=True,
                 batch_size=500,
             )
-            # Notify instructors about reschedule
+            # Notify Sub-Mentors about reschedule
             _ni2(
                 group=cls_fresh.group,
                 notification_type="CLASS_RESCHEDULED",
                 title=f"Class rescheduled: {cls_fresh.title}",
                 body=f'"{cls_fresh.title}" has been rescheduled to {starts_str}.',
-                link=f"/instructor/classes/{cls_fresh.id}",
+                link=f"/sub-mentor/classes/{cls_fresh.id}",
                 payload={"class_id": str(cls_fresh.id)},
                 actor=request.user,
                 dedupe_suffix=f"reschedule:{starts_str}",
             )
         else:
-            # Content-only edit by a co-instructor → CO_INSTRUCTOR_EDITED_CLASS (debounced per 5 min)
-            if request.user.role == "INSTRUCTOR":
+            # Content-only edit by a co-Sub-Mentor → CO_SUB_MENTOR_EDITED_CLASS (debounced per 5 min)
+            if request.user.role == "SUB_MENTOR":
                 debounce_window = _tz2.now().strftime("%Y%m%d%H") + str(_tz2.now().minute // 5)
                 _ni2(
                     group=cls_fresh.group,
-                    notification_type="CO_INSTRUCTOR_EDITED_CLASS",
+                    notification_type="CO_SUB_MENTOR_EDITED_CLASS",
                     title=f"Class updated: {cls_fresh.title}",
                     body=(
                         f"{request.user.full_name or request.user.email}"
                         f' updated class "{cls_fresh.title}".'
                     ),
-                    link=f"/instructor/classes/{cls_fresh.id}",
+                    link=f"/sub-mentor/classes/{cls_fresh.id}",
                     payload={"class_id": str(cls_fresh.id), "actor_id": str(request.user.id)},
                     actor=request.user,
                     dedupe_suffix=f"edit:{debounce_window}",
@@ -289,8 +301,13 @@ class ClassViewSet(ViewSet):
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
         cls = get_object_or_404(Class.objects.select_related("group"), pk=pk)
-        if request.user.role == "INSTRUCTOR" and not instructor_owns_group(request.user, cls.group_id):
-            return Response(self._INSTRUCTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
+            return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         title = cls.title
         class_id = cls.id
         group = cls.group
@@ -303,13 +320,13 @@ class ClassViewSet(ViewSet):
             target_id=class_id,
             metadata={"title": title},
         )
-        from apps.notifications.services import notify_instructors as _ni3  # noqa: PLC0415
+        from apps.notifications.services import notify_sub_mentors as _ni3  # noqa: PLC0415
         _ni3(
             group=group,
             notification_type="CLASS_CANCELLED",
             title=f"Class cancelled: {title}",
             body=f'Class "{title}" on {date_str} has been cancelled.',
-            link=f"/instructor/groups/{group.id}",
+            link=f"/sub-mentor/groups/{group.id}",
             payload={"group_id": str(group.id)},
             actor=request.user,
             dedupe_suffix=f"cancel:{class_id}",
@@ -338,12 +355,22 @@ class ParticipantCalendarView(APIView):
 class ClassParticipantsView(APIView):
     """GET /classes/{pk}/participants — list participants in the class's group."""
 
-    permission_classes = [IsAdminOrInstructor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def get(self, request: Request, pk: str) -> Response:
         from apps.groups.models import GroupMembership  # noqa: PLC0415
 
         cls = get_object_or_404(Class.objects.select_related("group"), pk=pk)
+        if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, cls.group_id):
+            return Response(
+                {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         members = (
             GroupMembership.objects
             .filter(group=cls.group, user__is_active=True)
@@ -366,18 +393,25 @@ class ClassParticipantsView(APIView):
 class RecurringClassView(APIView):
     """POST /classes/recurring — bulk-create classes for repeating weekdays in a date range."""
 
-    permission_classes = [IsAdminOrInstructor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def post(self, request: Request) -> Response:
         from datetime import datetime, timedelta  # noqa: PLC0415
         from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # noqa: PLC0415
         from django.utils import timezone as _tz  # noqa: PLC0415
 
-        if request.user.role == "INSTRUCTOR":
+        if request.user.role == "SUB_MENTOR":
             group_id = request.data.get("group_id")
-            if not group_id or not instructor_owns_group(request.user, group_id):
+            if not group_id or not sub_mentor_owns_group(request.user, group_id):
                 return Response(
-                    {"errors": [{"code": "perm.not_instructor_of_group", "message": "You are not assigned as instructor for this group."}]},
+                    {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        elif request.user.role == "LEAD_MENTOR":
+            group_id = request.data.get("group_id")
+            if not group_id or not lead_mentor_owns_group(request.user, group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}]},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -469,7 +503,7 @@ class RecurringClassView(APIView):
 
 @extend_schema(exclude=True)
 class ClassActivityView(APIView):
-    """GET /classes/{pk}/activity — audit trail for a class (admin + instructor)."""
+    """GET /classes/{pk}/activity — audit trail for a class (admin + Sub-Mentor)."""
 
     permission_classes = [IsAuthenticated]
 
@@ -480,7 +514,7 @@ class ClassActivityView(APIView):
         from apps.attendance.models import AttendanceSession  # noqa: PLC0415
         from apps.assignments.models import AssignmentTask  # noqa: PLC0415
 
-        if request.user.role not in ("ADMIN", "INSTRUCTOR"):
+        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             return Response(
                 {"errors": [{"code": "perm.denied", "message": "Access denied."}]},
                 status=status.HTTP_403_FORBIDDEN,
@@ -488,11 +522,17 @@ class ClassActivityView(APIView):
 
         cls = get_object_or_404(Class, pk=pk)
 
-        if request.user.role == "INSTRUCTOR":
-            from apps.common.visibility import instructor_can_view_all  # noqa: PLC0415
-            if not instructor_owns_group(request.user, cls.group_id) and not instructor_can_view_all(request.user):
+        if request.user.role == "SUB_MENTOR":
+            from apps.common.visibility import sub_mentor_can_view_all  # noqa: PLC0415
+            if not sub_mentor_owns_group(request.user, cls.group_id) and not sub_mentor_can_view_all(request.user):
                 return Response(
-                    {"errors": [{"code": "perm.not_instructor_of_group", "message": "Not your group."}]},
+                    {"errors": [{"code": "perm.not_sub_mentor_of_group", "message": "Not your group."}]},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        if request.user.role == "LEAD_MENTOR":
+            if not lead_mentor_owns_group(request.user, cls.group_id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "Not your group."}]},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -535,12 +575,12 @@ class ClassCountsView(APIView):
         qs = Class.objects.all()
         if request.user.role == "PARTICIPANT":
             qs = qs.filter(group__memberships__user=request.user).distinct()
-        elif request.user.role == "INSTRUCTOR":
-            from apps.common.scoping import instructor_class_qs  # noqa: PLC0415
-            qs = instructor_class_qs(request.user)
-        elif request.user.role == "GROUP_ADMIN":
-            from apps.groups.models import GroupAdmin  # noqa: PLC0415
-            managed_ids = GroupAdmin.objects.filter(admin=request.user).values_list("group_id", flat=True)
+        elif request.user.role == "SUB_MENTOR":
+            from apps.common.scoping import sub_mentor_class_qs  # noqa: PLC0415
+            qs = sub_mentor_class_qs(request.user)
+        elif request.user.role == "LEAD_MENTOR":
+            from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
+            managed_ids = GroupLeadMentor.objects.filter(lead_mentor=request.user).values_list("group_id", flat=True)
             qs = qs.filter(group_id__in=managed_ids)
         group_id = request.query_params.get("group_id")
         if group_id:

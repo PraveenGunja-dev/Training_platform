@@ -21,13 +21,14 @@ class Notification(models.Model):
         ("ATTENDANCE_OVERRIDE", "Attendance Override"),
         ("GROUP_ADDED", "Added to Group"),
         ("INVITE_RESENT", "Invite Resent"),
-        # Instructor notification types
+        # Sub-Mentor notification types
         ("GROUP_ASSIGNED", "Group Assigned"),
         ("GROUP_UNASSIGNED", "Group Unassigned"),
-        ("CO_INSTRUCTOR_ADDED", "Co-Instructor Added"),
+        ("CO_SUB_MENTOR_ADDED", "Co-Sub-Mentor Added"),
         ("CLASS_SCHEDULED_BY_ADMIN", "Class Scheduled by Admin"),
         ("CLASS_CANCELLED", "Class Cancelled"),
-        ("CO_INSTRUCTOR_EDITED_CLASS", "Co-Instructor Edited Class"),
+        ("CO_SUB_MENTOR_EDITED_CLASS", "Co-Sub-Mentor Edited Class"),
+        ("LEAD_MENTOR_ASSIGNED", "Lead Mentor Assigned"),
         ("ASSIGNMENT_CREATED_IN_GROUP", "Assignment Created in Group"),
         ("SUBMISSION_RECEIVED", "Submission Received"),
         ("DEADLINE_APPROACHING", "Deadline Approaching"),

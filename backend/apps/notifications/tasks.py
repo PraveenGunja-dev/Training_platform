@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 def send_deadline_reminders() -> int:
     """
     Runs every minute via Celery beat.
-    Fires DEADLINE_APPROACHING to assigned instructors for assignments
+    Fires DEADLINE_APPROACHING to assigned Sub-Mentors for assignments
     whose deadline is 23h55m–24h05m away (10-minute window, idempotent via dedupe_key).
     """
     from apps.assignments.models import AssignmentTask
-    from apps.notifications.services import notify_instructors
+    from apps.notifications.services import notify_sub_mentors
 
     now = timezone.now()
     window_start = now + timedelta(hours=23, minutes=55)
@@ -49,7 +49,7 @@ def send_deadline_reminders() -> int:
         pending = max(0, member_count - submitted)
         deadline_str = task.deadline_at.strftime("%d %b %Y, %I:%M %p")
         suffix = task.deadline_at.strftime("%Y%m%d")
-        count = notify_instructors(
+        count = notify_sub_mentors(
             group=task.group,
             notification_type="DEADLINE_APPROACHING",
             title=f"Deadline approaching: {task.title}",
@@ -57,7 +57,7 @@ def send_deadline_reminders() -> int:
                 f'Assignment "{task.title}" in {task.group.name} is due in 24 hours'
                 f" ({deadline_str}). {pending} participant(s) haven't submitted yet."
             ),
-            link=f"/instructor/assignments/{task.id}",
+            link=f"/sub-mentor/assignments/{task.id}",
             payload={"task_id": str(task.id), "group_id": str(task.group_id)},
             dedupe_suffix=suffix,
         )
@@ -70,10 +70,10 @@ def send_deadline_reminders() -> int:
 def send_attendance_session_reminders() -> int:
     """
     Runs every minute via Celery beat.
-    Fires ATTENDANCE_SESSION_REMINDER to assigned instructors for classes
+    Fires ATTENDANCE_SESSION_REMINDER to assigned Sub-Mentors for classes
     starting in 28–32 minutes (idempotent via dedupe_key).
     """
-    from apps.notifications.services import notify_instructors
+    from apps.notifications.services import notify_sub_mentors
     from apps.scheduling.models import Class
 
     now = timezone.now()
@@ -95,7 +95,7 @@ def send_attendance_session_reminders() -> int:
     for cls in upcoming:
         starts_str = cls.starts_at.strftime("%I:%M %p")
         suffix = cls.starts_at.strftime("%Y%m%d%H%M")
-        count = notify_instructors(
+        count = notify_sub_mentors(
             group=cls.group,
             notification_type="ATTENDANCE_SESSION_REMINDER",
             title=f"Class starting soon: {cls.title}",
@@ -103,7 +103,7 @@ def send_attendance_session_reminders() -> int:
                 f'Your class "{cls.title}" starts at {starts_str}. '
                 "Remember to start the attendance session."
             ),
-            link=f"/instructor/classes/{cls.id}",
+            link=f"/sub-mentor/classes/{cls.id}",
             payload={"class_id": str(cls.id), "group_id": str(cls.group_id)},
             dedupe_suffix=suffix,
         )

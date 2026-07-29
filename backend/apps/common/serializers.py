@@ -19,7 +19,7 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
             "video_max_mb",
             "reminder_offsets",
             "session_lifetime_hours",
-            "instructors_can_view_all_classes",
+            "sub_mentors_can_view_all_classes",
         ]
 
     def validate_brand_color(self, value: str) -> str:

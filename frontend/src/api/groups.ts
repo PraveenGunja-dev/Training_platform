@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api-client';
-import type { ApiEnvelope, ClassGroup, GroupDetail, GroupAnalytics, GroupInstructor, SubGroup, GroupAdminData } from '@/lib/types';
+import type { ApiEnvelope, ClassGroup, GroupDetail, GroupAnalytics, GroupSubMentor, SubGroup, LeadMentorData } from '@/lib/types';
 
 export const groupsApi = {
   list: (params?: { is_archived?: boolean; search?: string; sort?: string }) =>
@@ -22,18 +22,18 @@ export const groupsApi = {
     apiClient.post(`/groups/${id}/participants`, { user_ids }).then(r => r.data),
   removeParticipant: (id: string, userId: string) =>
     apiClient.delete(`/groups/${id}/participants/${userId}`),
-  getInstructors: (id: string) =>
-    apiClient.get<ApiEnvelope<GroupInstructor[]>>(`/groups/${id}/instructors`).then(r => r.data),
-  assignInstructors: (id: string, user_ids: string[], promote_participants?: boolean) =>
-    apiClient.post<ApiEnvelope<GroupInstructor[]>>(
-      `/groups/${id}/instructors`,
+  getSubMentors: (id: string) =>
+    apiClient.get<ApiEnvelope<GroupSubMentor[]>>(`/groups/${id}/sub-mentors`).then(r => r.data),
+  assignSubMentors: (id: string, user_ids: string[], promote_participants?: boolean) =>
+    apiClient.post<ApiEnvelope<GroupSubMentor[]>>(
+      `/groups/${id}/sub-mentors`,
       promote_participants ? { user_ids, promote_participants: true } : { user_ids },
     ).then(r => r.data),
-  unassignInstructor: (id: string, userId: string) =>
-    apiClient.delete(`/groups/${id}/instructors/${userId}`),
-  availableInstructors: (id: string, search?: string) =>
+  unassignSubMentor: (id: string, userId: string) =>
+    apiClient.delete(`/groups/${id}/sub-mentors/${userId}`),
+  availableSubMentors: (id: string, search?: string) =>
     apiClient.get<ApiEnvelope<{ id: string; full_name: string; email: string }[]>>(
-      `/groups/${id}/available-instructors${search ? `?search=${encodeURIComponent(search)}` : ''}`
+      `/groups/${id}/available-sub-mentors${search ? `?search=${encodeURIComponent(search)}` : ''}`
     ).then(r => r.data),
   listSubGroups: (groupId: string) =>
     apiClient.get<ApiEnvelope<SubGroup[]>>(`/groups/${groupId}/sub-groups`).then(r => r.data),
@@ -45,10 +45,10 @@ export const groupsApi = {
     apiClient.patch<ApiEnvelope<SubGroup>>(`/groups/${groupId}/sub-groups/${subGroupId}`, body).then(r => r.data),
   deleteSubGroup: (groupId: string, subGroupId: string) =>
     apiClient.delete(`/groups/${groupId}/sub-groups/${subGroupId}`),
-  getGroupAdmin: (groupId: string) =>
-    apiClient.get<ApiEnvelope<GroupAdminData | null>>(`/groups/${groupId}/admin`).then(r => r.data),
-  assignGroupAdmin: (groupId: string, userId: string) =>
-    apiClient.put<ApiEnvelope<GroupAdminData>>(`/groups/${groupId}/admin`, { user_id: userId }).then(r => r.data),
-  removeGroupAdmin: (groupId: string) =>
-    apiClient.delete(`/groups/${groupId}/admin`),
+  getLeadMentor: (groupId: string) =>
+    apiClient.get<ApiEnvelope<LeadMentorData | null>>(`/groups/${groupId}/lead-mentor`).then(r => r.data),
+  assignLeadMentor: (groupId: string, userId: string) =>
+    apiClient.put<ApiEnvelope<LeadMentorData>>(`/groups/${groupId}/lead-mentor`, { user_id: userId }).then(r => r.data),
+  removeLeadMentor: (groupId: string) =>
+    apiClient.delete(`/groups/${groupId}/lead-mentor`),
 };

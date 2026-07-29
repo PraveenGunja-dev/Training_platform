@@ -39,7 +39,7 @@ def pending_user(db):
 
 def _get_token(client, email: str, password: str) -> str:
     resp = client.post(
-        "/api/v1/auth/login",
+        "/training/api/v1/auth/login",
         {"email": email, "password": password},
         content_type="application/json",
     )
@@ -51,7 +51,7 @@ def _auth(client, email: str, password: str) -> dict:
 
 
 # ------------------------------------------------------------------ #
-# GET /api/v1/users                                                    #
+# GET /training/api/v1/users                                                    #
 # ------------------------------------------------------------------ #
 
 
@@ -59,7 +59,7 @@ def _auth(client, email: str, password: str) -> dict:
 class TestUserList:
     def test_list_returns_200_for_admin(self, client, admin_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.get("/api/v1/users", **h)
+        resp = client.get("/training/api/v1/users", **h)
         assert resp.status_code == 200
         assert "data" in resp.json()
         emails = [u["email"] for u in resp.json()["data"]]
@@ -67,35 +67,35 @@ class TestUserList:
 
     def test_list_filter_by_role(self, client, admin_user, participant_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.get("/api/v1/users?role=PARTICIPANT", **h)
+        resp = client.get("/training/api/v1/users?role=PARTICIPANT", **h)
         assert resp.status_code == 200
         for u in resp.json()["data"]:
             assert u["role"] == "PARTICIPANT"
 
     def test_list_filter_by_status_active(self, client, admin_user, pending_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.get("/api/v1/users?status=active", **h)
+        resp = client.get("/training/api/v1/users?status=active", **h)
         assert resp.status_code == 200
         assert all(u["is_active"] for u in resp.json()["data"])
 
     def test_list_filter_by_status_inactive(self, client, admin_user, pending_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.get("/api/v1/users?status=inactive", **h)
+        resp = client.get("/training/api/v1/users?status=inactive", **h)
         assert resp.status_code == 200
         assert all(not u["is_active"] for u in resp.json()["data"])
 
     def test_list_participant_returns_403(self, client, admin_user, participant_user):
         h = _auth(client, "part@test.com", "pass123")
-        resp = client.get("/api/v1/users", **h)
+        resp = client.get("/training/api/v1/users", **h)
         assert resp.status_code == 403
 
     def test_list_unauthenticated_returns_401(self, client, admin_user):
-        resp = client.get("/api/v1/users")
+        resp = client.get("/training/api/v1/users")
         assert resp.status_code == 401
 
 
 # ------------------------------------------------------------------ #
-# POST /api/v1/users  (invite single)                                  #
+# POST /training/api/v1/users  (invite single)                                  #
 # ------------------------------------------------------------------ #
 
 
@@ -104,7 +104,7 @@ class TestInviteUser:
     def test_invite_creates_user_and_sends_email(self, client, admin_user, mailoutbox):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users",
+            "/training/api/v1/users",
             {"email": "new@test.com", "full_name": "New User", "role": "PARTICIPANT"},
             content_type="application/json",
             **h,
@@ -120,7 +120,7 @@ class TestInviteUser:
     def test_invite_existing_email_returns_400(self, client, admin_user, participant_user):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users",
+            "/training/api/v1/users",
             {"email": "part@test.com", "full_name": "Dup", "role": "PARTICIPANT"},
             content_type="application/json",
             **h,
@@ -131,7 +131,7 @@ class TestInviteUser:
     def test_invite_missing_fields_returns_400(self, client, admin_user):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users",
+            "/training/api/v1/users",
             {"email": "x@test.com"},
             content_type="application/json",
             **h,
@@ -141,7 +141,7 @@ class TestInviteUser:
     def test_invite_participant_returns_403(self, client, admin_user, participant_user):
         h = _auth(client, "part@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users",
+            "/training/api/v1/users",
             {"email": "x@test.com", "full_name": "X", "role": "PARTICIPANT"},
             content_type="application/json",
             **h,
@@ -150,7 +150,7 @@ class TestInviteUser:
 
 
 # ------------------------------------------------------------------ #
-# POST /api/v1/users/bulk-invite                                       #
+# POST /training/api/v1/users/bulk-invite                                       #
 # ------------------------------------------------------------------ #
 
 
@@ -159,7 +159,7 @@ class TestBulkInvite:
     def test_bulk_invite_mixed_rows(self, client, admin_user, participant_user, mailoutbox):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users/bulk-invite",
+            "/training/api/v1/users/bulk-invite",
             {
                 "rows": [
                     {"email": "part@test.com", "full_name": "Dup", "role": "PARTICIPANT"},
@@ -182,7 +182,7 @@ class TestBulkInvite:
     def test_bulk_invite_empty_rows_returns_400(self, client, admin_user):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users/bulk-invite",
+            "/training/api/v1/users/bulk-invite",
             {"rows": []},
             content_type="application/json",
             **h,
@@ -192,7 +192,7 @@ class TestBulkInvite:
     def test_bulk_invite_participant_returns_403(self, client, admin_user, participant_user):
         h = _auth(client, "part@test.com", "pass123")
         resp = client.post(
-            "/api/v1/users/bulk-invite",
+            "/training/api/v1/users/bulk-invite",
             {"rows": [{"email": "x@test.com", "full_name": "X", "role": "PARTICIPANT"}]},
             content_type="application/json",
             **h,
@@ -201,7 +201,7 @@ class TestBulkInvite:
 
 
 # ------------------------------------------------------------------ #
-# GET /api/v1/users/:id                                                #
+# GET /training/api/v1/users/:id                                                #
 # ------------------------------------------------------------------ #
 
 
@@ -209,7 +209,7 @@ class TestBulkInvite:
 class TestUserDetail:
     def test_retrieve_returns_user_with_groups(self, client, admin_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.get(f"/api/v1/users/{admin_user.id}", **h)
+        resp = client.get(f"/training/api/v1/users/{admin_user.id}", **h)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["email"] == "admin@test.com"
@@ -218,12 +218,12 @@ class TestUserDetail:
 
     def test_retrieve_participant_returns_403(self, client, admin_user, participant_user):
         h = _auth(client, "part@test.com", "pass123")
-        resp = client.get(f"/api/v1/users/{admin_user.id}", **h)
+        resp = client.get(f"/training/api/v1/users/{admin_user.id}", **h)
         assert resp.status_code == 403
 
 
 # ------------------------------------------------------------------ #
-# PATCH /api/v1/users/:id                                              #
+# PATCH /training/api/v1/users/:id                                              #
 # ------------------------------------------------------------------ #
 
 
@@ -232,7 +232,7 @@ class TestUserUpdate:
     def test_partial_update_role(self, client, admin_user, participant_user):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.patch(
-            f"/api/v1/users/{participant_user.id}",
+            f"/training/api/v1/users/{participant_user.id}",
             {"role": "ADMIN"},
             content_type="application/json",
             **h,
@@ -245,7 +245,7 @@ class TestUserUpdate:
     def test_partial_update_full_name(self, client, admin_user, participant_user):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.patch(
-            f"/api/v1/users/{participant_user.id}",
+            f"/training/api/v1/users/{participant_user.id}",
             {"full_name": "Updated Name"},
             content_type="application/json",
             **h,
@@ -255,7 +255,7 @@ class TestUserUpdate:
 
 
 # ------------------------------------------------------------------ #
-# DELETE /api/v1/users/:id                                             #
+# DELETE /training/api/v1/users/:id                                             #
 # ------------------------------------------------------------------ #
 
 
@@ -263,7 +263,7 @@ class TestUserUpdate:
 class TestUserDestroy:
     def test_destroy_deactivates_user(self, client, admin_user, participant_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.delete(f"/api/v1/users/{participant_user.id}", **h)
+        resp = client.delete(f"/training/api/v1/users/{participant_user.id}", **h)
         assert resp.status_code == 204
         participant_user.refresh_from_db()
         assert not participant_user.is_active
@@ -271,13 +271,13 @@ class TestUserDestroy:
 
     def test_destroy_own_account_returns_400(self, client, admin_user):
         h = _auth(client, "admin@test.com", "pass123")
-        resp = client.delete(f"/api/v1/users/{admin_user.id}", **h)
+        resp = client.delete(f"/training/api/v1/users/{admin_user.id}", **h)
         assert resp.status_code == 400
         assert resp.json()["errors"][0]["code"] == "user.self_deactivate"
 
 
 # ------------------------------------------------------------------ #
-# POST /api/v1/users/:id/resend-invite                                 #
+# POST /training/api/v1/users/:id/resend-invite                                 #
 # ------------------------------------------------------------------ #
 
 
@@ -286,7 +286,7 @@ class TestResendInvite:
     def test_resend_invite_for_pending_user(self, client, admin_user, pending_user, mailoutbox):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            f"/api/v1/users/{pending_user.id}/resend-invite",
+            f"/training/api/v1/users/{pending_user.id}/resend-invite",
             content_type="application/json",
             **h,
         )
@@ -300,7 +300,7 @@ class TestResendInvite:
     ):
         h = _auth(client, "admin@test.com", "pass123")
         resp = client.post(
-            f"/api/v1/users/{participant_user.id}/resend-invite",
+            f"/training/api/v1/users/{participant_user.id}/resend-invite",
             content_type="application/json",
             **h,
         )
@@ -312,7 +312,7 @@ class TestResendInvite:
     ):
         h = _auth(client, "part@test.com", "pass123")
         resp = client.post(
-            f"/api/v1/users/{pending_user.id}/resend-invite",
+            f"/training/api/v1/users/{pending_user.id}/resend-invite",
             content_type="application/json",
             **h,
         )

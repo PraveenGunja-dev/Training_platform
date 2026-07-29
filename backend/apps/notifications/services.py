@@ -55,7 +55,7 @@ def _send_email_notification(user, title: str, body: str) -> None:
         logger.exception("Failed to send email notification to user %s", user.id)
 
 
-def notify_instructors(
+def notify_sub_mentors(
     group,
     notification_type: str,
     title: str,
@@ -66,20 +66,20 @@ def notify_instructors(
     dedupe_suffix: str = "",
 ) -> int:
     """
-    Send in-app notification to all instructors assigned to group, excluding actor.
+    Send in-app notification to all Sub-Mentors assigned to group, excluding actor.
     Returns count of notifications created (new ones only; skips duplicates).
-    Respects each instructor's email preference.
+    Respects each Sub-Mentor's email preference.
     """
-    from apps.groups.models import GroupInstructor  # noqa: PLC0415
+    from apps.groups.models import GroupSubMentor  # noqa: PLC0415
 
-    qs = GroupInstructor.objects.filter(group=group).select_related("instructor")
+    qs = GroupSubMentor.objects.filter(group=group).select_related("sub_mentor")
     if actor is not None:
-        qs = qs.exclude(instructor=actor)
+        qs = qs.exclude(sub_mentor=actor)
 
     count = 0
     suffix = dedupe_suffix or timezone.now().strftime("%Y%m%d")
     for gi in qs:
-        user = gi.instructor
+        user = gi.sub_mentor
         dk = f"{notification_type.lower()}:{group.id}:{user.id}:{suffix}"
         notif, created = Notification.objects.get_or_create(
             dedupe_key=dk,

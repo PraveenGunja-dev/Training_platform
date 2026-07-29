@@ -11,17 +11,17 @@ from .models import Document, ParticipantSharedDoc
 
 def document_visible_to(doc: Document, user) -> bool:
     """Visibility matrix:
-    GROUP           → all group members + Admin + Instructor-of-group
-    SELECTED        → only users in allowed_user_ids + Admin + Instructor-of-group
-    STAFF_ONLY      → Admin + Instructor-of-group only
+    GROUP           → all group members + Admin + Sub-Mentor-of-group
+    SELECTED        → only users in allowed_user_ids + Admin + Sub-Mentor-of-group
+    STAFF_ONLY      → Admin + Sub-Mentor-of-group only
     PUBLIC_TO_CLASS → anyone in any group linked to this doc's class
     """
     if user.role == "ADMIN":
         return True
 
-    if user.role == "INSTRUCTOR":
-        from apps.groups.models import GroupInstructor  # noqa: PLC0415
-        return GroupInstructor.objects.filter(instructor=user, group_id=doc.group_id).exists()
+    if user.role == "SUB_MENTOR":
+        from apps.groups.models import GroupSubMentor  # noqa: PLC0415
+        return GroupSubMentor.objects.filter(sub_mentor=user, group_id=doc.group_id).exists()
 
     if doc.visibility == Document.VIS_STAFF_ONLY:
         return False
