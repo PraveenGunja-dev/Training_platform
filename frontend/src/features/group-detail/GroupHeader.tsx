@@ -482,13 +482,13 @@ export function GroupHeader({
               {(group.lead_mentor || isAdmin) && (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Admin:
+                    Lead Mentor:
                   </span>
 
                   {group.lead_mentor ? (
                     <span className="inline-flex items-center gap-2 text-sm font-bold text-teal-800 bg-teal-100 border border-teal-300 px-3 py-1.5 rounded-lg shadow-sm">
                       <ShieldCheck className="h-4 w-4 shrink-0 text-teal-600" />
-                      <Link to={`/lead-mentor/users/${group.lead_mentor.admin_id}`} className="hover:underline leading-none">
+                      <Link to={`/admin/users/${group.lead_mentor.lead_mentor_id}`} className="hover:underline leading-none">
                         {group.lead_mentor.full_name}
                       </Link>
                       {isAdmin && (
@@ -517,7 +517,7 @@ export function GroupHeader({
                       className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0052A5] bg-white border border-dashed border-[#A8C8E8] px-3 py-1.5 rounded-lg hover:border-[#0052A5] hover:bg-[#EBF3FB] transition-colors"
                     >
                       <ShieldCheck className="h-4 w-4" />
-                      Assign Admin
+                      Assign Lead Mentor
                     </button>
                   )}
                 </div>
@@ -536,7 +536,7 @@ export function GroupHeader({
                       className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg shadow-sm"
                     >
                       <GraduationCap className="h-4 w-4 shrink-0 text-emerald-600" />
-                      <Link to={`/lead-mentor/users/${inst.id}`} className="hover:underline leading-none">
+                      <Link to={`/admin/users/${inst.id}`} className="hover:underline leading-none">
                         {inst.full_name}
                       </Link>
                       {isAdmin && (
@@ -597,7 +597,7 @@ export function GroupHeader({
           open={assignAdminOpen}
           onClose={() => setAssignAdminOpen(false)}
           groupId={group.id}
-          currentAdminId={group.lead_mentor?.admin_id}
+          currentAdminId={group.lead_mentor?.lead_mentor_id}
         />
       )}
 

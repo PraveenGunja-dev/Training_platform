@@ -151,7 +151,7 @@ function ClassesLoader() {
 
 export default function AdminClassesPage() {
   const [selectedGroup, setSelectedGroup]   = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('UPCOMING');
   const [scheduleOpen, setScheduleOpen]     = useState(false);
   const [page, setPage]                     = useState(1);
   const [searchInput, setSearchInput]       = useState('');

@@ -135,6 +135,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: 'dashboard', element: <LeadMentorDashboardPage /> },
       { path: 'calendar', element: <LeadMentorCalendarPage /> },
+      { path: 'classes/:id', element: <SubMentorClassDetailPage /> },
       { path: 'participants', element: <LeadMentorParticipantsPage /> },
       { path: 'sub-mentors', element: <LeadMentorSubMentorsPage /> },
       { path: 'analytics', element: <LeadMentorAnalyticsPage /> },

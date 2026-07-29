@@ -69,7 +69,7 @@ export const leadMentorNav: NavItem[] = [
   { to: '/lead-mentor/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
   { to: '/lead-mentor/calendar',     label: 'Calendar',     icon: CalendarRange,   section: 'Training' },
   { to: '/lead-mentor/participants', label: 'Participants', icon: Users,           section: 'People'   },
-  { to: '/lead-mentor/sub-mentors',  label: 'SubMentors',  icon: GraduationCap                        },
+  { to: '/lead-mentor/sub-mentors',  label: 'Sub-Mentors',  icon: GraduationCap                        },
   { to: '/lead-mentor/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },
   { to: '/lead-mentor/analytics',    label: 'Analytics',    icon: BarChart2,       section: 'Reports'  },
   { to: '/lead-mentor/profile',      label: 'Profile',      icon: User,            section: 'Account'  },

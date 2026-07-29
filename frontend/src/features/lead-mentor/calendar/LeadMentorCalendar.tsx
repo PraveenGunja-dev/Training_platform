@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import listPlugin from '@fullcalendar/list';
@@ -18,6 +19,7 @@ const LEGEND = [
 ] as const;
 
 export function LeadMentorCalendar() {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState(() => ({
     from: startOfMonth(new Date()).toISOString(),
     to:   endOfMonth(addMonths(new Date(), 1)).toISOString(),
@@ -141,6 +143,7 @@ export function LeadMentorCalendar() {
               right:  'dayGridMonth,listWeek',
             }}
             events={events}
+            eventClick={(info) => navigate(`/lead-mentor/classes/${info.event.id}`)}
             datesSet={(arg: DatesSetArg) =>
               setDateRange({ from: arg.start.toISOString(), to: arg.end.toISOString() })
             }

@@ -88,6 +88,17 @@ def get_org_chart_data() -> dict:
         _user_dict(u) for u in all_sub_mentors if u.id not in assigned_sub_mentor_ids
     ]
 
+    # Unassigned Lead Mentors: active Lead Mentors not assigned to any group
+    assigned_lead_mentor_ids = set(
+        GroupLeadMentor.objects.values_list("lead_mentor_id", flat=True)
+    )
+    all_lead_mentors = User.objects.filter(role="LEAD_MENTOR", is_active=True).only(
+        "id", "full_name", "email"
+    )
+    unassigned_lead_mentors = [
+        _user_dict(u) for u in all_lead_mentors if u.id not in assigned_lead_mentor_ids
+    ]
+
     return {
         "stats": {
             "total_admins": len(admins),
@@ -104,4 +115,5 @@ def get_org_chart_data() -> dict:
         "admins": [_user_dict(u) for u in admins],
         "groups": groups_data,
         "unassigned_sub_mentors": unassigned_sub_mentors,
+        "unassigned_lead_mentors": unassigned_lead_mentors,
     }

@@ -123,7 +123,7 @@ export interface SubGroup {
 }
 
 export interface LeadMentorData {
-  admin_id: string;
+  lead_mentor_id: string;
   full_name: string;
   email: string;
   assigned_at: string;

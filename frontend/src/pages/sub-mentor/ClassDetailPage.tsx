@@ -18,6 +18,7 @@ import { EndAttendanceDialog } from '@/features/admin/attendance/EndAttendanceDi
 import { SessionTimer } from '@/features/admin/attendance/SessionTimer';
 import { CreateAssignmentDialog } from '@/features/admin/assignments/CreateAssignmentDialog';
 import { useCan } from '@/hooks/useCan';
+import { useAuthStore } from '@/store/auth';
 import { ClassAttendanceHistory } from '@/features/admin/attendance/ClassAttendanceHistory';
 import { ClassActivityLog } from '@/features/admin/class/ClassActivityLog';
 
@@ -53,6 +54,10 @@ function DetailSkeleton() {
 export default function SubMentorClassDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const isLeadMentor = user?.role === 'LEAD_MENTOR';
+  const backTo = isLeadMentor ? '/lead-mentor/calendar' : '/sub-mentor/classes';
+  const backLabel = isLeadMentor ? 'Back to Calendar' : 'Back to Classes';
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['class', id],
@@ -104,11 +109,11 @@ export default function SubMentorClassDetailPage() {
 
       {/* Back link */}
       <Link
-        to="/sub-mentor/classes"
+        to={backTo}
         className="inline-flex items-center gap-1.5 text-sm text-[#5A7A9A] hover:text-[#00285A] transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Classes
+        {backLabel}
       </Link>
 
       {/* View-only banner for cross-visibility non-assigned classes */}

@@ -40,6 +40,7 @@ export interface OrgChartData {
   admins: OrgChartPerson[];
   groups: OrgChartGroup[];
   unassigned_sub_mentors: OrgChartPerson[];
+  unassigned_lead_mentors: OrgChartPerson[];
 }
 
 export const orgChartApi = {
