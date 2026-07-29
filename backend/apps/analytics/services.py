@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from django.core.cache import cache
 from django.db.models import Count, Max, Prefetch
 from django.utils import timezone
+
+
+def _natural_key(group) -> list:
+    """Sort by the first number in the name, then full natural sort as tiebreaker."""
+    m = re.search(r'\d+', group.name)
+    first_num = int(m.group()) if m else 0
+    rest = [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', group.name)]
+    return [first_num] + rest
 
 
 def compute_admin_payload(group_id: str | None = None) -> dict:
@@ -74,7 +83,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     ]
 
     # --- Submission bar (per group) ---
-    groups = ClassGroup.objects.filter(is_archived=False, **_group_q)
+    groups = sorted(ClassGroup.objects.filter(is_archived=False, **_group_q), key=_natural_key)
     submission_bar = []
     for group in groups:
         grp_submitted = Submission.objects.filter(task__group=group, status="SUBMITTED").count()
@@ -301,7 +310,7 @@ def compute_sub_mentor_payload(user) -> dict:
     assigned_group_ids = list(
         GroupSubMentor.objects.filter(sub_mentor=user).values_list("group_id", flat=True)
     )
-    groups = ClassGroup.objects.filter(pk__in=assigned_group_ids, is_archived=False)
+    _groups_qs = ClassGroup.objects.filter(pk__in=assigned_group_ids, is_archived=False)
 
     _class_q = {"group_id__in": assigned_group_ids}
     _group_q = {"pk__in": assigned_group_ids}
@@ -310,7 +319,8 @@ def compute_sub_mentor_payload(user) -> dict:
         GroupMembership.objects.filter(group_id__in=assigned_group_ids)
         .values("user_id").distinct().count()
     )
-    total_groups = groups.count()
+    total_groups = _groups_qs.count()
+    groups = sorted(_groups_qs, key=_natural_key)
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
     classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
@@ -903,7 +913,7 @@ def compute_batch_breakdown() -> dict:
     now = timezone.now()
     today = now.date()
 
-    groups = list(ClassGroup.objects.filter(is_archived=False).order_by("name"))
+    groups = sorted(ClassGroup.objects.filter(is_archived=False), key=_natural_key)
 
     # --- Membership counts (1 query) ---
     membership_counts = {

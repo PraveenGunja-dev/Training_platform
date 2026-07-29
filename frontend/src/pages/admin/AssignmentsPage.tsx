@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ListChecks, Plus, Eye, Lock, CheckCircle2, Circle, Zap, BookOpen } from 'lucide-react';
 import { assignmentsApi } from '@/api/assignments';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
@@ -88,7 +89,7 @@ export default function AdminAssignmentsPage() {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
-  const groups = groupsQuery.data?.data ?? [];
+  const groups = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   const assignmentsQuery = useQuery({
     queryKey: ['assignments', { group_id: selectedGroup, state: selectedState }],

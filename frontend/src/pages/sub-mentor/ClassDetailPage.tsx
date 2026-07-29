@@ -56,8 +56,9 @@ export default function SubMentorClassDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const isLeadMentor = user?.role === 'LEAD_MENTOR';
-  const backTo = isLeadMentor ? '/lead-mentor/calendar' : '/sub-mentor/classes';
-  const backLabel = isLeadMentor ? 'Back to Calendar' : 'Back to Classes';
+  const rolePrefix = isLeadMentor ? '/lead-mentor' : '/sub-mentor';
+  const backTo = `${rolePrefix}/classes`;
+  const backLabel = 'Back to Classes';
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['class', id],
@@ -350,7 +351,7 @@ export default function SubMentorClassDetailPage() {
 
         {/* Related tasks + documents */}
         <div className="space-y-4">
-          <RelatedTasksCard tasks={cls.related_tasks ?? []} linkPrefix="/sub-mentor/assignments" />
+          <RelatedTasksCard tasks={cls.related_tasks ?? []} linkPrefix={`${rolePrefix}/assignments`} />
           {canEditClass && (
             <ClassDocumentUploadCard classId={cls.id} groupId={cls.group_id} />
           )}
@@ -360,7 +361,7 @@ export default function SubMentorClassDetailPage() {
       {/* Attendance History */}
       <ClassAttendanceHistory
         classId={cls.id}
-        reportBasePath="/sub-mentor/attendance/sessions"
+        reportBasePath={`${rolePrefix}/attendance/sessions`}
       />
 
       {/* Assignment Submissions */}

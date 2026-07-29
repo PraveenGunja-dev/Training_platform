@@ -66,11 +66,18 @@ export const subMentorNav: NavItem[] = [
 ];
 
 export const leadMentorNav: NavItem[] = [
-  { to: '/lead-mentor/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, section: 'Overview' },
-  { to: '/lead-mentor/calendar',     label: 'Calendar',     icon: CalendarRange,   section: 'Training' },
-  { to: '/lead-mentor/participants', label: 'Participants', icon: Users,           section: 'People'   },
-  { to: '/lead-mentor/sub-mentors',  label: 'Sub-Mentors',  icon: GraduationCap                        },
-  { to: '/lead-mentor/sub-groups',   label: 'Sub-Groups',   icon: Layers                               },
-  { to: '/lead-mentor/analytics',    label: 'Analytics',    icon: BarChart2,       section: 'Reports'  },
-  { to: '/lead-mentor/profile',      label: 'Profile',      icon: User,            section: 'Account'  },
+  { to: '/lead-mentor/dashboard',      label: 'Dashboard',     icon: LayoutDashboard, section: 'Overview'  },
+  { to: '/lead-mentor/calendar',       label: 'Calendar',      icon: CalendarRange,   section: 'Training'  },
+  { to: '/lead-mentor/classes',        label: 'Classes',       icon: CalendarDays                          },
+  { to: '/lead-mentor/attendance',     label: 'Attendance',    icon: CheckSquare                           },
+  { to: '/lead-mentor/participants',   label: 'Participants',  icon: Users,           section: 'People'    },
+  { to: '/lead-mentor/sub-mentors',    label: 'Sub-Mentors',   icon: GraduationCap                         },
+  { to: '/lead-mentor/sub-groups',     label: 'Sub-Groups',    icon: Layers                                },
+  { to: '/lead-mentor/assignments',    label: 'Assignments',   icon: ListChecks,      section: 'Content'   },
+  { to: '/lead-mentor/submissions',    label: 'Submissions',   icon: ClipboardCheck                        },
+  { to: '/lead-mentor/documents',      label: 'Documents',     icon: FileText                              },
+  { to: '/lead-mentor/shared-uploads', label: 'Shared Uploads',icon: Upload                                },
+  { to: '/lead-mentor/analytics',      label: 'Analytics',     icon: BarChart2,       section: 'Reports'   },
+  { to: '/lead-mentor/notifications',  label: 'Notifications', icon: Bell,            section: 'Account'   },
+  { to: '/lead-mentor/profile',        label: 'Profile',       icon: User                                   },
 ];

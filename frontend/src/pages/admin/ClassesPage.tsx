@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X, MapPin } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
@@ -177,7 +178,7 @@ export default function AdminClassesPage() {
     queryKey: ['groups'],
     queryFn:  () => groupsApi.list(),
   });
-  const groups = groupsQuery.data?.data ?? [];
+  const groups = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   // Lightweight counts — single GROUP BY, used for stats strip
   const countsQuery = useQuery({

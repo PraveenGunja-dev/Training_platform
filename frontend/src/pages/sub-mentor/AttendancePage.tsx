@@ -1,8 +1,11 @@
 import { CheckSquare } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SessionsTable } from '@/features/admin/attendance/SessionsTable';
 
 export default function SubMentorAttendancePage() {
+  const location = useLocation();
+  const rolePrefix = location.pathname.startsWith('/lead-mentor') ? '/lead-mentor' : '/sub-mentor';
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -27,10 +30,10 @@ export default function SubMentorAttendancePage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="active">
-              <SessionsTable filter="ACTIVE" reportBasePath="/sub-mentor/attendance/sessions" />
+              <SessionsTable filter="ACTIVE" reportBasePath={`${rolePrefix}/attendance/sessions`} />
             </TabsContent>
             <TabsContent value="past">
-              <SessionsTable filter="ENDED" reportBasePath="/sub-mentor/attendance/sessions" />
+              <SessionsTable filter="ENDED" reportBasePath={`${rolePrefix}/attendance/sessions`} />
             </TabsContent>
           </Tabs>
         </div>

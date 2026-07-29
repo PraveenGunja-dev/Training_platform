@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ListChecks, Eye, Lock, CheckCircle2, Circle, BookOpen, Plus, Trash2, Send, X as XIcon } from 'lucide-react';
 import { assignmentsApi } from '@/api/assignments';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
@@ -97,6 +98,8 @@ function AssignmentRow({
   task, onPublish, onClose, onDelete,
   publishPending, closePending, deletePending,
 }: AssignmentRowProps) {
+  const location   = useLocation();
+  const rolePrefix = location.pathname.startsWith('/lead-mentor') ? '/lead-mentor' : '/sub-mentor';
   const state      = deriveState(task);
   const badge      = STATE_BADGE[state] ?? STATE_BADGE.CLOSED;
   const policyChip = LATE_POLICY_CHIP[task.late_policy];
@@ -179,7 +182,7 @@ function AssignmentRow({
             </Button>
           )}
           <Button variant="ghost" size="sm" asChild className="text-[#0052A5] hover:text-[#0052A5] hover:bg-blue-50">
-            <Link to={`/sub-mentor/assignments/${task.id}`}>
+            <Link to={`${rolePrefix}/assignments/${task.id}`}>
               <Eye className="h-4 w-4 mr-1" />
               View
             </Link>
@@ -203,7 +206,7 @@ export default function SubMentorAssignmentsPage() {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
-  const groups: ClassGroup[] = groupsQuery.data?.data ?? [];
+  const groups: ClassGroup[] = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   const assignmentsQuery = useQuery({
     queryKey: ['assignments', { group_id: selectedGroup, state: selectedState }],
