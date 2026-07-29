@@ -91,6 +91,7 @@ export interface ClassGroup {
   id: string;
   name: string;
   description: string;
+  location?: string;
   participants_count: number;
   is_archived: boolean;
   created_at: string;
@@ -187,6 +188,7 @@ export interface ClassSession {
   id: string;
   group_id: string;
   group_name: string;
+  group_location?: string;
   title: string;
   description: string;
   starts_at: string;

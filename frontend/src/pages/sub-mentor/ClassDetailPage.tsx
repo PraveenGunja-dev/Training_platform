@@ -143,6 +143,11 @@ export default function SubMentorClassDetailPage() {
               {cls.description && (
                 <p className="text-sm text-indigo-200/80 mt-1">{cls.description}</p>
               )}
+              {cls.group_location && (
+                <p className="text-sm text-indigo-200/80 mt-0.5">
+                  <span className="font-medium">Location:</span> {cls.group_location}
+                </p>
+              )}
             </div>
             <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badge.className}`}>
               {badge.label}

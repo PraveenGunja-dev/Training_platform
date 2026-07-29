@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X, MapPin } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
 import { formatDate } from '@/lib/dates';
@@ -107,6 +107,12 @@ function ClassCard({ cls }: { cls: ClassSession }) {
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
             <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+        {cls.group_location && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <MapPin className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <span className="truncate">{cls.group_location}</span>
           </div>
         )}
         <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">

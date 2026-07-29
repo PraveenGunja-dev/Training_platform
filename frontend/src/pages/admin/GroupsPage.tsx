@@ -159,6 +159,7 @@ function GroupCard({ group, index, onClick }: { group: ClassGroup; index: number
 const createGroupSchema = z.object({
   name:        z.string().min(2, 'Name must be at least 2 characters'),
   description: z.string().optional(),
+  location:    z.string().optional(),
 });
 type CreateGroupForm = z.infer<typeof createGroupSchema>;
 
@@ -200,6 +201,14 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
             <Input
               {...register('description')}
               placeholder="Brief description of this group"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground/90">Location (optional)</label>
+            <Input
+              {...register('location')}
+              placeholder="e.g. Conference Room A, Building 2"
               className="mt-1"
             />
           </div>

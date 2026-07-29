@@ -391,6 +391,7 @@ export function GroupHeader({
   const [removeAdminConfirmOpen, setRemoveAdminConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameName, setRenameName] = useState('');
+  const [editLocation, setEditLocation] = useState('');
 
   const removeAdminMutation = useMutation({
     mutationFn: () => groupsApi.removeLeadMentor(group.id),
@@ -420,15 +421,16 @@ export function GroupHeader({
     onError: () => toast.error('Failed to remove Sub-Mentor.'),
   });
 
-  const renameMutation = useMutation({
-    mutationFn: (name: string) => groupsApi.update(group.id, { name }),
+  const editMutation = useMutation({
+    mutationFn: (body: { name: string; location: string }) =>
+      groupsApi.update(group.id, { name: body.name, location: body.location }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['group', group.id] });
       void queryClient.invalidateQueries({ queryKey: ['groups'] });
-      toast.success('Group renamed.');
+      toast.success('Group updated.');
       setRenameOpen(false);
     },
-    onError: () => toast.error('Failed to rename group.'),
+    onError: () => toast.error('Failed to update group.'),
   });
 
   return (
@@ -451,9 +453,9 @@ export function GroupHeader({
                 <h1 className="text-xl font-bold text-[#00285A]">{group.name}</h1>
                 {canRename && (
                   <button
-                    onClick={() => { setRenameName(group.name); setRenameOpen(true); }}
+                    onClick={() => { setRenameName(group.name); setEditLocation(group.location ?? ''); setRenameOpen(true); }}
                     className="p-1 rounded hover:bg-[#EBF3FB] text-slate-400 hover:text-[#0052A5] transition-colors"
-                    aria-label="Rename group"
+                    aria-label="Edit group"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -468,6 +470,11 @@ export function GroupHeader({
 
               {group.description && (
                 <p className="text-sm text-slate-500 mt-1 leading-relaxed">{group.description}</p>
+              )}
+              {group.location && (
+                <p className="text-sm text-slate-400 mt-0.5 leading-relaxed">
+                  <span className="font-medium text-slate-500">Location:</span> {group.location}
+                </p>
               )}
 
               {/* Participants chip */}
@@ -609,34 +616,59 @@ export function GroupHeader({
         isPending={removeMutation.isPending}
       />
 
-      {/* Rename group dialog */}
+      {/* Edit group dialog (name + location) */}
       <Dialog open={renameOpen} onOpenChange={open => { if (!open) setRenameOpen(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename Group</DialogTitle>
-            <DialogDescription>Enter a new name for this group.</DialogDescription>
+            <DialogTitle>Edit Group</DialogTitle>
+            <DialogDescription>Update the name or location for this group.</DialogDescription>
           </DialogHeader>
-          <Input
-            value={renameName}
-            onChange={e => setRenameName(e.target.value)}
-            placeholder="Group name"
-            maxLength={200}
-            autoFocus
-            onKeyDown={e => {
-              if (e.key === 'Enter' && renameName.trim() && renameName.trim() !== group.name) {
-                renameMutation.mutate(renameName.trim());
-              }
-            }}
-          />
+          <div className="space-y-4 pt-1">
+            <div>
+              <label className="text-sm font-medium text-foreground/90">Group Name</label>
+              <Input
+                value={renameName}
+                onChange={e => setRenameName(e.target.value)}
+                placeholder="Group name"
+                maxLength={200}
+                autoFocus
+                className="mt-1"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && renameName.trim()) {
+                    editMutation.mutate({ name: renameName.trim(), location: editLocation.trim() });
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground/90">Location (optional)</label>
+              <Input
+                value={editLocation}
+                onChange={e => setEditLocation(e.target.value)}
+                placeholder="e.g. Conference Room A, Building 2"
+                maxLength={200}
+                className="mt-1"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && renameName.trim()) {
+                    editMutation.mutate({ name: renameName.trim(), location: editLocation.trim() });
+                  }
+                }}
+              />
+            </div>
+          </div>
           <DialogFooter className="gap-2 mt-2">
-            <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMutation.isPending}>
+            <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={editMutation.isPending}>
               Cancel
             </Button>
             <Button
-              disabled={!renameName.trim() || renameName.trim() === group.name || renameMutation.isPending}
-              onClick={() => renameMutation.mutate(renameName.trim())}
+              disabled={
+                !renameName.trim() ||
+                (renameName.trim() === group.name && editLocation.trim() === (group.location ?? '')) ||
+                editMutation.isPending
+              }
+              onClick={() => editMutation.mutate({ name: renameName.trim(), location: editLocation.trim() })}
             >
-              {renameMutation.isPending ? 'Saving…' : 'Save'}
+              {editMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
