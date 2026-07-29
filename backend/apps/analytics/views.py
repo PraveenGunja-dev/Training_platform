@@ -10,7 +10,13 @@ from rest_framework.views import APIView
 from apps.common.permissions import IsAdmin, IsAdminOrSubMentor, IsAdminOrLeadMentorOrSubMentor
 
 from .org_chart import get_org_chart_data
-from .services import compute_admin_payload, compute_lead_mentor_payload, compute_sub_mentor_payload, compute_participant_payload
+from .services import (
+    compute_admin_payload,
+    compute_batch_breakdown,
+    compute_lead_mentor_payload,
+    compute_participant_payload,
+    compute_sub_mentor_payload,
+)
 
 
 @extend_schema(exclude=True)
@@ -34,6 +40,21 @@ class AdminDashboardView(APIView):
                 {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        return Response({"data": payload})
+
+
+@extend_schema(exclude=True)
+class AdminDashboardBreakdownView(APIView):
+    """
+    GET /api/analytics/dashboard/admin/breakdown/
+
+    Returns per-batch KPI breakdown and day-wise attendance data
+    for the last 14 days. Admin-only.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request: Request) -> Response:
+        payload = compute_batch_breakdown()
         return Response({"data": payload})
 
 
