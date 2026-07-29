@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Pencil, XCircle, CheckCircle2, Users, CalendarDays, Clock, ClipboardList, Video, ExternalLink, ShieldCheck, GraduationCap, FolderKanban, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Pencil, XCircle, CheckCircle2, Users, CalendarDays, Clock, ClipboardList, Video, ExternalLink, ShieldCheck, GraduationCap, FolderKanban, Trash2, AlertTriangle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -137,11 +137,6 @@ export default function AdminClassDetailPage() {
               {cls.description && (
                 <p className="text-sm text-indigo-200/80 mt-1">{cls.description}</p>
               )}
-              {cls.group_location && (
-                <p className="text-sm text-indigo-200/80 mt-0.5">
-                  <span className="font-medium">Location:</span> {cls.group_location}
-                </p>
-              )}
             </div>
             <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badge.className}`}>
               {badge.label}
@@ -229,6 +224,19 @@ export default function AdminClassDetailPage() {
               ) : (
                 <p className="font-semibold text-slate-400 italic">None assigned</p>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Location row */}
+        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-b border-[#EBF3FB]">
+          <div className="flex items-start gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 flex-shrink-0 mt-0.5">
+              <MapPin className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xs text-[#5A7A9A]">Location</p>
+              <p className="font-semibold text-[#00285A]">{cls.group_location ?? ''}</p>
             </div>
           </div>
         </div>
