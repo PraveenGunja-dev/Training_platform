@@ -1060,3 +1060,156 @@ def compute_batch_breakdown() -> dict:
         "breakdown": breakdown,
         "attendance_by_batch": attendance_by_batch,
     }
+
+
+def compute_feedback_analytics(filters: dict) -> dict:
+    """
+    Returns feedback analytics aggregated across all classes matching the given filters.
+
+    Supported filter keys (all optional):
+      - batch_id   (str | UUID)  — filter to a specific ClassGroup.id
+      - class_id   (str | UUID)  — filter to a specific Class.id
+      - mentor_id  (str | UUID)  — filter to classes whose group has this user as Sub-Mentor
+                                   (matches GroupSubMentor.sub_mentor_id)
+      - date_from  (str, ISO date "YYYY-MM-DD") — include classes with starts_at >= this date
+      - date_to    (str, ISO date "YYYY-MM-DD") — include classes with starts_at <= this date
+
+    Return shape:
+    {
+        "summary": {
+            "total_feedback_count": int,
+            "average_rating": float | None,   # None if no feedback exists
+            "response_rate": float | None,    # submitted / enrolled * 100, None if 0 enrolled
+        },
+        "rating_distribution": [
+            {"rating": "1.0", "count": int},
+            ...
+        ],
+        "per_batch": [...],
+        "top_classes": [...],
+        "bottom_classes": [...],
+    }
+    """
+    from django.db.models import Avg, Count
+
+    from apps.feedback.models import ClassFeedback
+    from apps.groups.models import ClassGroup, GroupMembership, GroupSubMentor
+    from apps.scheduling.models import Class
+
+    # --- Build the class queryset from filters ---
+    class_qs = Class.objects.select_related("group")
+
+    batch_id = filters.get("batch_id")
+    class_id = filters.get("class_id")
+    mentor_id = filters.get("mentor_id")
+    date_from = filters.get("date_from")
+    date_to = filters.get("date_to")
+
+    if batch_id:
+        class_qs = class_qs.filter(group_id=batch_id)
+    if class_id:
+        class_qs = class_qs.filter(id=class_id)
+    if mentor_id:
+        group_ids_for_mentor = list(
+            GroupSubMentor.objects.filter(sub_mentor_id=mentor_id)
+            .values_list("group_id", flat=True)
+        )
+        class_qs = class_qs.filter(group_id__in=group_ids_for_mentor)
+    if date_from:
+        class_qs = class_qs.filter(starts_at__date__gte=date_from)
+    if date_to:
+        class_qs = class_qs.filter(starts_at__date__lte=date_to)
+
+    class_ids = list(class_qs.values_list("id", flat=True))
+
+    # --- Aggregate feedback for matched classes ---
+    feedback_qs = ClassFeedback.objects.filter(class_session_id__in=class_ids)
+
+    total_feedback = feedback_qs.count()
+    agg = feedback_qs.aggregate(avg=Avg("rating"))
+    average_rating = round(float(agg["avg"]), 2) if agg["avg"] is not None else None
+
+    # Response rate: total submitted vs total enrolled across all matched class groups
+    group_ids = list(class_qs.values_list("group_id", flat=True).distinct())
+    enrolled_count = GroupMembership.objects.filter(group_id__in=group_ids).values("user_id").distinct().count()
+    response_rate = (
+        round(total_feedback / enrolled_count * 100, 1) if enrolled_count else None
+    )
+
+    # --- Rating distribution (all 9 half-star buckets, always present) ---
+    BUCKETS = ["1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]
+    bucket_counts = {
+        str(row["rating"]): row["cnt"]
+        for row in feedback_qs.values("rating").annotate(cnt=Count("id"))
+    }
+    rating_distribution = [
+        {"rating": b, "count": bucket_counts.get(b, 0)}
+        for b in BUCKETS
+    ]
+
+    # --- Per-batch breakdown ---
+    per_batch = []
+    groups = ClassGroup.objects.filter(id__in=group_ids)
+    batch_feedback_agg = {
+        row["class_session__group_id"]: {"count": row["cnt"], "avg": row["avg"]}
+        for row in feedback_qs.values("class_session__group_id").annotate(
+            cnt=Count("id"), avg=Avg("rating")
+        )
+    }
+    batch_enrolled = {
+        row["group_id"]: row["cnt"]
+        for row in GroupMembership.objects.filter(group_id__in=group_ids)
+        .values("group_id").annotate(cnt=Count("user_id", distinct=True))
+    }
+    for group in groups:
+        gid = group.id
+        b_agg = batch_feedback_agg.get(gid, {"count": 0, "avg": None})
+        b_enrolled = batch_enrolled.get(gid, 0)
+        b_avg = round(float(b_agg["avg"]), 2) if b_agg["avg"] is not None else None
+        b_rate = (
+            round(b_agg["count"] / b_enrolled * 100, 1) if b_enrolled else None
+        )
+        per_batch.append({
+            "group_id": str(gid),
+            "group_name": group.name,
+            "feedback_count": b_agg["count"],
+            "average_rating": b_avg,
+            "enrolled_count": b_enrolled,
+            "response_rate": b_rate,
+        })
+
+    # --- Top / Bottom classes (min 1 feedback required to appear) ---
+    class_agg = list(
+        feedback_qs.values(
+            "class_session_id",
+            "class_session__title",
+            "class_session__group__name",
+        ).annotate(avg=Avg("rating"), cnt=Count("id"))
+    )
+
+    def _to_class_entry(row) -> dict:
+        return {
+            "class_id": str(row["class_session_id"]),
+            "class_title": row["class_session__title"],
+            "group_name": row["class_session__group__name"],
+            "average_rating": round(float(row["avg"]), 2),
+            "feedback_count": row["cnt"],
+        }
+
+    sorted_desc = sorted(class_agg, key=lambda r: (-float(r["avg"]), -r["cnt"]))
+    sorted_asc = sorted(class_agg, key=lambda r: (float(r["avg"]), r["cnt"]))
+
+    top_classes = [_to_class_entry(r) for r in sorted_desc[:5]]
+    bottom_classes = [_to_class_entry(r) for r in sorted_asc[:5]]
+
+    return {
+        "summary": {
+            "total_feedback_count": total_feedback,
+            "average_rating": average_rating,
+            "response_rate": response_rate,
+        },
+        "rating_distribution": rating_distribution,
+        "per_batch": per_batch,
+        "top_classes": top_classes,
+        "bottom_classes": bottom_classes,
+    }

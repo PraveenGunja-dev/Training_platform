@@ -37,6 +37,7 @@ class Notification(models.Model):
         ("PARTICIPANTS_REMOVED_FROM_GROUP", "Participants Removed from Group"),
         ("SHARED_UPLOAD_PENDING", "Shared Upload Pending"),
         ("SUBMISSION_REVIEWED", "Submission Reviewed"),
+        ("CLASS_FEEDBACK_REQUESTED", "Class Feedback Requested"),
     ]
     CHANNEL_CHOICES = [("IN_APP", "In-App")]
     STATUS_CHOICES = [("SENT", "Sent")]

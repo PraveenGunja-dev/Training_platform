@@ -31,6 +31,8 @@ core_urlpatterns = [
     path("api/v1/", include("apps.documents.urls")),
     # Notifications (in-app)
     path("api/v1/", include("apps.notifications.urls")),
+    # Feedback
+    path("api/v1/", include("apps.feedback.urls")),
     # Dashboard (admin + participant analytics)
     path("api/v1/dashboard/", include("apps.analytics.urls")),
     # Org-chart
