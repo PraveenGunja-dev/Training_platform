@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Users, FolderKanban, CalendarDays, AlertTriangle,
   CheckCircle, Clock, TrendingUp, BarChart2,
-  PieChart, Activity, Bell,
+  PieChart, Activity, Bell, Star,
 } from 'lucide-react';
 import { StaggerContainer } from '@/components/motion/StaggerContainer';
 import { StaggerItem } from '@/components/motion/StaggerItem';
@@ -24,6 +24,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { feedbackApi } from '@/api/feedback';
+import type { FeedbackAnalyticsFilters } from '@/api/feedback';
+import { FeedbackFilters } from '@/features/admin/dashboard/FeedbackFilters';
+import { FeedbackOverviewCards } from '@/features/admin/dashboard/FeedbackOverviewCards';
+import { RatingDistributionChart } from '@/features/admin/dashboard/RatingDistributionChart';
+import { FeedbackTrendChart } from '@/features/admin/dashboard/FeedbackTrendChart';
+import { TopBottomClassesTable } from '@/features/admin/dashboard/TopBottomClassesTable';
+
+function dateRangeToParams(range: 'last7' | 'last30' | 'last90' | 'all'): Pick<FeedbackAnalyticsFilters, 'date_from' | 'date_to'> {
+  if (range === 'all') return {};
+  const days = range === 'last7' ? 7 : range === 'last30' ? 30 : 90;
+  const to   = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  return {
+    date_from: from.toISOString().slice(0, 10),
+    date_to:   to.toISOString().slice(0, 10),
+  };
+}
 
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
@@ -52,6 +71,10 @@ function DashboardSkeleton() {
 export default function AdminDashboardPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
+  // ── Feedback filter state ─────────────────────────────────────────────────
+  const [feedbackBatchId, setFeedbackBatchId] = useState<string | null>(null);
+  const [feedbackDateRange, setFeedbackDateRange] = useState<'last7' | 'last30' | 'last90' | 'all'>('last30');
+
   // Main KPI + chart query — re-runs whenever selectedGroupId changes
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', 'admin', selectedGroupId],
@@ -68,6 +91,22 @@ export default function AdminDashboardPage() {
     queryFn: () => dashboardApi.breakdown(),
     staleTime: 60_000,
   });
+
+  // Feedback analytics query — re-runs whenever filters change
+  const feedbackFilters: FeedbackAnalyticsFilters = {
+    ...(feedbackBatchId ? { batch_id: feedbackBatchId } : {}),
+    ...dateRangeToParams(feedbackDateRange),
+  };
+
+  const { data: feedbackData, isLoading: feedbackLoading } = useQuery({
+    queryKey: ['feedback', 'analytics', feedbackFilters],
+    queryFn: () => feedbackApi.analytics(feedbackFilters),
+    staleTime: 120_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+  });
+
+  const fd = feedbackData?.data;
 
   if (isLoading) return <DashboardSkeleton />;
   const d = data?.data;
@@ -308,6 +347,90 @@ export default function AdminDashboardPage() {
             </ChartContainer>
           </StaggerItem>
         </StaggerContainer>
+
+      </div>
+
+      {/* ── Feedback Analytics ────────────────────────────────────────────────── */}
+      <div className="space-y-5">
+
+        {/* Section header */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50">
+            <Star className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-[#00285A] leading-tight">Feedback Analytics</h2>
+            <p className="text-sm text-[#5A7A9A]">Participant satisfaction and rating trends</p>
+          </div>
+        </div>
+
+        {/* Row 1 — Filters */}
+        <FeedbackFilters
+          batches={bd.map(b => ({ group_id: b.group_id, group_name: b.group_name }))}
+          selectedBatchId={feedbackBatchId}
+          onBatchChange={setFeedbackBatchId}
+          dateRange={feedbackDateRange}
+          onDateRangeChange={setFeedbackDateRange}
+        />
+
+        {/* Row 2 — Overview KPI cards */}
+        {fd && (
+          <FeedbackOverviewCards data={fd} isLoading={feedbackLoading} />
+        )}
+
+        {/* Row 3 — Distribution chart + Top/Bottom table */}
+        {fd && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2">
+              <ChartContainer
+                title="Rating Distribution"
+                subtitle="Responses per star bucket"
+                icon={<Star className="h-3.5 w-3.5" />}
+              >
+                <RatingDistributionChart data={fd.rating_distribution} />
+              </ChartContainer>
+            </div>
+            <div className="lg:col-span-1">
+              <ChartContainer
+                title="Top & Bottom Classes"
+                subtitle="By average rating"
+                icon={<TrendingUp className="h-3.5 w-3.5" />}
+              >
+                <TopBottomClassesTable
+                  topClasses={fd.top_classes}
+                  bottomClasses={fd.bottom_classes}
+                />
+              </ChartContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Row 4 — Rating trend (full width) */}
+        {fd && (
+          <ChartContainer
+            title="Rating Trend (Last 30 Days)"
+            subtitle="Average rating over time · dashed line = 3.5 threshold"
+            icon={<TrendingUp className="h-3.5 w-3.5" />}
+          >
+            <FeedbackTrendChart data={fd.avg_rating_over_time} />
+          </ChartContainer>
+        )}
+
+        {/* Loading skeleton */}
+        {feedbackLoading && !fd && (
+          <div className="space-y-4 animate-pulse">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="h-20 bg-white rounded-xl border border-[#C5D8EC]" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="lg:col-span-2 h-64 bg-white rounded-2xl border border-[#C5D8EC]" />
+              <div className="h-64 bg-white rounded-2xl border border-[#C5D8EC]" />
+            </div>
+            <div className="h-64 bg-white rounded-2xl border border-[#C5D8EC]" />
+          </div>
+        )}
 
       </div>
 
