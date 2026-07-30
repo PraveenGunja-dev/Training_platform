@@ -6,6 +6,7 @@ import { ClassHeader } from '@/features/participant/class/ClassHeader';
 import { AttendanceCard } from '@/features/participant/class/AttendanceCard';
 import { RelatedTasksCard } from '@/features/participant/class/RelatedTasksCard';
 import { RelatedDocumentsCard } from '@/features/participant/class/RelatedDocumentsCard';
+import { FeedbackFormCard } from '@/features/participant/class/FeedbackFormCard';
 
 export default function ClassDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,8 +53,9 @@ export default function ClassDetailPage() {
       <ClassHeader cls={cls} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
           <AttendanceCard cls={cls} />
+          {cls.status === 'COMPLETED' && <FeedbackFormCard cls={cls} />}
         </div>
         <div className="space-y-4">
           <RelatedTasksCard tasks={cls.related_tasks ?? []} />
