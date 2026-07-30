@@ -18,6 +18,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "location",
             "is_archived",
             "created_by",
             "created_by_name",
@@ -105,9 +106,10 @@ class ClassGroupDetailSerializer(ClassGroupListSerializer):
 class ClassGroupWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassGroup
-        fields = ["name", "description", "is_archived"]
+        fields = ["name", "description", "location", "is_archived"]
         extra_kwargs = {
             "description": {"required": False},
+            "location": {"required": False},
             "is_archived": {"required": False},
         }
 

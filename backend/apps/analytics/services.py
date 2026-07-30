@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 from django.core.cache import cache
 from django.db.models import Count, Max, Prefetch
 from django.utils import timezone
+
+
+def _natural_key(group) -> list:
+    """Sort by the first number in the name, then full natural sort as tiebreaker."""
+    m = re.search(r'\d+', group.name)
+    first_num = int(m.group()) if m else 0
+    rest = [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', group.name)]
+    return [first_num] + rest
 
 
 def compute_admin_payload(group_id: str | None = None) -> dict:
@@ -74,7 +83,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     ]
 
     # --- Submission bar (per group) ---
-    groups = ClassGroup.objects.filter(is_archived=False, **_group_q)
+    groups = sorted(ClassGroup.objects.filter(is_archived=False, **_group_q), key=_natural_key)
     submission_bar = []
     for group in groups:
         grp_submitted = Submission.objects.filter(task__group=group, status="SUBMITTED").count()
@@ -301,7 +310,7 @@ def compute_sub_mentor_payload(user) -> dict:
     assigned_group_ids = list(
         GroupSubMentor.objects.filter(sub_mentor=user).values_list("group_id", flat=True)
     )
-    groups = ClassGroup.objects.filter(pk__in=assigned_group_ids, is_archived=False)
+    _groups_qs = ClassGroup.objects.filter(pk__in=assigned_group_ids, is_archived=False)
 
     _class_q = {"group_id__in": assigned_group_ids}
     _group_q = {"pk__in": assigned_group_ids}
@@ -310,7 +319,8 @@ def compute_sub_mentor_payload(user) -> dict:
         GroupMembership.objects.filter(group_id__in=assigned_group_ids)
         .values("user_id").distinct().count()
     )
-    total_groups = groups.count()
+    total_groups = _groups_qs.count()
+    groups = sorted(_groups_qs, key=_natural_key)
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
     classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
@@ -884,4 +894,169 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
             "deadline_tracking": deadline_tracking,
         },
         "participant_activity": participant_activity,
+    }
+
+
+def compute_batch_breakdown() -> dict:
+    """
+    Returns per-batch KPI breakdown and day-wise attendance data (last 14 days)
+    for the admin dashboard breakdown panel.
+    """
+    import datetime as _dt
+    from collections import defaultdict
+
+    from apps.assignments.models import AssignmentTask, Submission
+    from apps.attendance.models import AttendanceRecord, AttendanceSession
+    from apps.groups.models import ClassGroup, GroupMembership
+    from apps.scheduling.models import Class
+
+    now = timezone.now()
+    today = now.date()
+
+    groups = sorted(ClassGroup.objects.filter(is_archived=False), key=_natural_key)
+
+    # --- Membership counts (1 query) ---
+    membership_counts = {
+        row["group_id"]: row["cnt"]
+        for row in GroupMembership.objects.filter(group__is_archived=False)
+        .values("group_id")
+        .annotate(cnt=Count("id"))
+    }
+
+    # --- Submission counts (3 queries) ---
+    submitted_per_group = {
+        row["task__group_id"]: row["cnt"]
+        for row in Submission.objects.filter(status="SUBMITTED")
+        .values("task__group_id")
+        .annotate(cnt=Count("id"))
+    }
+    late_per_group = {
+        row["task__group_id"]: row["cnt"]
+        for row in Submission.objects.filter(status="LATE_SUBMITTED")
+        .values("task__group_id")
+        .annotate(cnt=Count("id"))
+    }
+    open_tasks_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in AssignmentTask.objects.filter(is_open=True, is_closed=False)
+        .values("group_id")
+        .annotate(cnt=Count("id"))
+    }
+
+    # --- Class counts (2 queries) ---
+    classes_today_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in Class.objects.filter(starts_at__date=today)
+        .values("group_id")
+        .annotate(cnt=Count("id"))
+    }
+    year_end_2026 = _dt.datetime(2026, 12, 31, 23, 59, 59, tzinfo=_dt.timezone.utc)
+    classes_upcoming_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in Class.objects.filter(
+            starts_at__gt=now,
+            starts_at__lte=year_end_2026,
+        )
+        .exclude(status_cached="CANCELLED")
+        .values("group_id")
+        .annotate(cnt=Count("id"))
+    }
+
+    # --- Breakdown list ---
+    breakdown = []
+    for group in groups:
+        group_id = group.id
+        participants_count = membership_counts.get(group_id, 0)
+        grp_submitted = submitted_per_group.get(group_id, 0)
+        grp_late = late_per_group.get(group_id, 0)
+        grp_open = open_tasks_per_group.get(group_id, 0)
+        expected = participants_count * grp_open
+        grp_pending = max(0, expected - grp_submitted - grp_late)
+
+        breakdown.append({
+            "group_id": str(group_id),
+            "group_name": group.name,
+            "participants_count": participants_count,
+            "classes_today": classes_today_per_group.get(group_id, 0),
+            "classes_upcoming": classes_upcoming_per_group.get(group_id, 0),
+            "submitted": grp_submitted,
+            "pending": grp_pending,
+            "late_submissions": grp_late,
+        })
+
+    # --- Day-wise attendance per batch (last 14 days) ---
+    date_range = [today - timedelta(days=i) for i in range(13, -1, -1)]  # oldest first
+
+    window_start = _dt.datetime.combine(date_range[0], _dt.time.min).replace(tzinfo=_dt.timezone.utc)
+    window_end   = _dt.datetime.combine(today, _dt.time.max).replace(tzinfo=_dt.timezone.utc)
+
+    sessions_in_window = list(
+        AttendanceSession.objects.filter(
+            started_at__gte=window_start,
+            started_at__lte=window_end,
+        )
+        .values("id", "class_obj__group_id", "started_at__date")
+    )
+
+    # Map session_id -> (group_id, date)
+    session_meta = {
+        row["id"]: (row["class_obj__group_id"], row["started_at__date"])
+        for row in sessions_in_window
+    }
+    session_ids = list(session_meta.keys())
+
+    # Group+date pairs that had at least one session
+    session_day_set: set = {
+        (group_id, session_date)
+        for group_id, session_date in session_meta.values()
+    }
+
+    # Fetch record counts per (session_id, status) in 1 query
+    records_by_session_status: dict = {}
+    if session_ids:
+        for row in (
+            AttendanceRecord.objects.filter(session_id__in=session_ids)
+            .values("session_id", "status")
+            .annotate(cnt=Count("id"))
+        ):
+            records_by_session_status[(row["session_id"], row["status"])] = row["cnt"]
+
+    # Aggregate per (group_id, date)
+    agg: dict = defaultdict(lambda: defaultdict(int))
+    for session_id, (group_id, session_date) in session_meta.items():
+        agg[(group_id, session_date)]["present"] += records_by_session_status.get(
+            (session_id, "PRESENT"), 0
+        )
+        agg[(group_id, session_date)]["late"] += records_by_session_status.get(
+            (session_id, "LATE"), 0
+        )
+
+    # Build attendance_by_batch
+    attendance_by_batch = []
+    for group in groups:
+        group_id = group.id
+        total_participants = membership_counts.get(group_id, 0)
+        daily = []
+        for day in date_range:
+            had_session = (group_id, day) in session_day_set
+            day_present = agg[(group_id, day)]["present"]
+            day_late    = agg[(group_id, day)]["late"]
+            day_absent  = max(0, total_participants - day_present - day_late) if had_session else 0
+            daily.append({
+                "date": day.isoformat(),
+                "present": day_present,
+                "absent": day_absent,
+                "late": day_late,
+            })
+
+        attendance_by_batch.append({
+            "group_id": str(group_id),
+            "group_name": group.name,
+            "total_participants": total_participants,
+            "daily": daily,
+        })
+
+    return {
+        "breakdown": breakdown,
+        "attendance_by_batch": attendance_by_batch,
     }

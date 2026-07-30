@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { CalendarDays, Clock, Plus, ArrowRight, Users, Zap, ChevronLeft, ChevronRight, Search, X, MapPin } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
@@ -109,6 +110,12 @@ function ClassCard({ cls }: { cls: ClassSession }) {
             <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
           </div>
         )}
+        {cls.group_location && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <MapPin className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <span className="truncate">{cls.group_location}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0052A5] group-hover:gap-2 transition-all duration-150 ml-auto">
             View <ArrowRight className="h-3 w-3" />
@@ -171,7 +178,7 @@ export default function AdminClassesPage() {
     queryKey: ['groups'],
     queryFn:  () => groupsApi.list(),
   });
-  const groups = groupsQuery.data?.data ?? [];
+  const groups = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   // Lightweight counts — single GROUP BY, used for stats strip
   const countsQuery = useQuery({

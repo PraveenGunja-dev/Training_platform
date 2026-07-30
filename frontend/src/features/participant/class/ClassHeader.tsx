@@ -1,4 +1,4 @@
-import { Clock, Video, ExternalLink } from 'lucide-react';
+import { Clock, Video, ExternalLink, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/dates';
@@ -26,6 +26,12 @@ export function ClassHeader({ cls }: { cls: ClassSession }) {
             <h1 className="text-xl font-bold text-foreground">{cls.title}</h1>
             {cls.description && (
               <p className="text-sm text-muted-foreground">{cls.description}</p>
+            )}
+            {cls.group_location && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+                {cls.group_location}
+              </p>
             )}
           </div>
           <div className="text-sm text-muted-foreground space-y-1.5 shrink-0">

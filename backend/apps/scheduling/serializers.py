@@ -12,6 +12,7 @@ class ClassSerializer(serializers.ModelSerializer):
 
     group_id = serializers.UUIDField(read_only=True)
     group_name = serializers.CharField(source="group.name", read_only=True)
+    group_location = serializers.CharField(source="group.location", read_only=True, default="")
     # Use computed_status (time-based property) so the API always reflects reality
     # even if status_cached is stale (e.g. Celery beat not running in dev).
     status = serializers.CharField(source="computed_status", read_only=True)
@@ -30,6 +31,7 @@ class ClassSerializer(serializers.ModelSerializer):
             "id",
             "group_id",
             "group_name",
+            "group_location",
             "title",
             "description",
             "meeting_link",

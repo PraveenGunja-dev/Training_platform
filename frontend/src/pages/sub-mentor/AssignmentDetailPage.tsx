@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, Trash2, Send, X as XIcon, Edit2 } from 'lucide-react';
@@ -32,6 +32,8 @@ const STATE_COLOR: Record<string, string> = {
 export default function SubMentorAssignmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const rolePrefix = location.pathname.startsWith('/lead-mentor') ? '/lead-mentor' : '/sub-mentor';
   const queryClient = useQueryClient();
 
   const taskQuery = useQuery({
@@ -86,7 +88,7 @@ export default function SubMentorAssignmentDetailPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assignments'] });
       toast.success('Assignment deleted.');
-      navigate('/sub-mentor/assignments');
+      navigate(`${rolePrefix}/assignments`);
     },
     onError: (err: unknown) => {
       const status = (err as { response?: { status?: number } })?.response?.status;
@@ -115,7 +117,7 @@ export default function SubMentorAssignmentDetailPage() {
   return (
     <div className="space-y-6">
       <Link
-        to="/sub-mentor/assignments"
+        to={`${rolePrefix}/assignments`}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Plus, FileText, Trash2, Edit2, Download } from 'lucide-react';
 import { documentsApi } from '@/api/documents';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -67,7 +68,7 @@ export default function AdminDocumentsPage() {
     staleTime: 120_000,
   });
   const groupMap = new Map((groupsQuery.data?.data ?? []).map(g => [g.id, g.name]));
-  const allGroups = groupsQuery.data?.data ?? [];
+  const allGroups = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['documents'],

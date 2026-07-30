@@ -56,8 +56,9 @@ export default function SubMentorClassDetailPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const isLeadMentor = user?.role === 'LEAD_MENTOR';
-  const backTo = isLeadMentor ? '/lead-mentor/calendar' : '/sub-mentor/classes';
-  const backLabel = isLeadMentor ? 'Back to Calendar' : 'Back to Classes';
+  const rolePrefix = isLeadMentor ? '/lead-mentor' : '/sub-mentor';
+  const backTo = `${rolePrefix}/classes`;
+  const backLabel = 'Back to Classes';
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['class', id],
@@ -188,6 +189,19 @@ export default function SubMentorClassDetailPage() {
             <div>
               <p className="text-xs text-[#5A7A9A]">Group</p>
               <p className="font-semibold text-[#00285A]">{cls.group_name}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Location row */}
+        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-b border-[#EBF3FB]">
+          <div className="flex items-start gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 flex-shrink-0 mt-0.5">
+              <MapPin className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xs text-[#5A7A9A]">Location</p>
+              <p className="font-semibold text-[#00285A]">{cls.group_location ?? ''}</p>
             </div>
           </div>
         </div>
@@ -337,7 +351,7 @@ export default function SubMentorClassDetailPage() {
 
         {/* Related tasks + documents */}
         <div className="space-y-4">
-          <RelatedTasksCard tasks={cls.related_tasks ?? []} linkPrefix="/sub-mentor/assignments" />
+          <RelatedTasksCard tasks={cls.related_tasks ?? []} linkPrefix={`${rolePrefix}/assignments`} />
           {canEditClass && (
             <ClassDocumentUploadCard classId={cls.id} groupId={cls.group_id} />
           )}
@@ -347,7 +361,7 @@ export default function SubMentorClassDetailPage() {
       {/* Attendance History */}
       <ClassAttendanceHistory
         classId={cls.id}
-        reportBasePath="/sub-mentor/attendance/sessions"
+        reportBasePath={`${rolePrefix}/attendance/sessions`}
       />
 
       {/* Assignment Submissions */}

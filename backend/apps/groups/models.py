@@ -9,6 +9,7 @@ from apps.common.models import TimestampedModel
 class ClassGroup(TimestampedModel):
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True, default="")
+    location = models.CharField(max_length=255, blank=True, default="")
     is_archived = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

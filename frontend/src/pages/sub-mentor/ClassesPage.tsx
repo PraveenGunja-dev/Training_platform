@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Clock, ArrowRight, Users, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Clock, ArrowRight, Users, Plus, ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import { classesApi } from '@/api/classes';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { ScheduleClassDialog } from '@/features/admin/scheduling/ScheduleClassDialog';
@@ -46,13 +47,15 @@ function sortClasses(list: ClassSession[]): ClassSession[] {
 }
 
 function ClassCard({ cls }: { cls: ClassSession }) {
+  const location = useLocation();
+  const rolePrefix = location.pathname.startsWith('/lead-mentor') ? '/lead-mentor' : '/sub-mentor';
   const cfg = STATUS_CONFIG[cls.status] ?? STATUS_CONFIG.COMPLETED;
   const isLive = cls.status === 'ONGOING';
   const attendanceLive = cls.active_session?.status === 'ACTIVE';
 
   return (
     <Link
-      to={`/sub-mentor/classes/${cls.id}`}
+      to={`${rolePrefix}/classes/${cls.id}`}
       className="group flex flex-col rounded-2xl border border-[#C5D8EC] shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden"
     >
       <div className={`relative px-4 pt-4 pb-5 bg-gradient-to-br ${cfg.gradient} overflow-hidden`}>
@@ -108,6 +111,12 @@ function ClassCard({ cls }: { cls: ClassSession }) {
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
             <span>{cls.participants_count} participant{cls.participants_count !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+        {cls.group_location && (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <MapPin className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+            <span className="truncate">{cls.group_location}</span>
           </div>
         )}
         <div className="flex items-center justify-between pt-2 mt-auto border-t border-slate-100">
@@ -272,7 +281,7 @@ export default function SubMentorClassesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All groups</SelectItem>
-            {(groupsQuery.data?.data ?? []).map(g => (
+            {[...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort).map(g => (
               <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
             ))}
           </SelectContent>

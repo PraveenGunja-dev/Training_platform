@@ -95,6 +95,38 @@ export interface LeadMentorDashboardData {
   participant_activity: ParticipantActivityItem[];
 }
 
+// ── Batch breakdown (returned by /analytics/dashboard/admin/breakdown/) ──
+
+export interface BatchBreakdownItem {
+  group_id: string;
+  group_name: string;
+  participants_count: number;
+  classes_today: number;
+  classes_upcoming: number;
+  submitted: number;
+  pending: number;
+  late_submissions: number;
+}
+
+export interface BatchDailyAttendance {
+  date: string;          // ISO-8601 date, e.g. "2026-07-15"
+  present: number;
+  absent: number;
+  late: number;
+}
+
+export interface BatchAttendanceItem {
+  group_id: string;
+  group_name: string;
+  total_participants: number;
+  daily: BatchDailyAttendance[];   // last 14 days, oldest first
+}
+
+export interface BreakdownResponse {
+  breakdown: BatchBreakdownItem[];
+  attendance_by_batch: BatchAttendanceItem[];
+}
+
 export const dashboardApi = {
   admin: (params?: { group_id?: string }) =>
     apiClient.get<ApiEnvelope<AdminDashboardData>>('/dashboard/admin', { params }).then(r => r.data),
@@ -102,4 +134,8 @@ export const dashboardApi = {
     apiClient.get<ApiEnvelope<ParticipantDashboardData>>('/dashboard/participant').then(r => r.data),
   leadMentor: () =>
     apiClient.get<ApiEnvelope<LeadMentorDashboardData>>('/dashboard/lead-mentor').then(r => r.data),
+
+  // ── NEW ──────────────────────────────────────────────────────────────────
+  breakdown: () =>
+    apiClient.get<ApiEnvelope<BreakdownResponse>>('/dashboard/admin/breakdown/').then(r => r.data),
 };

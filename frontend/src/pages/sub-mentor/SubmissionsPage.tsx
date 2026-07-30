@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, Eye, Lock, CheckCircle2, Circle } from 'lucide-react';
 import { assignmentsApi } from '@/api/assignments';
 import { groupsApi } from '@/api/groups';
+import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,6 +52,8 @@ function SubmissionsSkeleton() {
 
 /* ── Page ────────────────────────────────────────────────────────────── */
 export default function SubMentorSubmissionsPage() {
+  const location   = useLocation();
+  const rolePrefix = location.pathname.startsWith('/lead-mentor') ? '/lead-mentor' : '/sub-mentor';
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [selectedState, setSelectedState] = useState('all');
 
@@ -58,7 +61,7 @@ export default function SubMentorSubmissionsPage() {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
-  const groups = groupsQuery.data?.data ?? [];
+  const groups = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
   const assignmentsQuery = useQuery({
     queryKey: ['assignments', { group_id: selectedGroup, state: selectedState }],
@@ -187,7 +190,7 @@ export default function SubMentorSubmissionsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" asChild className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
-                            <Link to={`/sub-mentor/assignments/${task.id}`}>
+                            <Link to={`${rolePrefix}/assignments/${task.id}`}>
                               <Eye className="h-4 w-4 mr-1" />
                               View
                             </Link>
