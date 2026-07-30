@@ -230,6 +230,16 @@ class ClassViewSet(ViewSet):
             raise DRFValidationError(detail=exc.message_dict)
 
         cls = serializer.save()
+
+        # Notify participants when a class is explicitly marked COMPLETED
+        _new_status = serializer.validated_data.get("status_cached")
+        if _new_status == Class.STATUS_COMPLETED:
+            from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
+            _cls_for_notif = get_object_or_404(
+                Class.objects.select_related("group"), pk=cls.pk
+            )
+            _notify_fb(_cls_for_notif)
+
         log_action(
             actor=request.user,
             action="class.updated",
@@ -613,6 +623,17 @@ class MarkPastClassesCompletedView(APIView):
             status_cached=Class.STATUS_UPCOMING,
             starts_at__lt=now,
         ).update(status_cached=Class.STATUS_COMPLETED)
+
+        # Notify participants for each newly completed class
+        if updated > 0:
+            from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
+            completed_qs = Class.objects.filter(
+                status_cached=Class.STATUS_COMPLETED,
+                starts_at__lt=now,
+            ).select_related("group")
+            for _cls in completed_qs.iterator(chunk_size=100):
+                _notify_fb(_cls)
+
         log_action(
             actor=request.user,
             action="class.bulk_completed",
