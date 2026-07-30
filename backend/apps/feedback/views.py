@@ -7,7 +7,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import IsAdmin, IsLeadMentorOrSubMentor
+from apps.common.permissions import IsAdmin, IsAdminOrLeadMentorOrSubMentor, IsLeadMentorOrSubMentor
 from apps.common.scoping import lead_mentor_class_qs, sub_mentor_class_qs
 from apps.groups.models import GroupMembership
 from apps.scheduling.models import Class
@@ -146,12 +146,12 @@ class MyFeedbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        feedback = get_object_or_404(
-            ClassFeedback.objects.select_related("participant"),
-            class_session_id=class_id,
-            participant=request.user,
+        feedback = (
+            ClassFeedback.objects.select_related("participant")
+            .filter(class_session_id=class_id, participant=request.user)
+            .first()
         )
-        return Response({"data": ClassFeedbackReadSerializer(feedback).data})
+        return Response({"data": ClassFeedbackReadSerializer(feedback).data if feedback else None})
 
 
 # ---------------------------------------------------------------------------
@@ -160,9 +160,9 @@ class MyFeedbackView(APIView):
 
 
 class FeedbackListView(APIView):
-    """List all feedback for a class. LEAD_MENTOR or SUB_MENTOR, scoped to assigned groups."""
+    """List all feedback for a class. ADMIN sees all; LEAD_MENTOR/SUB_MENTOR scoped to assigned groups."""
 
-    permission_classes = [IsLeadMentorOrSubMentor]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def get(self, request: Request) -> Response:
         class_id = request.query_params.get("class_id")
@@ -180,24 +180,26 @@ class FeedbackListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if request.user.role == "SUB_MENTOR":
-            allowed_qs = sub_mentor_class_qs(request.user)
-        else:  # LEAD_MENTOR
-            allowed_qs = lead_mentor_class_qs(request.user)
+        # ADMIN can access any class; mentors are scoped to their assigned groups.
+        if request.user.role != "ADMIN":
+            if request.user.role == "SUB_MENTOR":
+                allowed_qs = sub_mentor_class_qs(request.user)
+            else:  # LEAD_MENTOR
+                allowed_qs = lead_mentor_class_qs(request.user)
 
-        if not allowed_qs.filter(pk=class_id).exists():
-            return Response(
-                {
-                    "errors": [
-                        {
-                            "code": "perm.class_not_assigned",
-                            "message": "You are not assigned to this class.",
-                        }
-                    ],
-                    "data": None,
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            if not allowed_qs.filter(pk=class_id).exists():
+                return Response(
+                    {
+                        "errors": [
+                            {
+                                "code": "perm.class_not_assigned",
+                                "message": "You are not assigned to this class.",
+                            }
+                        ],
+                        "data": None,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         feedbacks = (
             ClassFeedback.objects.filter(class_session_id=class_id)

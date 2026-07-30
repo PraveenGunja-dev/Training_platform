@@ -25,7 +25,7 @@ class ClassFeedbackWriteSerializer(serializers.Serializer):
 class ClassFeedbackReadSerializer(serializers.ModelSerializer):
     """Output serializer for all read endpoints."""
 
-    class_session_id = serializers.UUIDField(source="class_session_id", read_only=True)
+    class_session_id = serializers.UUIDField(read_only=True)
     participant_name = serializers.SerializerMethodField()
 
     class Meta:

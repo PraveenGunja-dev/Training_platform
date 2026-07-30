@@ -55,7 +55,21 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     pending_approvals = ParticipantSharedDoc.objects.filter(status="PENDING").count()
     video_uploads = Submission.objects.filter(file_type__startswith="video/").count()
     doc_uploads = Submission.objects.filter(file_type="application/pdf").count()
-    pending = AssignmentTask.objects.filter(is_open=True, is_closed=False).count()
+    _open_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in AssignmentTask.objects.filter(is_open=True, is_closed=False)
+        .values("group_id").annotate(cnt=Count("id"))
+    }
+    _member_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in GroupMembership.objects.filter(group__is_archived=False)
+        .values("group_id").annotate(cnt=Count("id"))
+    }
+    total_submissions_expected = sum(
+        _member_per_group.get(gid, 0) * cnt
+        for gid, cnt in _open_per_group.items()
+    )
+    pending = max(0, total_submissions_expected - submitted - late)
 
     # --- 14-day upload trend ---
     trend_days = []
@@ -277,6 +291,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
             "submitted": submitted,
             "pending": pending,
             "late": late,
+            "total_submissions_expected": total_submissions_expected,
             "video_uploads": video_uploads,
             "doc_uploads": doc_uploads,
             "pending_approvals": pending_approvals,
@@ -329,9 +344,22 @@ def compute_sub_mentor_payload(user) -> dict:
     pending_approvals = ParticipantSharedDoc.objects.filter(
         group_id__in=assigned_group_ids, status="PENDING"
     ).count()
-    pending = AssignmentTask.objects.filter(
-        group_id__in=assigned_group_ids, is_open=True, is_closed=False
-    ).count()
+    _sm_open_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in AssignmentTask.objects.filter(
+            group_id__in=assigned_group_ids, is_open=True, is_closed=False
+        ).values("group_id").annotate(cnt=Count("id"))
+    }
+    _sm_member_per_group = {
+        row["group_id"]: row["cnt"]
+        for row in GroupMembership.objects.filter(group_id__in=assigned_group_ids)
+        .values("group_id").annotate(cnt=Count("id"))
+    }
+    total_submissions_expected = sum(
+        _sm_member_per_group.get(gid, 0) * cnt
+        for gid, cnt in _sm_open_per_group.items()
+    )
+    pending = max(0, total_submissions_expected - submitted - late)
 
     # 14-day upload trend
     trend_days = []
@@ -578,6 +606,7 @@ def compute_sub_mentor_payload(user) -> dict:
             "submitted": submitted,
             "pending": pending,
             "late": late,
+            "total_submissions_expected": total_submissions_expected,
             "video_uploads": 0,
             "doc_uploads": 0,
             "pending_approvals": pending_approvals,
@@ -740,6 +769,7 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
     from apps.accounts.models import User
     from apps.assignments.models import AssignmentTask, Submission
     from apps.attendance.models import AttendanceRecord, AttendanceSession
+    from apps.documents.models import ParticipantSharedDoc
     from apps.groups.models import ClassGroup, GroupLeadMentor, GroupSubMentor, GroupMembership, SubGroup
     from apps.scheduling.models import Class
 
@@ -759,7 +789,10 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
     classes_completed = Class.objects.filter(group_id=group_id, ends_at__lt=now).exclude(status_cached="CANCELLED").count()
     submitted = Submission.objects.filter(task__group_id=group_id, status="SUBMITTED").count()
     late = Submission.objects.filter(task__group_id=group_id, status="LATE_SUBMITTED").count()
-    pending = AssignmentTask.objects.filter(group_id=group_id, is_open=True, is_closed=False).count()
+    pending_approvals = ParticipantSharedDoc.objects.filter(group_id=group_id, status="PENDING").count()
+    open_tasks_count = AssignmentTask.objects.filter(group_id=group_id, is_open=True, is_closed=False).count()
+    total_submissions_expected = total_participants * open_tasks_count
+    pending = max(0, total_submissions_expected - submitted - late)
 
     # Attendance pie (last 30 days)
     thirty_days_ago = now - timedelta(days=30)
@@ -886,6 +919,8 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
             "submitted": submitted,
             "pending": pending,
             "late": late,
+            "pending_approvals": pending_approvals,
+            "total_submissions_expected": total_submissions_expected,
         },
         "charts": {
             "attendance_pie": attendance_pie,
@@ -1143,12 +1178,12 @@ def compute_feedback_analytics(filters: dict) -> dict:
         for row in feedback_qs.values("rating").annotate(cnt=Count("id"))
     }
     rating_distribution = [
-        {"rating": b, "count": bucket_counts.get(b, 0)}
+        {"bucket": b, "count": bucket_counts.get(b, 0)}
         for b in BUCKETS
     ]
 
     # --- Per-batch breakdown ---
-    per_batch = []
+    per_batch_avg = []
     groups = ClassGroup.objects.filter(id__in=group_ids)
     batch_feedback_agg = {
         row["class_session__group_id"]: {"count": row["cnt"], "avg": row["avg"]}
@@ -1165,16 +1200,14 @@ def compute_feedback_analytics(filters: dict) -> dict:
         gid = group.id
         b_agg = batch_feedback_agg.get(gid, {"count": 0, "avg": None})
         b_enrolled = batch_enrolled.get(gid, 0)
-        b_avg = round(float(b_agg["avg"]), 2) if b_agg["avg"] is not None else None
-        b_rate = (
-            round(b_agg["count"] / b_enrolled * 100, 1) if b_enrolled else None
-        )
-        per_batch.append({
-            "group_id": str(gid),
-            "group_name": group.name,
-            "feedback_count": b_agg["count"],
-            "average_rating": b_avg,
-            "enrolled_count": b_enrolled,
+        b_avg = round(float(b_agg["avg"]), 2) if b_agg["avg"] is not None else 0.0
+        # response_rate as fraction (0.0–1.0) so frontend can multiply by 100 for display
+        b_rate = round(b_agg["count"] / b_enrolled, 3) if b_enrolled else 0.0
+        per_batch_avg.append({
+            "batch_id": str(gid),
+            "batch_name": group.name,
+            "avg_rating": b_avg,
+            "total_feedbacks": b_agg["count"],
             "response_rate": b_rate,
         })
 
@@ -1190,10 +1223,9 @@ def compute_feedback_analytics(filters: dict) -> dict:
     def _to_class_entry(row) -> dict:
         return {
             "class_id": str(row["class_session_id"]),
-            "class_title": row["class_session__title"],
-            "group_name": row["class_session__group__name"],
-            "average_rating": round(float(row["avg"]), 2),
-            "feedback_count": row["cnt"],
+            "class_name": row["class_session__title"],
+            "batch_name": row["class_session__group__name"],
+            "avg_rating": round(float(row["avg"]), 2),
         }
 
     sorted_desc = sorted(class_agg, key=lambda r: (-float(r["avg"]), -r["cnt"]))
@@ -1202,14 +1234,37 @@ def compute_feedback_analytics(filters: dict) -> dict:
     top_classes = [_to_class_entry(r) for r in sorted_desc[:5]]
     bottom_classes = [_to_class_entry(r) for r in sorted_asc[:5]]
 
+    # --- Average rating over time (daily, based on submitted_at) ---
+    from collections import OrderedDict  # noqa: PLC0415
+    import datetime as _dt  # noqa: PLC0415
+
+    daily_agg = {
+        row["submitted_at__date"].isoformat(): round(float(row["avg"]), 2)
+        for row in feedback_qs.values("submitted_at__date").annotate(avg=Avg("rating"))
+        if row["submitted_at__date"] is not None
+    }
+    # Build a sorted list covering the date range in the filters (or last 30 days)
+    if date_from and date_to:
+        range_start = _dt.date.fromisoformat(date_from)
+        range_end = _dt.date.fromisoformat(date_to)
+    else:
+        range_end = _dt.date.today()
+        range_start = range_end - _dt.timedelta(days=29)
+
+    avg_rating_over_time = []
+    current = range_start
+    while current <= range_end:
+        iso = current.isoformat()
+        if iso in daily_agg:
+            avg_rating_over_time.append({"date": iso, "avg": daily_agg[iso]})
+        current += _dt.timedelta(days=1)
+
     return {
-        "summary": {
-            "total_feedback_count": total_feedback,
-            "average_rating": average_rating,
-            "response_rate": response_rate,
-        },
+        "overall_avg": average_rating if average_rating is not None else 0.0,
+        "total_feedbacks": total_feedback,
         "rating_distribution": rating_distribution,
-        "per_batch": per_batch,
+        "per_batch_avg": per_batch_avg,
         "top_classes": top_classes,
         "bottom_classes": bottom_classes,
+        "avg_rating_over_time": avg_rating_over_time,
     }

@@ -202,7 +202,7 @@ export default function SubMentorClassDetailPage() {
             </div>
             <div>
               <p className="text-xs text-[#5A7A9A]">Location</p>
-              <p className="font-semibold text-[#00285A]">{cls.group_location ?? ''}</p>
+              <p className="font-semibold text-[#00285A]">{cls.group_location || '—'}</p>
             </div>
           </div>
         </div>

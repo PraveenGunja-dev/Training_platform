@@ -132,6 +132,8 @@ export default function AdminDashboardPage() {
   // ── KPI popover rows ──────────────────────────────────────────────────────
   const totalSubmitted   = bd.reduce((s, b) => s + b.submitted, 0);
   const totalAssignments = bd.reduce((s, b) => s + b.submitted + b.pending + b.late_submissions, 0);
+  const totalExpected      = bd.reduce((s, b) => s + b.submitted + b.pending + b.late_submissions, 0);
+  const pendingSubmissions = bd.reduce((s, b) => s + b.pending, 0);
 
   const participantRows: BreakdownRow[] = bd.map(b => ({
     group_id: b.group_id, group_name: b.group_name, value: b.participants_count,
@@ -146,15 +148,24 @@ export default function AdminDashboardPage() {
   }));
 
   const submittedRows: BreakdownRow[] = bd.map(b => ({
-    group_id: b.group_id, group_name: b.group_name, value: b.submitted,
+    group_id: b.group_id,
+    group_name: b.group_name,
+    value: b.submitted,
+    total: b.submitted + b.pending + b.late_submissions,
   }));
 
   const pendingRows: BreakdownRow[] = bd.map(b => ({
-    group_id: b.group_id, group_name: b.group_name, value: b.pending,
+    group_id: b.group_id,
+    group_name: b.group_name,
+    value: b.pending,
+    total: b.submitted + b.pending + b.late_submissions,
   }));
 
   const lateRows: BreakdownRow[] = bd.map(b => ({
-    group_id: b.group_id, group_name: b.group_name, value: b.late_submissions,
+    group_id: b.group_id,
+    group_name: b.group_name,
+    value: b.late_submissions,
+    total: b.submitted + b.pending + b.late_submissions,
   }));
 
   // ── Attendance Today per-batch rows (today's present count only) ──────────
@@ -250,41 +261,41 @@ export default function AdminDashboardPage() {
           </BatchBreakdownPopover>
         </StaggerItem>
 
-        {/* 5 — Submitted */}
+        {/* 5 — Submitted Assignments */}
         <StaggerItem>
           <BatchBreakdownPopover
-            title="Submitted"
+            title="Submitted Assignments"
             rows={submittedRows}
             summary={`${totalSubmitted} / ${totalAssignments} total`}
             disabled={noPopover}
           >
             <KpiCard
               icon={<CheckCircle className="h-4 w-4" />}
-              label="Submitted"
-              value={d.kpis.submitted}
+              label="Submitted Assignments"
+              value={`${d.kpis.submitted}/${totalExpected}`}
               accent="emerald"
             />
           </BatchBreakdownPopover>
         </StaggerItem>
 
-        {/* 6 — Pending */}
+        {/* 6 — Pending Assignments */}
         <StaggerItem>
-          <BatchBreakdownPopover title="Pending" rows={pendingRows} disabled={noPopover}>
+          <BatchBreakdownPopover title="Pending Assignments" rows={pendingRows} disabled={noPopover}>
             <KpiCard
               icon={<Clock className="h-4 w-4" />}
-              label="Pending"
-              value={d.kpis.pending}
+              label="Pending Assignments"
+              value={`${pendingSubmissions}/${totalExpected}`}
             />
           </BatchBreakdownPopover>
         </StaggerItem>
 
-        {/* 7 — Late Submissions */}
+        {/* 7 — Late Assignments */}
         <StaggerItem>
-          <BatchBreakdownPopover title="Late Submissions" rows={lateRows} disabled={noPopover}>
+          <BatchBreakdownPopover title="Late Assignments" rows={lateRows} disabled={noPopover}>
             <KpiCard
               icon={<AlertTriangle className="h-4 w-4" />}
-              label="Late Submissions"
-              value={d.kpis.late}
+              label="Late Assignments"
+              value={`${d.kpis.late}/${totalExpected}`}
               accent="rose"
             />
           </BatchBreakdownPopover>
@@ -409,7 +420,7 @@ export default function AdminDashboardPage() {
         {fd && (
           <ChartContainer
             title="Rating Trend (Last 30 Days)"
-            subtitle="Average rating over time · dashed line = 3.5 threshold"
+            subtitle="Average rating over time · adjust threshold below"
             icon={<TrendingUp className="h-3.5 w-3.5" />}
           >
             <FeedbackTrendChart data={fd.avg_rating_over_time} />

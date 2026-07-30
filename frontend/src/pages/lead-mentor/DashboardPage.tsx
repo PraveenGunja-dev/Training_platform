@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Users, GraduationCap, Layers, CalendarDays,
+  Users, CalendarDays,
   CheckCircle, Clock, AlertTriangle, BarChart2,
-  PieChart, TrendingUp, FileText,
+  PieChart, TrendingUp, FileText, Bell,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { dashboardApi } from '@/api/dashboard';
@@ -53,6 +53,8 @@ export default function LeadMentorDashboardPage() {
   const classStatus = d.charts.class_status as ClassStatusPoint[];
   const weeklyTrend = d.charts.weekly_trend as WeeklyTrendPoint[];
 
+  const lmTotalExpected = d.kpis.submitted + d.kpis.pending + d.kpis.late;
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -70,20 +72,20 @@ export default function LeadMentorDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Row 1 */}
+      {/* KPI Row 1 — Overview */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard icon={<Users className="h-4 w-4" />}         label="Participants"      value={d.kpis.total_participants}  accent="indigo"  />
-        <KpiCard icon={<GraduationCap className="h-4 w-4" />} label="SubMentors"       value={d.kpis.total_sub_mentors}   accent="cyan"    />
-        <KpiCard icon={<Layers className="h-4 w-4" />}        label="Sub-Groups"        value={d.kpis.total_sub_groups}    accent="violet"  />
         <KpiCard icon={<FileText className="h-4 w-4" />}      label="Total Assignments" value={d.kpis.total_assignments}              />
+        <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Classes Today"     value={d.kpis.classes_today}       accent="emerald" />
+        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Balance 2026"      value={d.kpis.classes_upcoming}                  />
       </div>
 
-      {/* KPI Row 2 */}
+      {/* KPI Row 2 — Assignment submission KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Classes Today"    value={d.kpis.classes_today}      accent="emerald" />
-        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Balance 2026"    value={d.kpis.classes_upcoming}                   />
-        <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted"        value={d.kpis.submitted}          accent="emerald" />
-        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Late Submissions" value={d.kpis.late}               accent="rose"    />
+        <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted Assignments" value={`${d.kpis.submitted}/${lmTotalExpected}`} accent="emerald" />
+        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Pending Assignments"   value={`${d.kpis.pending}/${lmTotalExpected}`}              />
+        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Late Assignments"      value={`${d.kpis.late}/${lmTotalExpected}`}    accent="rose"    />
+        <KpiCard icon={<Bell className="h-4 w-4" />}          label="Pending Approvals"     value={(d.kpis as any).pending_approvals ?? 0}  accent="amber"   />
       </div>
 
       {/* Charts row */}

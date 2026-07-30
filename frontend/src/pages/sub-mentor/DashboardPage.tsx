@@ -99,6 +99,11 @@ export default function SubMentorDashboardPage() {
   const weeklyTrend = (charts.weekly_trend  ?? []) as WeeklyTrendPoint[];
   const classStatus = (charts.class_status  ?? []) as ClassStatusPoint[];
 
+  type SubBarItem = { group_name: string; submitted: number; pending: number; late: number };
+  const subBar = (charts.submission_bar ?? []) as SubBarItem[];
+  const smTotalExpected = subBar.reduce((s, b) => s + b.submitted + b.pending + b.late, 0);
+  const smPendingSubmissions = subBar.reduce((s, b) => s + b.pending, 0);
+
   return (
     <div className="space-y-6">
 
@@ -135,13 +140,13 @@ export default function SubMentorDashboardPage() {
           <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Balance 2026"         value={d.kpis.classes_upcoming}    />
         </StaggerItem>
         <StaggerItem>
-          <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted"            value={d.kpis.submitted}           accent="emerald" />
+          <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted Assignments"  value={`${d.kpis.submitted}/${smTotalExpected}`}          accent="emerald" />
         </StaggerItem>
         <StaggerItem>
-          <KpiCard icon={<Clock className="h-4 w-4" />}         label="Pending"              value={d.kpis.pending}             />
+          <KpiCard icon={<Clock className="h-4 w-4" />}         label="Pending Assignments"    value={`${smPendingSubmissions}/${smTotalExpected}`}       />
         </StaggerItem>
         <StaggerItem>
-          <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Late Submissions"     value={d.kpis.late}                accent="rose"    />
+          <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Late Assignments"       value={`${d.kpis.late}/${smTotalExpected}`}                accent="rose"    />
         </StaggerItem>
         <StaggerItem>
           <KpiCard icon={<Bell className="h-4 w-4" />}          label="Pending Approvals"    value={d.kpis.pending_approvals}   accent="amber"   />

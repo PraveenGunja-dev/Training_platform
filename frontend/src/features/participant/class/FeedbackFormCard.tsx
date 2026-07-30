@@ -25,22 +25,31 @@ export function FeedbackFormCard({ cls }: FeedbackFormCardProps) {
     queryKey: ['my-feedback', cls.id],
     queryFn: () => feedbackApi.getMy(cls.id),
     staleTime: 60_000,
+    retry: false,
   });
 
   const existing = feedbackData?.data ?? null;
 
   const mutation = useMutation({
     mutationFn: () => feedbackApi.submit(cls.id, rating, comment),
-    onSuccess: () => {
+    onSuccess: (submittedData) => {
+      // Populate the cache immediately so the read-only view appears as soon as
+      // the success banner clears — no form flash while a background refetch runs.
+      qc.setQueryData(['my-feedback', cls.id], submittedData);
       setSubmitSuccess(true);
-      setTimeout(() => {
-        qc.invalidateQueries({ queryKey: ['my-feedback', cls.id] });
-        setSubmitSuccess(false);
-      }, 1500);
+      setTimeout(() => setSubmitSuccess(false), 1500);
     },
     onError: (err: unknown) => {
-      const e = err as { response?: { data?: { errors?: { message?: string }[]; detail?: string } } };
+      const e = err as { response?: { data?: { errors?: { code?: string; message?: string }[]; detail?: string } } };
       const firstError = e?.response?.data?.errors?.[0];
+
+      // If feedback was already submitted (duplicate submission), force-reload
+      // the existing feedback so the read-only view appears instead of an error.
+      if (firstError?.code === 'already_submitted') {
+        void qc.invalidateQueries({ queryKey: ['my-feedback', cls.id] });
+        return;
+      }
+
       const msg = firstError?.message ?? e?.response?.data?.detail ?? 'Failed to submit feedback. Please try again.';
       setErrorMsg(msg);
     },
@@ -66,7 +75,7 @@ export function FeedbackFormCard({ cls }: FeedbackFormCardProps) {
           </div>
         ) : existing ? (
           <div className="space-y-3">
-            <StarRating value={existing.rating} readOnly size="md" />
+            <StarRating value={Number(existing.rating)} readOnly size="md" />
             {existing.comment && (
               <p className="text-sm text-foreground/80 whitespace-pre-wrap">{existing.comment}</p>
             )}
@@ -104,7 +113,7 @@ export function FeedbackFormCard({ cls }: FeedbackFormCardProps) {
               </Label>
               <Textarea
                 id="feedback-comment"
-                placeholder="Share your thoughts about this class…"
+                placeholder="Share your feedback about this class…"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}

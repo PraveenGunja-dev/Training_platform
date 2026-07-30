@@ -153,7 +153,7 @@ REST_FRAMEWORK = {
 
 # SimpleJWT
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -165,7 +165,7 @@ SIMPLE_JWT = {
 }
 
 JWT_REFRESH_COOKIE_NAME = "refresh_token"
-JWT_REFRESH_COOKIE_PATH = "/api/v1/auth/refresh"
+JWT_REFRESH_COOKIE_PATH = "/training/api/v1/auth/refresh"
 JWT_REFRESH_COOKIE_SAMESITE = "Lax"
 JWT_REFRESH_COOKIE_HTTPONLY = True
 JWT_REFRESH_COOKIE_SECURE = False  # flipped to True in production

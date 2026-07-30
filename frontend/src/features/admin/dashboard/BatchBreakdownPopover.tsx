@@ -9,6 +9,7 @@ export interface BreakdownRow {
   group_id: string;
   group_name: string;
   value: number;
+  total?: number;        // ← enables "value/total" display e.g. "2/20"
   /** Optional secondary label shown in muted text after the value, e.g. "/ 240" */
   valueSuffix?: string;
 }
@@ -100,9 +101,11 @@ export function BatchBreakdownPopover({
               </span>
               <span className="text-xs font-semibold text-[#00285A] whitespace-nowrap flex-shrink-0">
                 {row.value}
-                {row.valueSuffix && (
+                {row.total !== undefined ? (
+                  <span className="text-[#7C7AAE] font-normal">/{row.total}</span>
+                ) : row.valueSuffix ? (
                   <span className="text-[#7C7AAE] font-normal"> {row.valueSuffix}</span>
-                )}
+                ) : null}
               </span>
             </div>
           ))}

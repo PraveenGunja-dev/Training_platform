@@ -16,9 +16,10 @@ export function FeedbackListCard({ classId }: FeedbackListCardProps) {
 
   const items: FeedbackListItem[] = data?.data ?? [];
   const count = items.length;
+  // DRF DecimalField returns rating as a string ("4.50") — coerce to number before arithmetic.
   const avg =
     count > 0
-      ? (items.reduce((sum, f) => sum + f.rating, 0) / count).toFixed(1)
+      ? (items.reduce((sum, f) => sum + Number(f.rating), 0) / count).toFixed(1)
       : null;
 
   return (
@@ -70,7 +71,7 @@ export function FeedbackListCard({ classId }: FeedbackListCardProps) {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <StarRating value={item.rating} readOnly size="sm" />
+                    <StarRating value={Number(item.rating)} readOnly size="sm" />
                     <span className="text-xs text-[#5A7A9A]">
                       {formatDate(item.submitted_at, 'dd MMM yyyy')}
                     </span>

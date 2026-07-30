@@ -52,20 +52,24 @@ export function StarRating({ value, onChange, readOnly = false, size = 'md' }: S
 
         return (
           <div key={star} className={cn('relative', sizeClass)}>
+            {/* Base layer — always a gray outline star */}
             <StarSvg
-              className={cn(
-                sizeClass,
-                'absolute inset-0',
-                fill !== 'empty' ? 'fill-amber-400 stroke-amber-400' : 'fill-transparent stroke-gray-300',
-              )}
+              className={cn(sizeClass, 'absolute inset-0 fill-transparent stroke-gray-300')}
             />
-            {fill === 'half' && (
-              <div className={cn('absolute inset-0 overflow-hidden', sizeClass)} style={{ left: '50%' }}>
-                <div style={{ marginLeft: '-100%', width: '200%', height: '100%' }}>
-                  <StarSvg className="fill-transparent stroke-gray-300 w-full h-full" />
-                </div>
+
+            {/* Amber layer — full star for 'full', left-half only for 'half'.
+                clip-path inset(0 50% 0 0) hides the right 50%, revealing only
+                the left half of the amber star over the gray base. */}
+            {fill !== 'empty' && (
+              <div
+                className={cn('absolute inset-0', sizeClass)}
+                style={fill === 'half' ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
+              >
+                <StarSvg className={cn(sizeClass, 'fill-amber-400 stroke-amber-400')} />
               </div>
             )}
+
+            {/* Invisible click / hover zones split at the star's midpoint */}
             {!readOnly && (
               <>
                 <button
