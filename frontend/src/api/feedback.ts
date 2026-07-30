@@ -9,6 +9,13 @@ export interface ClassFeedback {
   submitted_at: string;
 }
 
+export interface FeedbackListItem {
+  participant_name: string;
+  rating: number;
+  comment: string;
+  submitted_at: string;
+}
+
 export const feedbackApi = {
   submit: (classId: string, rating: number, comment: string) =>
     apiClient
@@ -22,6 +29,13 @@ export const feedbackApi = {
   getMy: (classId: string) =>
     apiClient
       .get<ApiEnvelope<ClassFeedback | null>>('/feedback/my/', {
+        params: { class_id: classId },
+      })
+      .then(r => r.data),
+
+  list: (classId: string) =>
+    apiClient
+      .get<ApiEnvelope<FeedbackListItem[]>>('/feedback/list/', {
         params: { class_id: classId },
       })
       .then(r => r.data),

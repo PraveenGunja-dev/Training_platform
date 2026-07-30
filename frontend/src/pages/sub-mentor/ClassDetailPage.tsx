@@ -21,6 +21,7 @@ import { useCan } from '@/hooks/useCan';
 import { useAuthStore } from '@/store/auth';
 import { ClassAttendanceHistory } from '@/features/admin/attendance/ClassAttendanceHistory';
 import { ClassActivityLog } from '@/features/admin/class/ClassActivityLog';
+import { FeedbackListCard } from '@/features/admin/class/FeedbackListCard';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   UPCOMING:  { label: 'Upcoming',  className: 'bg-blue-50 text-[#0052A5] border border-blue-200'   },
@@ -369,6 +370,11 @@ export default function SubMentorClassDetailPage() {
 
       {/* Activity Log */}
       <ClassActivityLog classId={cls.id} />
+
+      {/* Class Feedback — visible only when class is completed */}
+      {cls.status === 'COMPLETED' && (
+        <FeedbackListCard classId={cls.id} />
+      )}
     </div>
   );
 }
