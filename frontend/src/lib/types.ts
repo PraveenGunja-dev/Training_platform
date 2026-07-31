@@ -72,9 +72,6 @@ export interface SystemSettings {
   product_name: string;
   timezone: string;
   brand_color: string;
-  doc_max_mb: number;
-  image_max_mb: number;
-  video_max_mb: number;
   reminder_offsets: number[];
   session_lifetime_hours: number;
   sub_mentors_can_view_all_classes?: boolean;
