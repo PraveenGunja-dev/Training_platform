@@ -111,9 +111,9 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Large file upload support (binary storage in PostgreSQL)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024   # 600 MB for video support
-FILE_UPLOAD_MAX_MEMORY_SIZE = 600 * 1024 * 1024   # 600 MB
+# No Django-level upload size limit — enforcement is handled at the infrastructure layer (nginx)
+DATA_UPLOAD_MAX_MEMORY_SIZE = None
+FILE_UPLOAD_MAX_MEMORY_SIZE = None
 
 # Redis cache (django-redis)
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
