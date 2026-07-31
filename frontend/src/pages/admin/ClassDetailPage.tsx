@@ -22,6 +22,7 @@ import { CancelClassDialog } from '@/features/admin/class/CancelClassDialog';
 import { ClassSubmissionsPanel } from '@/features/admin/class/ClassSubmissionsPanel';
 import { ClassAttendanceHistory } from '@/features/admin/attendance/ClassAttendanceHistory';
 import { ClassActivityLog } from '@/features/admin/class/ClassActivityLog';
+import { FeedbackListCard } from '@/features/admin/class/FeedbackListCard';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   UPCOMING:  { label: 'Upcoming',  className: 'bg-blue-50 text-[#0052A5] border border-blue-200'   },
@@ -236,7 +237,7 @@ export default function AdminClassDetailPage() {
             </div>
             <div>
               <p className="text-xs text-[#5A7A9A]">Location</p>
-              <p className="font-semibold text-[#00285A]">{cls.group_location ?? ''}</p>
+              <p className="font-semibold text-[#00285A]">{cls.group_location || '—'}</p>
             </div>
           </div>
         </div>
@@ -385,6 +386,11 @@ export default function AdminClassDetailPage() {
 
       {/* ── Activity Log ─────────────────────────────────────────────── */}
       <ClassActivityLog classId={cls.id} />
+
+      {/* ── Class Feedback — visible only when class is completed ─────── */}
+      {cls.status === 'COMPLETED' && (
+        <FeedbackListCard classId={cls.id} />
+      )}
 
       {/* Allocate Assignment dialog — group + class pre-filled from this class */}
       <CreateAssignmentDialog

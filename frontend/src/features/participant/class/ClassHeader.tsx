@@ -27,12 +27,10 @@ export function ClassHeader({ cls }: { cls: ClassSession }) {
             {cls.description && (
               <p className="text-sm text-muted-foreground">{cls.description}</p>
             )}
-            {cls.group_location && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
-                {cls.group_location}
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+              {cls.group_location || '—'}
+            </p>
           </div>
           <div className="text-sm text-muted-foreground space-y-1.5 shrink-0">
             <div className="flex items-center gap-2">

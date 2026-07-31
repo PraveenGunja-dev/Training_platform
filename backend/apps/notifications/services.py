@@ -101,3 +101,49 @@ def notify_sub_mentors(
             if prefs and prefs.email_enabled:
                 _send_email_notification(user, title, body)
     return count
+
+
+def notify_feedback_requested(class_session) -> int:
+    """
+    Bulk-create CLASS_FEEDBACK_REQUESTED in-app notifications for all participants
+    enrolled in class_session's group.
+
+    Idempotent: uses dedupe_key="feedback_req_<class_id>_<user_id>" so calling
+    this function twice for the same class is safe (bulk_create ignore_conflicts=True).
+
+    Returns the number of Notification rows inserted (new ones only).
+    """
+    from django.utils import timezone as _tz  # noqa: PLC0415
+
+    from apps.groups.models import GroupMembership  # noqa: PLC0415
+
+    member_ids = list(
+        GroupMembership.objects.filter(group=class_session.group)
+        .values_list("user_id", flat=True)
+    )
+    if not member_ids:
+        return 0
+
+    now = _tz.now()
+    class_id_str = str(class_session.id)
+    notifications = [
+        Notification(
+            user_id=uid,
+            type="CLASS_FEEDBACK_REQUESTED",
+            channel="IN_APP",
+            title="Feedback Requested",
+            body=f"Please share your feedback for {class_session.title}.",
+            link=f"/me/classes/{class_id_str}",
+            dedupe_key=f"feedback_req_{class_id_str}_{uid}",
+            status="SENT",
+            sent_at=now,
+            payload={"class_id": class_id_str},
+        )
+        for uid in member_ids
+    ]
+    result = Notification.objects.bulk_create(
+        notifications,
+        ignore_conflicts=True,
+        batch_size=500,
+    )
+    return len(result)

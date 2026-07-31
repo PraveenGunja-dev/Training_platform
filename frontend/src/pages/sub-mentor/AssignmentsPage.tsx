@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ListChecks, Eye, Lock, CheckCircle2, Circle, BookOpen, Plus, Trash2, Send, X as XIcon } from 'lucide-react';
 import { assignmentsApi } from '@/api/assignments';
 import { groupsApi } from '@/api/groups';
+import { subMentorApi } from '@/api/subMentor';
 import { naturalGroupSort } from '@/lib/sort';
 import { formatDate } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
@@ -208,6 +209,17 @@ export default function SubMentorAssignmentsPage() {
   });
   const groups: ClassGroup[] = [...(groupsQuery.data?.data ?? [])].sort(naturalGroupSort);
 
+  const myGroupsQuery = useQuery({
+    queryKey: ['subMentor', 'my-groups'],
+    queryFn: () => subMentorApi.myGroups(),
+    staleTime: 60_000,
+  });
+  // Use /me/groups directly — scoped to this user's assigned batches for both
+  // LEAD_MENTOR and SUB_MENTOR roles. Cast is safe: dialog only uses id + name.
+  const myGroups = myGroupsQuery.data?.data ?? [];
+  const dialogGroups = myGroups.length > 0 ? (myGroups as unknown as ClassGroup[]) : groups;
+  const defaultGroupId = myGroups.length === 1 ? myGroups[0].id : undefined;
+
   const assignmentsQuery = useQuery({
     queryKey: ['assignments', { group_id: selectedGroup, state: selectedState }],
     queryFn: () =>
@@ -409,7 +421,8 @@ export default function SubMentorAssignmentsPage() {
       <CreateAssignmentDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        groups={groups}
+        groups={dialogGroups}
+        defaultGroupId={defaultGroupId}
       />
     </div>
   );
