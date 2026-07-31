@@ -238,7 +238,7 @@ export function TaskUploadCard({ task }: TaskUploadCardProps) {
               {isDragActive ? 'Drop the file here…' : 'Drag & drop a file, or click to choose'}
             </p>
             <p className="text-xs text-muted-foreground/70 mt-2">
-              PDF/DOC/DOCX, JPG/PNG, MP4/MOV/AVI/MKV · Max 500 MB
+              Any file type accepted
             </p>
           </div>
         )}
