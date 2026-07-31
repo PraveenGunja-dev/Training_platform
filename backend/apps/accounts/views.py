@@ -29,21 +29,6 @@ from .services import authenticate_user, consume_setup_token
 from .throttles import ChangePasswordThrottle, LoginRateThrottle, RefreshTokenThrottle
 
 
-_MAGIC_BYTES = [
-    b'\xff\xd8\xff',   # JPEG
-    b'\x89PNG\r\n',    # PNG
-    b'GIF87a',         # GIF
-    b'GIF89a',         # GIF
-    b'RIFF',           # WebP (starts with RIFF....WEBP)
-]
-
-
-def _check_magic_bytes(file_obj) -> bool:
-    """Return True if the file header matches a known safe image type."""
-    header = file_obj.read(12)
-    file_obj.seek(0)
-    return any(header.startswith(magic) for magic in _MAGIC_BYTES)
-
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     samesite = cast(Literal["Lax", "Strict", "None", False], settings.JWT_REFRESH_COOKIE_SAMESITE)
@@ -289,29 +274,11 @@ class MePhotoView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
-    _ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    _MAX_BYTES = 5 * 1024 * 1024  # 5 MB
-
     def post(self, request: Request) -> Response:
         photo = request.FILES.get("photo")
         if not photo:
             return Response(
                 {"errors": [{"code": "photo.missing", "message": "No photo file provided"}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if photo.content_type not in self._ALLOWED:
-            return Response(
-                {"errors": [{"code": "photo.invalid_type", "message": "Only JPEG, PNG, WEBP or GIF allowed"}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if photo.size > self._MAX_BYTES:
-            return Response(
-                {"errors": [{"code": "photo.too_large", "message": "Photo must be under 5 MB"}], "data": None},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not _check_magic_bytes(photo):
-            return Response(
-                {"errors": [{"code": "file.invalid_signature", "message": "Uploaded file is not a valid image."}], "data": None},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
