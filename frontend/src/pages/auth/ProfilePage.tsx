@@ -287,7 +287,7 @@ export function ProfilePage() {
                   >
                     {uploadPhoto.isPending ? 'Uploading…' : 'Click avatar to change photo'}
                   </button>
-                  <p className="text-xs text-slate-400 mt-0.5">JPEG, PNG, WEBP or GIF · max 5 MB</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Any file type accepted</p>
                 </div>
               </div>
             </div>
