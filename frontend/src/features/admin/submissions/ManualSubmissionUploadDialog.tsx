@@ -14,10 +14,6 @@ import {
 import { assignmentsApi } from '@/api/assignments';
 import type { GroupParticipant } from '@/lib/types';
 
-const ALLOWED_TYPES = ['application/pdf', 'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'image/jpeg', 'image/png', 'video/mp4'];
-
 const schema = z.object({
   participant_id: z.string().min(1, 'Select a participant'),
   file: z.instanceof(File).refine(f => f.size > 0, 'File required'),
@@ -55,10 +51,6 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
     const file = e.target.files?.[0];
     setFileError('');
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setFileError('File type not allowed.');
-      return;
-    }
     setValue('file', file);
   }
 
@@ -91,7 +83,6 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
             <Label>File</Label>
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4"
               onChange={handleFileChange}
               className="block w-full text-sm text-foreground/90 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-white/15 file:text-xs file:bg-white/5 hover:file:bg-white/8"
             />

@@ -186,7 +186,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-700">Drop a file here or click to browse</p>
-                <p className="text-xs text-slate-400 mt-0.5">PDF, Word, PowerPoint, Excel, images — any format</p>
+                <p className="text-xs text-slate-400 mt-0.5">Any file type accepted</p>
               </div>
               <input
                 ref={fileInputRef}

@@ -183,7 +183,7 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
               <Upload className="h-5 w-5 text-violet-500" />
             </div>
             <p className="text-sm font-medium text-slate-700">Drop a file here or click to browse</p>
-            <p className="text-xs text-slate-400">PDF, DOCX, PPTX, XLSX, images — any format</p>
+            <p className="text-xs text-slate-400">Any file type accepted</p>
             <input
               ref={fileInputRef}
               type="file"

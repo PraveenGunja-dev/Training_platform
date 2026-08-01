@@ -1,4 +1,4 @@
-import { Clock, FileText, Image, Video, Bell, CheckCircle2, Shield } from 'lucide-react';
+import { Clock, Bell, CheckCircle2, Shield } from 'lucide-react';
 import type { SettingsFormValues } from './settingsSchema';
 
 interface Props {
@@ -13,29 +13,6 @@ function formatOffset(min: number): string {
   return `${min}m before`;
 }
 
-function LimitBar({ label, value, max, icon: Icon, color }: {
-  label: string; value: number; max: number;
-  icon: React.ElementType; color: string;
-}) {
-  const pct = Math.min(100, (value / max) * 100);
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Icon className={`h-3.5 w-3.5 ${color}`} />
-          <span className="text-xs text-slate-600">{label}</span>
-        </div>
-        <span className="text-xs font-semibold text-slate-700">{value} MB</span>
-      </div>
-      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-500 transition-all duration-300"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function SettingsPreviewSidebar({ values, lastSaved, saving }: Props) {
   const color = values.brand_color || '#4F46E5';
@@ -140,21 +117,6 @@ export function SettingsPreviewSidebar({ values, lastSaved, saving }: Props) {
             />
             <span className="text-xs text-slate-400 font-mono ml-1">{safeColor}</span>
           </div>
-        </div>
-      </div>
-
-      {/* ── Upload limits ────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-teal-500 to-emerald-500" />
-        <div className="px-4 py-3 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            Upload Limits
-          </p>
-        </div>
-        <div className="p-4 space-y-3">
-          <LimitBar label="Document" value={values.doc_max_mb}   max={500}  icon={FileText} color="text-violet-500" />
-          <LimitBar label="Image"    value={values.image_max_mb} max={100}  icon={Image}    color="text-teal-500"   />
-          <LimitBar label="Video"    value={values.video_max_mb} max={2000} icon={Video}    color="text-[#0066BB]" />
         </div>
       </div>
 

@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Globe,
-  HardDrive,
   Bell,
   ShieldAlert,
   X,
@@ -67,9 +66,6 @@ const DEFAULT_VALUES: SystemSettings = {
   product_name: 'Training Management System',
   timezone: 'UTC',
   brand_color: '#4F46E5',
-  doc_max_mb: 25,
-  image_max_mb: 10,
-  video_max_mb: 500,
   reminder_offsets: [60, 30, 10],
   session_lifetime_hours: 24,
   sub_mentors_can_view_all_classes: false,
@@ -236,56 +232,6 @@ export function SettingsForm({
                 Sample button
               </button>
             </div>
-          </div>
-        </div>
-      </SectionCard>
-
-      {/* ── File Upload Limits ────────────────────────────────────── */}
-      <SectionCard
-        icon={HardDrive}
-        title="File Upload Limits"
-        description="Maximum file sizes accepted during uploads"
-        accent="bg-gradient-to-r from-teal-500 to-emerald-500"
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <Label>Document (MB)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={500}
-              {...register('doc_max_mb', { valueAsNumber: true })}
-            />
-            {errors.doc_max_mb && (
-              <p className="text-xs text-red-500">{errors.doc_max_mb.message}</p>
-            )}
-            <p className="text-xs text-slate-400">PDF, DOCX etc. Max 500 MB</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Image (MB)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={100}
-              {...register('image_max_mb', { valueAsNumber: true })}
-            />
-            {errors.image_max_mb && (
-              <p className="text-xs text-red-500">{errors.image_max_mb.message}</p>
-            )}
-            <p className="text-xs text-slate-400">JPG, PNG etc. Max 100 MB</p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Video (MB)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={2000}
-              {...register('video_max_mb', { valueAsNumber: true })}
-            />
-            {errors.video_max_mb && (
-              <p className="text-xs text-red-500">{errors.video_max_mb.message}</p>
-            )}
-            <p className="text-xs text-slate-400">MP4, MOV etc. Max 2000 MB</p>
           </div>
         </div>
       </SectionCard>
