@@ -21,8 +21,18 @@ interface AuditFiltersProps {
 }
 
 const TARGET_TYPES = [
-  'User', 'ClassGroup', 'ClassSession', 'AssignmentTask',
-  'AttendanceRecord', 'ParticipantSharedDoc', 'Document', 'GroupManager',
+  'User',
+  'ClassGroup',
+  'Class',
+  'AssignmentTask',
+  'AttendanceRecord',
+  'AttendanceSession',
+  'ParticipantSharedDoc',
+  'Document',
+  'Submission',
+  'SubmissionReview',
+  'SystemSettings',
+  'ParticipantUploadPermission',
 ];
 
 export function AuditFilters({ filters, onChange, users }: AuditFiltersProps) {

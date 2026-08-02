@@ -6,31 +6,74 @@ import type { AuditEntry } from '@/lib/types';
 
 // ── Action colour map ────────────────────────────────────────────────────────
 const ACTION_COLOR: Record<string, string> = {
-  // creates / invites → indigo
-  'user.invite':           'bg-blue-50  text-[#0052A5]  border-blue-200',
-  'user.resend_invite':    'bg-blue-50  text-[#0052A5]  border-blue-200',
-  'class.create':          'bg-blue-50  text-[#0052A5]  border-blue-200',
-  'group.create':          'bg-blue-50  text-[#0052A5]  border-blue-200',
-  'document.created':      'bg-blue-50  text-[#0052A5]  border-blue-200',
-  'document.upload':       'bg-blue-50  text-[#0052A5]  border-blue-200',
-  // approvals / completions → emerald
-  'shared_doc.approve':    'bg-emerald-50 text-emerald-700 border-emerald-200',
-  'attendance.override':   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  // warnings / changes → amber
-  'user.role_changed':     'bg-amber-50   text-amber-700   border-amber-200',
-  'assignment.late_policy_override': 'bg-amber-50 text-amber-700 border-amber-200',
-  'assignment.task_updated': 'bg-amber-50 text-amber-700 border-amber-200',
-  // closes / ends → slate
-  'assignment.close':           'bg-slate-50  text-slate-600  border-slate-200',
-  'attendance.session_ended':   'bg-slate-50  text-slate-600  border-slate-200',
-  'attendance.session_started': 'bg-teal-50   text-teal-700   border-teal-200',
-  // destructive → rose
-  'user.deleted':          'bg-rose-50    text-rose-700    border-rose-200',
-  'shared_doc.reject':     'bg-rose-50    text-rose-700    border-rose-200',
-  'document.deleted':      'bg-rose-50    text-rose-700    border-rose-200',
-  // uploads → violet
-  'shared_doc.uploaded':   'bg-violet-50  text-violet-700  border-violet-200',
-  'shared_doc.upload':     'bg-violet-50  text-violet-700  border-violet-200',
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  'auth.login_failed':                    'bg-rose-50    text-rose-700    border-rose-200',
+  'auth.login_success':                   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'auth.logout':                          'bg-slate-50   text-slate-600   border-slate-200',
+  'auth.password_changed':                'bg-amber-50   text-amber-700   border-amber-200',
+  'auth.email_changed':                   'bg-amber-50   text-amber-700   border-amber-200',
+
+  // ── User ──────────────────────────────────────────────────────────────────
+  'user.invite':                          'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'user.bulk_invite':                     'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'user.updated':                         'bg-amber-50   text-amber-700   border-amber-200',
+  'user.deleted':                         'bg-rose-50    text-rose-700    border-rose-200',
+  'user.role_changed':                    'bg-amber-50   text-amber-700   border-amber-200',
+  'user.resend_invite':                   'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'user.blocked':                         'bg-rose-50    text-rose-700    border-rose-200',
+  'user.unblocked':                       'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'sub_mentor_visibility_changed':        'bg-amber-50   text-amber-700   border-amber-200',
+
+  // ── Group ──────────────────────────────────────────────────────────────────
+  'group.created':                        'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'group.updated':                        'bg-amber-50   text-amber-700   border-amber-200',
+  'group.archived':                       'bg-amber-50   text-amber-700   border-amber-200',
+  'group.participants_added':             'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'group.participant_removed':            'bg-rose-50    text-rose-700    border-rose-200',
+  'group.lead_mentor_assigned':           'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'group.lead_mentor_removed':            'bg-rose-50    text-rose-700    border-rose-200',
+  'sub_mentor_assigned':                  'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'sub_mentor_unassigned':                'bg-rose-50    text-rose-700    border-rose-200',
+
+  // ── Class ──────────────────────────────────────────────────────────────────
+  'class.created':                        'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'class.updated':                        'bg-amber-50   text-amber-700   border-amber-200',
+  'class.deleted':                        'bg-rose-50    text-rose-700    border-rose-200',
+  'class.recurring_created':              'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'class.bulk_completed':                 'bg-emerald-50 text-emerald-700 border-emerald-200',
+
+  // ── Assignment ─────────────────────────────────────────────────────────────
+  'assignment.task_created':              'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'assignment.task_updated':              'bg-amber-50   text-amber-700   border-amber-200',
+  'assignment.task_deleted':              'bg-rose-50    text-rose-700    border-rose-200',
+  'assignment.task_closed':               'bg-slate-50   text-slate-600   border-slate-200',
+  'assignment.submission_created':        'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'assignment.submission_reviewed':       'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'assignment.late_policy_override':      'bg-amber-50   text-amber-700   border-amber-200',
+
+  // ── Document ───────────────────────────────────────────────────────────────
+  'document.created':                     'bg-blue-50    text-[#0052A5]   border-blue-200',
+  'document.updated':                     'bg-amber-50   text-amber-700   border-amber-200',
+  'document.deleted':                     'bg-rose-50    text-rose-700    border-rose-200',
+
+  // ── Shared Document ────────────────────────────────────────────────────────
+  'shared_doc.uploaded':                  'bg-violet-50  text-violet-700  border-violet-200',
+  'shared_doc.approved':                  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'shared_doc.rejected':                  'bg-rose-50    text-rose-700    border-rose-200',
+  'shared_doc.deleted':                   'bg-rose-50    text-rose-700    border-rose-200',
+
+  // ── Upload Permission ──────────────────────────────────────────────────────
+  'upload_permission.granted':            'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'upload_permission.revoked':            'bg-rose-50    text-rose-700    border-rose-200',
+
+  // ── Attendance ─────────────────────────────────────────────────────────────
+  'attendance.session_started':           'bg-teal-50    text-teal-700    border-teal-200',
+  'attendance.session_started_with_drift':'bg-amber-50   text-amber-700   border-amber-200',
+  'attendance.session_ended':             'bg-slate-50   text-slate-600   border-slate-200',
+  'attendance.record_overridden':         'bg-emerald-50 text-emerald-700 border-emerald-200',
+
+  // ── System ─────────────────────────────────────────────────────────────────
+  'system.force_logout_all':              'bg-rose-50    text-rose-700    border-rose-200',
 };
 
 function actionColor(action: string): string {
@@ -85,10 +128,18 @@ function MetadataCell({ metadata }: { metadata: Record<string, unknown> }) {
 
 // ── Target type label ────────────────────────────────────────────────────────
 const TARGET_LABELS: Record<string, string> = {
-  User: 'User', ClassGroup: 'Group', ClassSession: 'Class',
-  AssignmentTask: 'Assignment', AttendanceRecord: 'Attendance',
-  AttendanceSession: 'Session', ParticipantSharedDoc: 'Shared Upload',
-  Document: 'Document',
+  User:                     'User',
+  ClassGroup:               'Group',
+  Class:                    'Class',
+  AssignmentTask:           'Assignment',
+  AttendanceRecord:         'Attendance',
+  AttendanceSession:        'Session',
+  ParticipantSharedDoc:     'Shared Upload',
+  Document:                 'Document',
+  Submission:               'Submission',
+  SubmissionReview:         'Review',
+  SystemSettings:           'System',
+  ParticipantUploadPermission: 'Upload Permission',
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
