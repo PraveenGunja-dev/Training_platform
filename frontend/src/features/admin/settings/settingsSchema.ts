@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
 export const settingsSchema = z.object({
-  product_name: z.string().min(1, 'Product name is required'),
   timezone: z.string().min(1, 'Timezone is required'),
-  brand_color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color like #6366f1'),
   reminder_offsets: z.array(z.number().int().min(1)),
   session_lifetime_hours: z.number().int().min(1).max(720),
   sub_mentors_can_view_all_classes: z.boolean().optional().default(false),

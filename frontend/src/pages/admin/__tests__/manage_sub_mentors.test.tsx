@@ -363,9 +363,7 @@ import { SettingsForm } from '@/features/admin/settings/SettingsForm';
 import type { SettingsFormValues } from '@/features/admin/settings/settingsSchema';
 
 const baseSettings: SettingsFormValues = {
-  product_name: 'Test System',
   timezone: 'UTC',
-  brand_color: '#4F46E5',
   reminder_offsets: [],
   session_lifetime_hours: 24,
   sub_mentors_can_view_all_classes: false,

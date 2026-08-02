@@ -9,7 +9,6 @@ import {
   Plus,
   RefreshCw,
   LogOut,
-  Palette,
   GraduationCap,
 } from 'lucide-react';
 import { settingsSchema, type SettingsFormValues } from './settingsSchema';
@@ -63,9 +62,7 @@ const TIMEZONES = [
 const REMINDER_PRESETS = [5, 10, 15, 30, 60, 120, 1440];
 
 const DEFAULT_VALUES: SystemSettings = {
-  product_name: 'Training Management System',
   timezone: 'UTC',
-  brand_color: '#4F46E5',
   reminder_offsets: [60, 30, 10],
   session_lifetime_hours: 24,
   sub_mentors_can_view_all_classes: false,
@@ -141,7 +138,6 @@ export function SettingsForm({
   }, [watch, onValuesChange]);
 
   const reminders = watch('reminder_offsets') ?? [];
-  const brandColor = watch('brand_color') ?? '#4F46E5';
   const subMentorViewAll = watch('sub_mentors_can_view_all_classes') ?? false;
 
   const addOffset = (val?: number) => {
@@ -169,17 +165,9 @@ export function SettingsForm({
       <SectionCard
         icon={Globe}
         title="General"
-        description="Product identity and regional settings"
+        description="Regional settings"
         accent="bg-gradient-to-r from-violet-500 to-indigo-500"
       >
-        <div className="space-y-1.5">
-          <Label>Product Name</Label>
-          <Input {...register('product_name')} placeholder="Training Management System" />
-          {errors.product_name && (
-            <p className="text-xs text-red-500">{errors.product_name.message}</p>
-          )}
-        </div>
-
         <div className="space-y-1.5">
           <Label>Default Timezone</Label>
           <select
@@ -190,49 +178,6 @@ export function SettingsForm({
               <option key={tz} value={tz}>{tz}</option>
             ))}
           </select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Primary Brand Color</Label>
-          <div className="flex items-center gap-3">
-            <input
-              type="color"
-              value={brandColor}
-              onChange={e => setValue('brand_color', e.target.value, { shouldDirty: true })}
-              className="h-9 w-14 rounded-md border border-slate-200 cursor-pointer p-0.5 bg-white"
-            />
-            <Input
-              {...register('brand_color')}
-              placeholder="#4F46E5"
-              className="w-32 font-mono text-sm"
-            />
-          </div>
-          {errors.brand_color && (
-            <p className="text-xs text-red-500">{errors.brand_color.message}</p>
-          )}
-          {/* Live preview */}
-          <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
-            <div className="h-2" style={{ backgroundColor: brandColor }} />
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50">
-              <div
-                className="flex items-center justify-center w-8 h-8 rounded-lg"
-                style={{ backgroundColor: brandColor + '20' }}
-              >
-                <Palette className="h-4 w-4" style={{ color: brandColor }} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-700">Accent preview</p>
-                <p className="text-xs text-slate-500">{brandColor}</p>
-              </div>
-              <button
-                type="button"
-                className="ml-auto text-xs font-medium px-3 py-1.5 rounded-lg text-white"
-                style={{ backgroundColor: brandColor }}
-              >
-                Sample button
-              </button>
-            </div>
-          </div>
         </div>
       </SectionCard>
 

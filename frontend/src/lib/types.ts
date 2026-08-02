@@ -69,9 +69,7 @@ export function isLeadMentor(user: User | null): boolean {
 }
 
 export interface SystemSettings {
-  product_name: string;
   timezone: string;
-  brand_color: string;
   reminder_offsets: number[];
   session_lifetime_hours: number;
   sub_mentors_can_view_all_classes?: boolean;
