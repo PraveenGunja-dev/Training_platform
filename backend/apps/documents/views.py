@@ -323,13 +323,15 @@ class DocumentViewSet(ViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         doc_id = doc.id
+        doc_title = doc.title
+        doc_group_id = str(doc.group_id)
         doc.delete()
         log_action(
             actor=request.user,
             action="document.deleted",
             target_type="Document",
             target_id=doc_id,
-            metadata={},
+            metadata={"title": doc_title, "group_id": doc_group_id},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -415,7 +417,7 @@ class GroupUploadPermissionDetailView(APIView):
                 actor=request.user,
                 action="upload_permission.revoked",
                 target_type="ParticipantUploadPermission",
-                target_id=None,
+                target_id=str(user_id),
                 metadata={"user_id": str(user.id), "group_id": str(group.id)},
             )
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -263,13 +263,15 @@ class AssignmentTaskViewSet(ViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         task_id = task.id
+        task_title = task.title
+        task_group_id = str(task.group_id)
         task.delete()
         log_action(
             actor=request.user,
             action="assignment.task_deleted",
             target_type="AssignmentTask",
             target_id=task_id,
-            metadata={},
+            metadata={"title": task_title, "group_id": task_group_id},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 

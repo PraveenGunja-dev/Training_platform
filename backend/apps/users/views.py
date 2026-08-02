@@ -74,9 +74,14 @@ class UserViewSet(
 
     def partial_update(self, request: Request, pk=None) -> Response:
         user = self.get_object()
+
+        old_role = user.role
+        old_is_active = user.is_active
+
         s = UserWriteSerializer(user, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         s.save()
+
         log_action(
             actor=request.user,
             action="user.updated",
@@ -84,6 +89,26 @@ class UserViewSet(
             target_id=user.id,
             metadata={"fields": list(request.data.keys())},
         )
+
+        if "role" in request.data and user.role != old_role:
+            log_action(
+                actor=request.user,
+                action="user.role_changed",
+                target_type="User",
+                target_id=user.id,
+                metadata={"old_role": old_role, "new_role": user.role},
+            )
+
+        if "is_active" in request.data and user.is_active != old_is_active:
+            block_action = "user.unblocked" if user.is_active else "user.blocked"
+            log_action(
+                actor=request.user,
+                action=block_action,
+                target_type="User",
+                target_id=user.id,
+                metadata={"email": user.email},
+            )
+
         return Response({"data": UserDetailSerializer(user).data})
 
     def destroy(self, request: Request, pk=None) -> Response:
@@ -250,6 +275,13 @@ class UserViewSet(
             role=user.role,
             invited_by=request.user,
             resend=True,
+        )
+        log_action(
+            actor=request.user,
+            action="user.resend_invite",
+            target_type="User",
+            target_id=user.id,
+            metadata={"email": user.email},
         )
         return Response({"data": {"detail": "Invite resent."}})
 

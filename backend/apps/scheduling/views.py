@@ -638,7 +638,7 @@ class MarkPastClassesCompletedView(APIView):
             actor=request.user,
             action="class.bulk_completed",
             target_type="Class",
-            target_id=None,
+            target_id="bulk",
             metadata={"updated_count": updated},
         )
         return Response({"data": {"updated": updated}})
