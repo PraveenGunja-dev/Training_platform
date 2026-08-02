@@ -15,10 +15,6 @@ function formatOffset(min: number): string {
 
 
 export function SettingsPreviewSidebar({ values, lastSaved, saving }: Props) {
-  const color = values.brand_color || '#4F46E5';
-  const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(color);
-  const safeColor = isValidHex ? color : '#4F46E5';
-  const lightBg   = safeColor + '18';
 
   return (
     <div className="space-y-4">
@@ -46,77 +42,6 @@ export function SettingsPreviewSidebar({ values, lastSaved, saving }: Props) {
               <span className="text-xs text-slate-400">No changes saved yet</span>
             </>
           )}
-        </div>
-      </div>
-
-      {/* ── Brand color preview ──────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
-        <div className="px-4 py-3 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            Brand Preview
-          </p>
-        </div>
-
-        {/* Mini mock UI */}
-        <div className="p-4 space-y-3">
-          {/* Sidebar strip */}
-          <div className="flex rounded-xl overflow-hidden border border-slate-200 text-xs">
-            <div className="w-2 shrink-0 self-stretch" style={{ backgroundColor: safeColor }} />
-            <div className="flex-1 px-3 py-2.5 space-y-2">
-              {['Dashboard', 'Participants', 'Settings'].map((item, i) => (
-                <div
-                  key={item}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors"
-                  style={i === 2 ? { backgroundColor: lightBg } : {}}
-                >
-                  <div
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: i === 2 ? safeColor : '#cbd5e1' }}
-                  />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: i === 2 ? safeColor : '#94a3b8' }}
-                  >
-                    {item}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Button + badge */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              className="text-xs font-medium px-3 py-1.5 rounded-lg text-white transition-all"
-              style={{ backgroundColor: safeColor }}
-            >
-              Save changes
-            </button>
-            <span
-              className="text-xs font-medium px-2 py-1 rounded-full border"
-              style={{ color: safeColor, borderColor: safeColor + '40', backgroundColor: lightBg }}
-            >
-              Active
-            </span>
-          </div>
-
-          {/* Color swatch row */}
-          <div className="flex items-center gap-2 pt-1">
-            <div
-              className="h-6 w-6 rounded-full border-2 border-white shadow"
-              style={{ backgroundColor: safeColor }}
-            />
-            <div
-              className="h-6 w-6 rounded-full border-2 border-white shadow opacity-70"
-              style={{ backgroundColor: safeColor }}
-            />
-            <div
-              className="h-6 w-6 rounded-full border-2 border-white shadow opacity-40"
-              style={{ backgroundColor: safeColor }}
-            />
-            <span className="text-xs text-slate-400 font-mono ml-1">{safeColor}</span>
-          </div>
         </div>
       </div>
 

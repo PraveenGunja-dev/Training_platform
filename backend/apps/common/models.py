@@ -33,9 +33,7 @@ class SchedulerHealth(models.Model):
 class SystemSettings(models.Model):
     """Singleton — always query with SystemSettings.get_solo(). Never call .create() directly."""
 
-    product_name = models.CharField(max_length=100, default="Training Management System")
     timezone = models.CharField(max_length=64, default="UTC")
-    brand_color = models.CharField(max_length=7, default="#4F46E5")
     doc_max_mb = models.PositiveIntegerField(default=25)
     image_max_mb = models.PositiveIntegerField(default=10)
     video_max_mb = models.PositiveIntegerField(default=500)

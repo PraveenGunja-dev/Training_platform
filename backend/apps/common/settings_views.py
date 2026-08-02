@@ -57,7 +57,7 @@ class ForceLogoutView(APIView):
             actor=request.user,
             action="system.force_logout_all",
             target_type="SystemSettings",
-            target_id=None,
+            target_id="system",
             metadata={"cleared_sessions": cleared},
         )
         return Response(

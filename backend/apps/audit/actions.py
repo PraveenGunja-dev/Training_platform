@@ -1,6 +1,7 @@
 # Audit action string constants for the Sub-Mentor role.
-# Not yet emitted — declarations only (Chunk 01).
-# Chunk 3 (assign/unassign) and Chunk 8 (visibility) will call log_action() with these.
+# All three constants are actively used:
+#   SUB_MENTOR_ASSIGNED / SUB_MENTOR_UNASSIGNED — apps/groups/views.py (ClassGroupViewSet)
+#   SUB_MENTOR_VISIBILITY_CHANGED              — apps/common/settings_views.py (AdminSettingsView)
 
 SUB_MENTOR_ASSIGNED = "sub_mentor_assigned"
 SUB_MENTOR_UNASSIGNED = "sub_mentor_unassigned"

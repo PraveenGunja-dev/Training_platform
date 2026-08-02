@@ -77,7 +77,7 @@ export default function LeadMentorDashboardPage() {
         <KpiCard icon={<Users className="h-4 w-4" />}         label="Participants"      value={d.kpis.total_participants}  accent="indigo"  />
         <KpiCard icon={<FileText className="h-4 w-4" />}      label="Total Assignments" value={d.kpis.total_assignments}              />
         <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Classes Today"     value={d.kpis.classes_today}       accent="emerald" />
-        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Balance 2026"      value={d.kpis.classes_upcoming}                  />
+        <KpiCard icon={<Clock className="h-4 w-4" />}         label="Upcoming Classes"      value={d.kpis.classes_upcoming}                  />
       </div>
 
       {/* KPI Row 2 — Assignment submission KPIs */}

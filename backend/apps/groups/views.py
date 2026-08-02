@@ -440,10 +440,29 @@ class ClassGroupViewSet(ViewSet):
                 dedupe_key=f"lead_mentor_assigned:{group.id}:{user.id}",
                 payload={"group_id": str(group.id), "group_name": group.name},
             )
+            log_action(
+                actor=request.user,
+                action="group.lead_mentor_assigned",
+                target_type="ClassGroup",
+                target_id=group.id,
+                metadata={"user_id": str(user.id), "group_name": group.name},
+            )
             return Response({"data": GroupLeadMentorSerializer(ga).data})
 
         if request.method == "DELETE":
+            try:
+                existing_lm = GroupLeadMentor.objects.get(group=group)
+                removed_user_id = str(existing_lm.lead_mentor_id)
+            except GroupLeadMentor.DoesNotExist:
+                removed_user_id = "unknown"
             GroupLeadMentor.objects.filter(group=group).delete()
+            log_action(
+                actor=request.user,
+                action="group.lead_mentor_removed",
+                target_type="ClassGroup",
+                target_id=group.id,
+                metadata={"user_id": removed_user_id, "group_name": group.name},
+            )
             return Response(status=204)
 
     @action(detail=True, methods=["get"], url_path="analytics")

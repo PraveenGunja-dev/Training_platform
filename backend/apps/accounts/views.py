@@ -64,7 +64,7 @@ class LoginView(APIView):
                 actor=None,
                 action="auth.login_failed",
                 target_type="User",
-                target_id=None,
+                target_id="unknown_email",
                 metadata={
                     "email": email,
                     "ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "unknown")),
@@ -105,6 +105,13 @@ class LoginView(APIView):
             status=status.HTTP_200_OK,
         )
         _set_refresh_cookie(response, str(refresh))
+        log_action(
+            actor=user,
+            action="auth.login_success",
+            target_type="User",
+            target_id=user.id,
+            metadata={"ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "unknown"))},
+        )
         return response
 
 
@@ -146,6 +153,15 @@ class LogoutView(APIView):
                 RefreshToken(raw_refresh).blacklist()  # type: ignore[arg-type]
             except Exception:
                 pass
+        actor = request.user if request.user.is_authenticated else None
+        if actor is not None:
+            log_action(
+                actor=actor,
+                action="auth.logout",
+                target_type="User",
+                target_id=actor.id,
+                metadata={},
+            )
         response = Response(status=status.HTTP_204_NO_CONTENT)
         response.delete_cookie(
             key=settings.JWT_REFRESH_COOKIE_NAME,
@@ -208,6 +224,13 @@ class ChangePasswordView(APIView):
         for token in OutstandingToken.objects.filter(user=user):
             BlacklistedToken.objects.get_or_create(token=token)
 
+        log_action(
+            actor=user,
+            action="auth.password_changed",
+            target_type="User",
+            target_id=user.id,
+            metadata={"ip": request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "unknown"))},
+        )
         return Response({"data": {"detail": "Password changed successfully."}})
 
 
@@ -249,9 +272,17 @@ class ChangeEmailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        old_email = user.email  # capture before overwrite
         user.email = new_email
         user.save(update_fields=["email"])
 
+        log_action(
+            actor=user,
+            action="auth.email_changed",
+            target_type="User",
+            target_id=user.id,
+            metadata={"old_email": old_email, "new_email": new_email},
+        )
         return Response({"data": {"email": new_email, "detail": "Email updated successfully."}})
 
 

@@ -1,9 +1,8 @@
 """Tests for admin settings endpoint (B-14).
 
 Covers:
-- GET /api/v1/admin/settings — 200 with all 8 fields (admin only)
+- GET /api/v1/admin/settings — 200 with all 7 fields (admin only)
 - PATCH /api/v1/admin/settings — 200, value updated
-- PATCH with invalid brand_color — 400
 - Unauthenticated — 401
 - Participant — 403
 - Singleton: get_solo() returns same row on repeated calls
@@ -66,14 +65,14 @@ def test_get_settings_returns_all_fields(admin_client):
     resp = admin_client.get(SETTINGS_URL)
     assert resp.status_code == 200
     data = resp.data["data"]
-    assert "product_name" in data
     assert "timezone" in data
-    assert "brand_color" in data
     assert "doc_max_mb" in data
     assert "image_max_mb" in data
     assert "video_max_mb" in data
     assert "reminder_offsets" in data
     assert "session_lifetime_hours" in data
+    assert "product_name" not in data
+    assert "brand_color" not in data
 
 
 @pytest.mark.django_db
@@ -84,7 +83,6 @@ def test_get_settings_defaults(admin_client):
     assert data["doc_max_mb"] == 25
     assert data["image_max_mb"] == 10
     assert data["video_max_mb"] == 500
-    assert data["brand_color"] == "#4F46E5"
     assert data["session_lifetime_hours"] == 24
 
 
@@ -116,28 +114,15 @@ def test_patch_settings_updates_value(admin_client):
 
 
 @pytest.mark.django_db
-def test_patch_settings_invalid_brand_color(admin_client):
-    resp = admin_client.patch(SETTINGS_URL, {"brand_color": "notacolor"}, format="json")
-    assert resp.status_code == 400
-
-
-@pytest.mark.django_db
-def test_patch_settings_valid_brand_color(admin_client):
-    resp = admin_client.patch(SETTINGS_URL, {"brand_color": "#AABBCC"}, format="json")
-    assert resp.status_code == 200
-    assert resp.data["data"]["brand_color"] == "#AABBCC"
-
-
-@pytest.mark.django_db
 def test_patch_settings_partial_update_preserves_other_fields(admin_client):
-    # First set product_name
-    admin_client.patch(SETTINGS_URL, {"product_name": "My Portal"}, format="json")
+    # First set timezone
+    admin_client.patch(SETTINGS_URL, {"timezone": "Asia/Kolkata"}, format="json")
     # Then patch only doc_max_mb
     resp = admin_client.patch(SETTINGS_URL, {"doc_max_mb": 100}, format="json")
     assert resp.status_code == 200
     data = resp.data["data"]
     assert data["doc_max_mb"] == 100
-    assert data["product_name"] == "My Portal"
+    assert data["timezone"] == "Asia/Kolkata"
 
 
 # ---------------------------------------------------------------------------
