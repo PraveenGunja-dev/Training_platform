@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ScrollText } from 'lucide-react';
+import { ScrollText, Download } from 'lucide-react';
 import { auditApi } from '@/api/audit';
-import { usersApi } from '@/api/users';
+import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { AuditTable } from '@/features/admin/audit/AuditTable';
 import { AuditFilters, type AuditFilterValues } from '@/features/admin/audit/AuditFilters';
@@ -20,11 +20,13 @@ export default function AuditLogPage() {
   const [cursor, setCursor]   = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
-  const { data: usersData } = useQuery({
-    queryKey: ['users-all'],
-    queryFn:  () => usersApi.list({ page_size: 200 }),
-  });
-  const users = (usersData?.data ?? []).map(u => ({ id: u.id, full_name: u.full_name, email: u.email }));
+  // Reset load-more state whenever filters change so stale extra pages
+  // never bleed into a new filter's result set.
+  useEffect(() => {
+    setExtraEntries([]);
+    setCursor(null);
+    setHasMore(false);
+  }, [filters]);
 
   // Primary query — data lives in React Query cache, not local state
   const { data, isFetching, isLoading, isError, refetch } = useQuery({
@@ -68,26 +70,65 @@ export default function AuditLogPage() {
 
   const handleFiltersChange = (newFilters: AuditFilterValues) => {
     setFilters(newFilters);
-    setExtraEntries([]);
-    setCursor(null);
-    setHasMore(false);
+    // Load-more state is reset by useEffect watching `filters`
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const response = await apiClient.get('/audit/export', {
+        params: {
+          actor_id:    filters.actorId    || undefined,
+          action:      filters.action     || undefined,
+          target_type: filters.targetType || undefined,
+          from: filters.from ? `${filters.from}T00:00:00Z` : undefined,
+          to:   filters.to   ? `${filters.to}T23:59:59Z`   : undefined,
+        },
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([response.data as BlobPart], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'audit_log.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Silent failure — the table will still show errors via isError
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
 
       {/* ── Page header ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 flex-shrink-0">
-          <ScrollText className="h-5 w-5 text-slate-600" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 flex-shrink-0">
+            <ScrollText className="h-5 w-5 text-slate-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">Audit Log</h1>
+            <p className="text-sm text-slate-500">Track all admin and manager actions in the system.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 leading-tight">Audit Log</h1>
-          <p className="text-sm text-slate-500">Track all admin and manager actions in the system.</p>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void handleExport()}
+          disabled={isExporting || isLoading}
+        >
+          <Download className="h-4 w-4 mr-1.5" />
+          {isExporting ? 'Exporting…' : 'Export CSV'}
+        </Button>
       </div>
 
-      <AuditFilters filters={filters} onChange={handleFiltersChange} users={users} />
+      <AuditFilters filters={filters} onChange={handleFiltersChange} />
 
       {/* ── Log card ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
