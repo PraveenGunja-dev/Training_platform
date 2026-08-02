@@ -137,7 +137,7 @@ export default function SubMentorDashboardPage() {
           <KpiCard icon={<Activity className="h-4 w-4" />}      label="Classes Today"        value={d.kpis.classes_today}       accent="emerald" />
         </StaggerItem>
         <StaggerItem>
-          <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Balance 2026"         value={d.kpis.classes_upcoming}    />
+          <KpiCard icon={<CalendarDays className="h-4 w-4" />}  label="Upcoming Classes"         value={d.kpis.classes_upcoming}    />
         </StaggerItem>
         <StaggerItem>
           <KpiCard icon={<CheckCircle className="h-4 w-4" />}   label="Submitted Assignments"  value={`${d.kpis.submitted}/${smTotalExpected}`}          accent="emerald" />

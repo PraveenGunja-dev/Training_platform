@@ -250,12 +250,12 @@ export default function AdminDashboardPage() {
           </BatchBreakdownPopover>
         </StaggerItem>
 
-        {/* 4 — Balance 2026 */}
+        {/* 4 — Upcoming Classes */}
         <StaggerItem>
-          <BatchBreakdownPopover title="Balance 2026" rows={upcomingRows} disabled={noPopover}>
+          <BatchBreakdownPopover title="Upcoming Classes" rows={upcomingRows} disabled={noPopover}>
             <KpiCard
               icon={<CalendarDays className="h-4 w-4" />}
-              label="Balance 2026"
+              label="Upcoming Classes"
               value={d.kpis.classes_upcoming}
             />
           </BatchBreakdownPopover>

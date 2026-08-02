@@ -114,7 +114,7 @@ export default function AuditLogPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 leading-tight">Audit Log</h1>
-            <p className="text-sm text-slate-500">Track all admin and manager actions in the system.</p>
+            <p className="text-sm text-slate-500">A complete record of all actions performed by users across the platform.</p>
           </div>
         </div>
         <Button

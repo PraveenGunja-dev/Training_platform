@@ -77,8 +77,7 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
     setActorOpen(false);
   };
 
-  const clearActor = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const clearActor = () => {
     set('actorId', '');
     setActorLabel('');
     setActorSearch('');
@@ -88,29 +87,22 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
   return (
     <div className="flex flex-wrap gap-3 items-end">
 
-      {/* Actor combobox */}
+      {/* Performed By combobox */}
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground font-medium">Actor</p>
+        <p className="text-xs text-muted-foreground font-medium">Performed By</p>
+        <div className="flex items-center">
         <Popover open={actorOpen} onOpenChange={setActorOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               role="combobox"
               aria-expanded={actorOpen}
-              className="w-48 justify-between font-normal"
+              className={`justify-between font-normal ${filters.actorId ? 'w-40 rounded-r-none border-r-0' : 'w-48'}`}
             >
               <span className="truncate">
-                {filters.actorId ? actorLabel || 'Selected actor' : 'All actors'}
+                {filters.actorId ? actorLabel || 'Selected user' : 'All users'}
               </span>
-              <span className="flex items-center gap-1 ml-1 shrink-0">
-                {filters.actorId && (
-                  <X
-                    className="h-3 w-3 text-slate-400 hover:text-slate-600"
-                    onClick={clearActor}
-                  />
-                )}
-                <ChevronsUpDown className="h-3.5 w-3.5 text-slate-400" />
-              </span>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-slate-400 ml-1 shrink-0" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-72 p-2" align="start">
@@ -127,7 +119,7 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
                 className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-slate-100 text-slate-500"
                 onClick={() => selectActor('', '')}
               >
-                All actors
+                All users
               </button>
               {actorFetching && (
                 <p className="text-xs text-slate-400 px-2 py-1">Searching…</p>
@@ -146,9 +138,24 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
                   <span className="text-slate-400 ml-1 text-xs">{u.email}</span>
                 </button>
               ))}
+              {!actorFetching && !debouncedSearch && actorOptions.length > 0 && (
+                <p className="text-xs text-slate-400 px-2 py-2 border-t mt-1">
+                  Showing first 20 results — type to search
+                </p>
+              )}
             </div>
           </PopoverContent>
         </Popover>
+        {filters.actorId && (
+          <button
+            type="button"
+            onClick={clearActor}
+            className="h-9 px-2 border border-input border-l-0 rounded-r-md hover:bg-slate-100 flex items-center"
+          >
+            <X className="h-3 w-3 text-slate-400 hover:text-slate-600" />
+          </button>
+        )}
+        </div>
       </div>
 
       {/* Action */}
