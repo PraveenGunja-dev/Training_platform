@@ -35,6 +35,12 @@ class UserWriteSerializer(serializers.ModelSerializer):
         model = User
         fields = ["full_name", "role", "is_active", "business_unit", "grade_code", "department", "employee_code"]
 
+    def validate_full_name(self, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise serializers.ValidationError("Full name cannot be blank.")
+        return stripped
+
 
 class InviteSerializer(serializers.Serializer):
     email = serializers.EmailField()

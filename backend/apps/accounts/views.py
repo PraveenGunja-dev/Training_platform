@@ -26,6 +26,7 @@ from .serializers import (
 )
 from apps.audit.services import log_action
 from .services import authenticate_user, consume_setup_token
+from apps.common.file_validation import validate_image_bytes, InvalidImageError
 from .throttles import ChangePasswordThrottle, LoginRateThrottle, RefreshTokenThrottle
 
 
@@ -314,9 +315,18 @@ class MePhotoView(APIView):
             )
 
         content = photo.read()
+
+        try:
+            canonical_mime = validate_image_bytes(content)
+        except InvalidImageError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user = request.user
         user.photo_data = content  # type: ignore[attr-defined]
-        user.photo_content_type = photo.content_type  # type: ignore[attr-defined]
+        user.photo_content_type = canonical_mime  # type: ignore[attr-defined]
         user.photo_url = f"/api/v1/users/{user.id}/photo"  # type: ignore[attr-defined]
         user.save(update_fields=["photo_data", "photo_content_type", "photo_url"])  # type: ignore[attr-defined]
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from django.db.models import Count, Q
+from django.db.models import Count, ProtectedError, Q
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -41,9 +41,8 @@ class UserViewSet(
 ):
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset = User.objects.all().order_by("-created_at")
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = UserFilter
-    search_fields = ["email", "full_name", "employee_code"]
     ordering_fields = ["created_at", "full_name", "email"]
 
     def get_serializer_class(self):
@@ -128,7 +127,13 @@ class UserViewSet(
         user_id   = str(user.id)
         user_email = user.email
         user_role  = user.role
-        user.delete()
+        try:
+            user.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This user cannot be deleted because they are assigned to one or more groups. Remove them from all groups first."},
+                status=status.HTTP_409_CONFLICT,
+            )
         log_action(
             actor=request.user,
             action="user.deleted",
