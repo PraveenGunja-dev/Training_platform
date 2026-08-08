@@ -325,8 +325,8 @@ class MePhotoView(APIView):
 
 @extend_schema(exclude=True)
 class UserPhotoView(APIView):
-    """GET /users/{pk}/photo — serve profile photo binary. No auth required (profile photos are public)."""
-    permission_classes = []
+    """GET /users/{pk}/photo — serve profile photo binary. Requires authentication."""
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, pk: str) -> Response:
         user = get_object_or_404(

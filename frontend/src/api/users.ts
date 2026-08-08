@@ -32,4 +32,8 @@ export const usersApi = {
     apiClient.get<ApiEnvelope<{ total: number; admins: number; sub_mentors: number; participants: number; lead_mentors: number; active: number; blocked: number }>>('/users/stats').then(r => r.data),
   checkEmailExists: (email: string) =>
     apiClient.get<ApiEnvelope<{ exists: boolean }>>(`/users/check-email?email=${encodeURIComponent(email)}`).then(r => r.data),
+  getPhoto: async (pk: string): Promise<string> => {
+    const response = await apiClient.get(`/users/${pk}/photo`, { responseType: 'blob' });
+    return URL.createObjectURL(response.data);
+  },
 };

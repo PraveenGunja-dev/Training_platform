@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RootRedirect } from './RootRedirect';
+import { AuthOnly } from './RoleGuard';
 import { MustChangePasswordGuard } from './MustChangePasswordGuard';
 import { AdminLayout, ParticipantLayout, SubMentorLayout, LeadMentorLayout } from '@/components/layout/AppShell';
 import { ForceChangePasswordPage } from '@/pages/auth/ForceChangePasswordPage';
@@ -155,7 +156,7 @@ export const router = createBrowserRouter([
       { path: 'sub-mentors/:id', element: <LeadMentorSubMentorProfilePage /> },
     ],
   },
-  { path: '/change-password', element: <ForceChangePasswordPage /> },
+  { path: '/change-password', element: <AuthOnly><ForceChangePasswordPage /></AuthOnly> },
   { path: '*', element: <NotFoundPage /> },
 ], {
   basename: import.meta.env.BASE_URL,

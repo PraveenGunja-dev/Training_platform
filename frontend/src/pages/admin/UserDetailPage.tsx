@@ -14,12 +14,11 @@ import { formatDate, formatRelative } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AuthenticatedAvatar } from '@/components/ui/AuthenticatedAvatar';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { AuditTable } from '@/features/admin/audit/AuditTable';
-import { getFileUrl } from '@/lib/utils';
 import type { Role } from '@/lib/types';
 
 const ROLE_CONFIG: Record<Role, {
@@ -173,17 +172,13 @@ export default function AdminUserDetailPage() {
         {/* Profile body */}
         <div className="bg-white px-6 pb-6">
           <div className="flex items-end gap-4 -mt-10 mb-4">
-            <Avatar
+            <AuthenticatedAvatar
+              photoUrl={user.photo_url}
+              fallback={initials}
               className="h-20 w-20 border-4 border-white shadow-lg flex-shrink-0"
-            >
-              <AvatarImage src={getFileUrl(user.photo_url) ?? undefined} />
-              <AvatarFallback
-                className="text-2xl font-bold text-white"
-                style={{ background: rc.gradient }}
-              >
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+              fallbackClassName="text-2xl font-bold text-white"
+              fallbackStyle={{ background: rc.gradient }}
+            />
 
             {/* Badges shown next to avatar on right edge */}
             <div className="pb-1 flex flex-wrap gap-2 items-center">

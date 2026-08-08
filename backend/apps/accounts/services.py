@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.mail import EmailMultiAlternatives
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -81,17 +82,9 @@ def invite_user(
 
 def consume_setup_token(*, token: str, password: str) -> User:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    try:
-        setup_token = PasswordSetupToken.objects.get(
-            token_hash=token_hash,
-            consumed_at__isnull=True,
-        )
-    except PasswordSetupToken.DoesNotExist as exc:
-        raise ValueError("invite_token_invalid") from exc
 
-    if setup_token.expires_at and setup_token.expires_at < timezone.now():
-        raise ValueError("invite_token_expired")
-
+    # Validate cryptographic signature BEFORE entering the DB transaction
+    # so we don't hold a row lock during CPU-bound work.
     signer = TimestampSigner()
     try:
         signer.unsign(token, max_age=INVITE_TOKEN_MAX_AGE)
@@ -100,13 +93,26 @@ def consume_setup_token(*, token: str, password: str) -> User:
     except BadSignature as exc:
         raise ValueError("invite_token_invalid") from exc
 
-    user = setup_token.user
-    user.set_password(password)
-    user.is_active = True
-    user.save(update_fields=["password", "is_active"])
+    with transaction.atomic():
+        try:
+            setup_token = (
+                PasswordSetupToken.objects
+                .select_for_update()
+                .get(token_hash=token_hash, consumed_at__isnull=True)
+            )
+        except PasswordSetupToken.DoesNotExist as exc:
+            raise ValueError("invite_token_invalid") from exc
 
-    setup_token.consumed_at = timezone.now()
-    setup_token.save(update_fields=["consumed_at"])
+        if setup_token.expires_at and setup_token.expires_at < timezone.now():
+            raise ValueError("invite_token_expired")
+
+        setup_token.consumed_at = timezone.now()
+        setup_token.save(update_fields=["consumed_at"])
+
+        user = setup_token.user
+        user.set_password(password)
+        user.is_active = True
+        user.save(update_fields=["password", "is_active"])
 
     return user
 

@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AuthenticatedAvatar } from '@/components/ui/AuthenticatedAvatar';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -25,7 +25,6 @@ import {
 import { InviteUserDialog } from '@/features/admin/users/InviteUserDialog';
 import { BulkInviteDialog } from '@/features/admin/users/BulkInviteDialog';
 import { ErrorState } from '@/components/states/ErrorState';
-import { getFileUrl } from '@/lib/utils';
 import type { Role } from '@/lib/types';
 
 /* ── Role styling ────────────────────────────────────────────────────── */
@@ -270,12 +269,12 @@ export default function AdminUsersPage() {
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={getFileUrl(user.photo_url) ?? undefined} />
-                            <AvatarFallback className={`text-xs font-semibold ${rc.avatarBg} ${rc.avatarText}`}>
-                              {initials}
-                            </AvatarFallback>
-                          </Avatar>
+                          <AuthenticatedAvatar
+                            photoUrl={user.photo_url}
+                            fallback={initials}
+                            className="h-8 w-8"
+                            fallbackClassName={`text-xs font-semibold ${rc.avatarBg} ${rc.avatarText}`}
+                          />
                           <div>
                             <p className="text-sm font-semibold text-slate-800">
                               {user.full_name || <span className="text-slate-400 italic font-normal">No name</span>}

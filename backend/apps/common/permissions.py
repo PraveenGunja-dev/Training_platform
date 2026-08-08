@@ -51,7 +51,7 @@ class IsSubMentorOfGroup(BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         from apps.groups.models import GroupSubMentor  # noqa: PLC0415
 
-        group_id = getattr(obj, "group_id", None) or getattr(obj, "id", None)
+        group_id = getattr(obj, "group_id", None)
         if group_id is None:
             return False
         return GroupSubMentor.objects.filter(
@@ -72,7 +72,7 @@ class IsParticipantInGroup(BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         from apps.groups.models import GroupMembership  # noqa: PLC0415
 
-        group_id = getattr(obj, "group_id", None) or getattr(obj, "id", None)
+        group_id = getattr(obj, "group_id", None)
         if group_id is None:
             return False
         return GroupMembership.objects.filter(

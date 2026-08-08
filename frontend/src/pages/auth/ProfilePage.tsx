@@ -17,9 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AuthenticatedAvatar } from '@/components/ui/AuthenticatedAvatar';
 import { Separator } from '@/components/ui/separator';
-import { cn, getFileUrl } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -132,7 +132,6 @@ export function ProfilePage() {
   const accentRing   = isAdmin ? 'ring-[#0052A5]' : isSubMentor ? 'ring-emerald-500' : isLeadMentor ? 'ring-teal-500' : 'ring-violet-500';
   const roleLabel    = isAdmin ? 'Super Admin' : isSubMentor ? 'Sub-Mentor' : isLeadMentor ? 'Lead Mentor' : 'Participant';
 
-  const photoSrc = preview ?? getFileUrl(user?.photo_url) ?? undefined;
   const userInitials = user ? initials(user.full_name) : '?';
 
   return (
@@ -149,12 +148,13 @@ export function ProfilePage() {
         <div className="-mt-16 mb-8 flex flex-col sm:flex-row items-center sm:items-end gap-4">
           {/* Avatar with upload overlay */}
           <div className="relative group">
-            <Avatar className={cn('h-32 w-32 border-4 border-white shadow-xl ring-2', accentRing)}>
-              <AvatarImage src={photoSrc} alt={user?.full_name} className="object-cover" />
-              <AvatarFallback className={cn('text-2xl font-bold text-white', accentBg)}>
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
+            <AuthenticatedAvatar
+              photoUrl={preview ?? user?.photo_url}
+              fallback={userInitials}
+              className={cn('h-32 w-32 border-4 border-white shadow-xl ring-2', accentRing)}
+              fallbackClassName={cn('text-2xl font-bold text-white', accentBg)}
+              imageClassName="object-cover"
+            />
 
             {/* Upload overlay */}
             <button
