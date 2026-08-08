@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AuthenticatedAvatar } from '@/components/ui/AuthenticatedAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,14 +49,12 @@ export function UserMenu() {
           className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="User menu"
         >
-          <Avatar className="h-8 w-8">
-            {user?.photo_url ? (
-              <AvatarImage src={user.photo_url} alt={user.full_name} />
-            ) : null}
-            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <AuthenticatedAvatar
+            photoUrl={user?.photo_url}
+            fallback={initials}
+            className="h-8 w-8"
+            fallbackClassName="text-xs bg-primary/10 text-primary"
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">

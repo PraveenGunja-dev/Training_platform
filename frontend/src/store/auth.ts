@@ -117,3 +117,11 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e: StorageEvent) => {
+    if (e.key === 'ems-auth' && !e.newValue) {
+      useAuthStore.getState().logout()
+    }
+  })
+}
