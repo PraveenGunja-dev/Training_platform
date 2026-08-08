@@ -40,4 +40,6 @@ class ClassFeedbackReadSerializer(serializers.ModelSerializer):
         ]
 
     def get_participant_name(self, obj: ClassFeedback) -> str:
+        if obj.participant is None:
+            return "Deleted User"
         return obj.participant.full_name or obj.participant.email

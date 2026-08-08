@@ -92,7 +92,9 @@ class Document(TimestampedModel):
 class ParticipantUploadPermission(TimestampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="upload_permissions",
     )
     group = models.ForeignKey(
@@ -136,7 +138,9 @@ class ParticipantSharedDoc(TimestampedModel):
     )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="shared_docs",
     )
     title = models.CharField(max_length=255)

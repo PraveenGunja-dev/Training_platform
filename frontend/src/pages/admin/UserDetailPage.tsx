@@ -94,7 +94,8 @@ export default function AdminUserDetailPage() {
   };
 
   const saveEdit = () => {
-    updateMutation.mutate({ full_name: fullName, role });
+    if (!fullName.trim()) return;
+    updateMutation.mutate({ full_name: fullName.trim(), role });
   };
 
   if (isLoading) {
@@ -224,7 +225,7 @@ export default function AdminUserDetailPage() {
                 <Button
                   size="sm"
                   onClick={saveEdit}
-                  disabled={updateMutation.isPending}
+                  disabled={updateMutation.isPending || !fullName.trim()}
                   className="gap-1.5"
                   style={{ background: 'linear-gradient(135deg, #0052A5 0%, #003F8A 100%)' }}
                 >

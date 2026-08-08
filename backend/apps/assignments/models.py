@@ -93,7 +93,9 @@ class Submission(TimestampedModel):
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="submissions",
     )
     version = models.PositiveIntegerField(default=1)

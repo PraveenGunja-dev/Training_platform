@@ -30,7 +30,7 @@ class GroupMembership(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="group_memberships",
     )
     group = models.ForeignKey(
@@ -62,7 +62,7 @@ class GroupSubMentor(models.Model):
     )
     sub_mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="sub_mentored_groups",
         limit_choices_to={"role": "SUB_MENTOR"},
     )
@@ -118,7 +118,7 @@ class SubGroupMembership(models.Model):
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='sub_group_memberships',
     )
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -143,7 +143,7 @@ class GroupLeadMentor(TimestampedModel):
     )
     lead_mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="lead_mentor_of_groups",
     )
     assigned_by = models.ForeignKey(
