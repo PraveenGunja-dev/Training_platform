@@ -186,7 +186,7 @@ export default function AdminClassesPage() {
     queryFn:  () => classesApi.counts({
       group_id: selectedGroup !== 'all' ? selectedGroup : undefined,
     }),
-    staleTime: 30_000,
+    refetchInterval: 10_000,
   });
   const counts = countsQuery.data?.data;
 

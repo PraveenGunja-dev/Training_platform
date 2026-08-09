@@ -57,10 +57,11 @@ export default function AdminClassDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [allocateOpen, setAllocateOpen] = useState(false);
-  const [editOpen, setEditOpen]         = useState(false);
-  const [cancelOpen, setCancelOpen]     = useState(false);
-  const [deleteOpen, setDeleteOpen]     = useState(false);
+  const [allocateOpen, setAllocateOpen]   = useState(false);
+  const [editOpen, setEditOpen]           = useState(false);
+  const [cancelOpen, setCancelOpen]       = useState(false);
+  const [deleteOpen, setDeleteOpen]       = useState(false);
+  const [completeOpen, setCompleteOpen]   = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['class', id],
@@ -72,7 +73,7 @@ export default function AdminClassDetailPage() {
   });
 
   const markCompleted = useMutation({
-    mutationFn: () => classesApi.update(data!.data!.id, { status: 'COMPLETED' } as never),
+    mutationFn: () => classesApi.update(data?.data?.id ?? '', { status: 'COMPLETED' } as never),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['class', id] });
       void queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -82,14 +83,22 @@ export default function AdminClassDetailPage() {
   });
 
   const deleteClass = useMutation({
-    mutationFn: () => classesApi.delete(data!.data!.id),
+    mutationFn: () => classesApi.delete(data?.data?.id ?? ''),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['class', id] });
       void queryClient.invalidateQueries({ queryKey: ['classes'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard', 'admin'] });
       toast.success('Class deleted successfully.');
       navigate('/admin/classes');
     },
-    onError: () => toast.error('Failed to delete class.'),
+    onError: (err: unknown) => {
+      const errStatus = (err as { response?: { status?: number } })?.response?.status;
+      if (errStatus === 409) {
+        toast.error('Cannot delete: class has attendance records. Cancel it instead.');
+      } else {
+        toast.error('Failed to delete class.');
+      }
+    },
   });
 
   if (isLoading) return <DetailSkeleton />;
@@ -102,7 +111,7 @@ export default function AdminClassDetailPage() {
   const badge = STATUS_BADGE[cls.status] ?? STATUS_BADGE.COMPLETED;
 
   const canStartAttendance =
-    !cls.active_session &&
+    cls.active_session?.status !== 'ACTIVE' &&
     cls.status !== 'CANCELLED' &&
     cls.status !== 'COMPLETED';
 
@@ -310,7 +319,7 @@ export default function AdminClassDetailPage() {
               size="sm"
               className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
               disabled={markCompleted.isPending}
-              onClick={() => markCompleted.mutate()}
+              onClick={() => setCompleteOpen(true)}
             >
               <CheckCircle2 className="h-4 w-4 mr-1.5" />
               {markCompleted.isPending ? 'Updating…' : 'Mark Completed'}
@@ -414,6 +423,32 @@ export default function AdminClassDetailPage() {
         onClose={() => setCancelOpen(false)}
       />
 
+      {/* Mark Completed confirmation */}
+      <Dialog open={completeOpen} onOpenChange={v => { if (!v) setCompleteOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark class as completed?</DialogTitle>
+            <DialogDescription>
+              This will permanently mark "{cls.title}" as completed and notify participants.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCompleteOpen(false)} disabled={markCompleted.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => { markCompleted.mutate(); setCompleteOpen(false); }}
+              disabled={markCompleted.isPending}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+              {markCompleted.isPending ? 'Updating…' : 'Mark Completed'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Class confirmation */}
       <Dialog open={deleteOpen} onOpenChange={v => { if (!v) setDeleteOpen(false); }}>
         <DialogContent className="max-w-md">
@@ -430,10 +465,14 @@ export default function AdminClassDetailPage() {
                   You are about to permanently delete{' '}
                   <span className="font-semibold text-slate-800">"{cls.title}"</span>.
                 </p>
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 mb-1">
+                  <p className="text-amber-700 text-sm font-medium">
+                    ⚠ Classes with attendance records cannot be deleted. Cancel the class instead.
+                  </p>
+                </div>
                 <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 space-y-1.5">
                   <p className="font-medium text-red-800 text-xs uppercase tracking-wide">This will permanently remove:</p>
                   <ul className="list-disc list-inside space-y-1 text-red-700 text-sm">
-                    <li>All attendance sessions and records</li>
                     <li>All assignment submissions linked to this class</li>
                     <li>All class documents</li>
                     <li>All activity logs for this class</li>

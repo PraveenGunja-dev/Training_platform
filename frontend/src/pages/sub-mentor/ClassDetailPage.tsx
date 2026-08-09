@@ -11,6 +11,9 @@ import { ClassAttendancePanel } from '@/features/admin/attendance/ClassAttendanc
 import { ClassSubmissionsPanel } from '@/features/admin/class/ClassSubmissionsPanel';
 import { ClassDocumentUploadCard } from '@/features/admin/class/ClassDocumentUploadCard';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { EditClassDialog } from '@/features/admin/class/EditClassDialog';
 import { CancelClassDialog } from '@/features/admin/class/CancelClassDialog';
 import { StartAttendanceDialog } from '@/features/admin/attendance/StartAttendanceDialog';
@@ -70,12 +73,13 @@ export default function SubMentorClassDetailPage() {
     staleTime: 0,
   });
 
-  const [allocateOpen, setAllocateOpen] = useState(false);
-  const [editOpen, setEditOpen]         = useState(false);
-  const [cancelOpen, setCancelOpen]     = useState(false);
+  const [allocateOpen, setAllocateOpen]   = useState(false);
+  const [editOpen, setEditOpen]           = useState(false);
+  const [cancelOpen, setCancelOpen]       = useState(false);
+  const [completeOpen, setCompleteOpen]   = useState(false);
 
   const markCompleted = useMutation({
-    mutationFn: () => classesApi.update(data!.data!.id, { status: 'COMPLETED' } as never),
+    mutationFn: () => classesApi.update(data?.data?.id ?? '', { status: 'COMPLETED' } as never),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['class', id] });
       void queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -280,7 +284,7 @@ export default function SubMentorClassDetailPage() {
                 size="sm"
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
                 disabled={markCompleted.isPending}
-                onClick={() => markCompleted.mutate()}
+                onClick={() => setCompleteOpen(true)}
               >
                 <CheckCircle2 className="h-4 w-4 mr-1.5" />
                 {markCompleted.isPending ? 'Updating…' : 'Mark Completed'}
@@ -320,6 +324,32 @@ export default function SubMentorClassDetailPage() {
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
       />
+
+      {/* Mark Completed confirmation */}
+      <Dialog open={completeOpen} onOpenChange={v => { if (!v) setCompleteOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark class as completed?</DialogTitle>
+            <DialogDescription>
+              This will permanently mark "{cls.title}" as completed and notify participants.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCompleteOpen(false)} disabled={markCompleted.isPending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => { markCompleted.mutate(); setCompleteOpen(false); }}
+              disabled={markCompleted.isPending}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+              {markCompleted.isPending ? 'Updating…' : 'Mark Completed'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Attendance + sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

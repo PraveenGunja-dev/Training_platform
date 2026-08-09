@@ -10,7 +10,7 @@ import { FeedbackFormCard } from '@/features/participant/class/FeedbackFormCard'
 
 export default function ClassDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['class', id],
     queryFn: () => classesApi.get(id!),
     enabled: !!id,
@@ -28,12 +28,25 @@ export default function ClassDetailPage() {
   }
 
   if (isError || !data?.data) {
+    const is404 = (error as { response?: { status?: number } })?.response?.status === 404;
     return (
-      <div className="text-center py-16">
-        <p className="text-muted-foreground">Class not found.</p>
-        <Link to="/me/calendar" className="text-primary hover:underline text-sm mt-2 inline-block">
-          Back to Calendar
-        </Link>
+      <div className="text-center py-16 space-y-3">
+        <p className="text-muted-foreground">
+          {is404 ? 'Class not found.' : 'Something went wrong loading this class.'}
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          {!is404 && (
+            <button
+              onClick={() => void refetch()}
+              className="text-sm text-[#0052A5] hover:underline"
+            >
+              Try again
+            </button>
+          )}
+          <Link to="/me/calendar" className="text-sm text-[#5A7A9A] hover:underline">
+            Back to Calendar
+          </Link>
+        </div>
       </div>
     );
   }
