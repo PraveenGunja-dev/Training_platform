@@ -9,20 +9,29 @@ from celery import shared_task
     max_retries=3,
     default_retry_delay=30,
 )
-def send_attendance_session_email(self, class_id: str) -> None:
+def send_attendance_session_email(self, class_id: str, session_id: str | None = None) -> None:
     from celery.exceptions import Retry
 
     try:
         from apps.scheduling.models import Class
         from apps.groups.models import GroupMembership
         from .emails import send_session_started_email
+        from .models import AttendanceSession
 
         cls = Class.objects.get(id=class_id)
         recipient_emails = list(
             GroupMembership.objects.filter(group=cls.group)
             .values_list("user__email", flat=True)
         )
-        send_session_started_email(class_obj=cls, recipient_emails=recipient_emails)
+        started_at = None
+        if session_id:
+            started_at = (
+                AttendanceSession.objects
+                .filter(id=session_id)
+                .values_list("started_at", flat=True)
+                .first()
+            )
+        send_session_started_email(class_obj=cls, recipient_emails=recipient_emails, started_at=started_at)
     except Retry:
         raise
     except Exception as exc:
@@ -100,7 +109,7 @@ def auto_end_attendance_session(self, session_id: str) -> None:
         if session.status != "ACTIVE":
             return
 
-        end_session(session=session, actor=session.started_by)
+        end_session(session=session, actor=session.started_by, is_auto=True)
     except Retry:
         raise
     except Exception as exc:

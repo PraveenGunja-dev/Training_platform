@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function ClassAttendanceHistory({ classId, reportBasePath }: Props) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['attendance', 'sessions', classId, 'ended'],
     queryFn: () => attendanceApi.admin.listSessions({ class_id: classId, status: 'ENDED' }),
   });
@@ -30,8 +30,28 @@ export function ClassAttendanceHistory({ classId, reportBasePath }: Props) {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#C5D8EC] shadow-card p-5 text-center">
+        <p className="text-sm text-rose-500 font-medium mb-2">Failed to load session history.</p>
+        <button
+          onClick={() => refetch()}
+          className="text-xs text-[#0052A5] underline hover:text-[#002D6E]"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   const sessions = data?.data ?? [];
-  if (sessions.length === 0) return null;
+  if (sessions.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#C5D8EC] shadow-card p-5 text-center">
+        <p className="text-sm text-[#5A7A9A]">No attendance sessions recorded for this class yet.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-[#C5D8EC] shadow-card overflow-hidden">

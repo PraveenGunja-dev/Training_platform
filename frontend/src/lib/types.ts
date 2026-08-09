@@ -155,6 +155,7 @@ export interface AttendanceRecord {
 export interface ActiveSessionResponse {
   session: AttendanceSession | null;
   my_record: AttendanceRecord | null;
+  _warning?: string;
 }
 
 // Legacy record shape — used by admin override handlers until F-X-05 migrates them.

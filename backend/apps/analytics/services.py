@@ -240,7 +240,10 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     # Precompute user-level aggregates (3 queries)
     _attended_per_user = {
         row["user_id"]: row["cnt"]
-        for row in AttendanceRecord.objects.filter(user_id__in=participant_ids)
+        for row in AttendanceRecord.objects.filter(
+            user_id__in=participant_ids,
+            status=AttendanceRecord.STATUS_PRESENT,
+        )
         .values("user_id").annotate(cnt=Count("id"))
     }
     _submitted_per_user = {
@@ -558,6 +561,7 @@ def compute_sub_mentor_payload(user) -> dict:
         for row in AttendanceRecord.objects.filter(
             user_id__in=participant_ids,
             session__class_obj__group_id__in=assigned_group_ids,
+            status=AttendanceRecord.STATUS_PRESENT,
         ).values("user_id").annotate(cnt=Count("id"))
     }
     _submitted_per_user = {
@@ -726,7 +730,9 @@ def compute_participant_payload(user) -> dict:
         class_obj__group_id__in=group_ids
     ).count()
     attended = AttendanceRecord.objects.filter(
-        user=user, session__class_obj__group_id__in=group_ids
+        user=user,
+        session__class_obj__group_id__in=group_ids,
+        status=AttendanceRecord.STATUS_PRESENT,
     ).count()
     attendance_rate = round(min((attended / total_sessions * 100) if total_sessions else 0, 100))
     submitted_count = (
@@ -873,6 +879,7 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
         for row in AttendanceRecord.objects.filter(
             user_id__in=participant_ids,
             session__class_obj__group_id=group_id,
+            status=AttendanceRecord.STATUS_PRESENT,
         ).values("user_id").annotate(cnt=Count("id"))
     }
     _submitted_per_user = {
