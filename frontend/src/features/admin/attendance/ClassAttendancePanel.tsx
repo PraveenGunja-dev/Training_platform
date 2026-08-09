@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ClassAttendancePanel({ activeSession }: Props) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'attendance', 'report', activeSession?.id],
     queryFn: () => attendanceApi.admin.sessionReport(activeSession!.id),
     enabled: !!activeSession?.id,
@@ -41,6 +41,21 @@ export function ClassAttendancePanel({ activeSession }: Props) {
           {[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-slate-100 rounded-xl" />)}
         </div>
         {[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-slate-100 rounded-lg" />)}
+      </div>
+    );
+  }
+
+  /* ── Error ───────────────────────────────────────────────────────── */
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+        <p className="text-sm text-rose-500 font-medium">Failed to load attendance data.</p>
+        <button
+          onClick={() => refetch()}
+          className="text-xs text-[#0052A5] underline hover:text-[#002D6E]"
+        >
+          Retry
+        </button>
       </div>
     );
   }

@@ -4,13 +4,20 @@ import { useActiveSession } from './useActiveSession';
 import { useMarkAttendance } from './useMarkAttendance';
 import { Button } from '@/components/ui/button';
 
-export function AttendanceLiveBanner() {
+interface AttendanceLiveBannerProps {
+  /** Pass the current class's ID on class detail pages so the banner hides itself
+   *  (AttendanceCard handles it there, avoiding a duplicate UI and wrong-session mark). */
+  currentClassId?: string;
+}
+
+export function AttendanceLiveBanner({ currentClassId }: AttendanceLiveBannerProps = {}) {
   const { data } = useActiveSession();
   const mark = useMarkAttendance();
   const session = data?.data.session;
   const myRecord = data?.data.my_record;
 
   if (!session || session.status !== 'ACTIVE') return null;
+  if (currentClassId && session.class_id === currentClassId) return null;
 
   return (
     <motion.div
@@ -35,6 +42,11 @@ export function AttendanceLiveBanner() {
           <div>
             <p className="text-sm font-semibold text-[#00285A]">Attendance is now open</p>
             <p className="text-xs text-[#7C7AAE] font-medium mt-0.5">{session.class_title}</p>
+            {data?.data._warning === 'multiple_active' && (
+              <p className="text-xs text-amber-600 font-medium mt-0.5">
+                Multiple sessions active — showing the most recent.
+              </p>
+            )}
           </div>
         </div>
 

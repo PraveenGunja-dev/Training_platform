@@ -534,11 +534,26 @@ class ClassGroupViewSet(ViewSet):
         submission_completion = {"completed": completed, "total": max(total_possible, completed)}
 
         # Top participants
-        att_sessions_total = AttendanceSession.objects.filter(class_obj__group=group).count()
+        from django.db.models import Count as _Count  # noqa: PLC0415
+        sessions_filter = {"class_obj__group": group}
+        if sub_group_id:
+            sessions_filter["class_obj__sub_group_id"] = sub_group_id
+        att_sessions_total = AttendanceSession.objects.filter(**sessions_filter).count()
+
+        records_filter = {"session__class_obj__group": group, "status": "PRESENT"}
+        if sub_group_id:
+            records_filter["session__class_obj__sub_group_id"] = sub_group_id
+        attended_map = dict(
+            AttendanceRecord.objects.filter(**records_filter)
+            .values("user_id")
+            .annotate(n=_Count("id"))
+            .values_list("user_id", "n")
+        )
+
         participant_rows = []
         for m in members_iter:
             user_obj = m.user
-            attended = AttendanceRecord.objects.filter(session__class_obj__group=group, user=user_obj).count()
+            attended = attended_map.get(m.user_id, 0)
             att_rate = round(attended / att_sessions_total * 100, 1) if att_sessions_total else 0.0
             subs = Submission.objects.filter(user=user_obj, task__group=group).values("task_id").distinct().count()
             participant_rows.append({

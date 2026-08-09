@@ -3,15 +3,16 @@ from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 
 
-def send_session_started_email(*, class_obj, recipient_emails: list[str]) -> None:
+def send_session_started_email(*, class_obj, recipient_emails: list[str], started_at=None) -> None:
     if not recipient_emails:
         return
+    session_time = started_at or class_obj.starts_at
     subject = f"Attendance is now open for {class_obj.title}"
     body = render_to_string(
         "attendance/session_started.txt",
         {
             "class_title": class_obj.title,
-            "started_at": class_obj.starts_at.strftime("%d %b %Y, %I:%M %p UTC"),
+            "started_at": session_time.strftime("%d %b %Y, %I:%M %p UTC"),
             "frontend_url": settings.FRONTEND_URL,
         },
     )

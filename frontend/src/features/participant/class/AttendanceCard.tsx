@@ -10,7 +10,7 @@ export function AttendanceCard({ cls }: { cls: ClassSession }) {
   const { data } = useActiveSession();
   const mark = useMarkAttendance();
   const session = data?.data.session;
-  const myRecord = data?.data.my_record;
+  const myRecord = data?.data.my_record ?? cls.my_record ?? null;
   const [showUnlock, setShowUnlock] = useState(false);
 
   // Fire UnlockAnimation exactly once when session flips from null → active for this class

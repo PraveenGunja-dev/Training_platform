@@ -64,7 +64,10 @@ class ClassGroupDetailSerializer(ClassGroupListSerializer):
         open_tasks = AssignmentTask.objects.filter(group=obj, is_open=True).count()
 
         attendance_map = dict(
-            AttendanceRecord.objects.filter(session__class_obj__group=obj)
+            AttendanceRecord.objects.filter(
+                session__class_obj__group=obj,
+                status=AttendanceRecord.STATUS_PRESENT,
+            )
             .values("user_id")
             .annotate(n=Count("id"))
             .values_list("user_id", "n")
