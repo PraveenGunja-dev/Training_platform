@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -51,7 +52,7 @@ class ClassViewSet(ViewSet):
         from apps.groups.models import GroupSubMentor  # noqa: PLC0415
         return (
             Class.objects
-            .select_related("group", "created_by")
+            .select_related("group", "group__lead_mentor_assignment__lead_mentor", "created_by")
             .prefetch_related(
                 Prefetch(
                     "group__sub_mentors",
@@ -98,21 +99,32 @@ class ClassViewSet(ViewSet):
         return qs
 
     def list(self, request: Request) -> Response:
-        # Silently correct class statuses on every admin list call (no-op when already correct).
         if request.user.role == "ADMIN":
-            now = timezone.now()
-            # Step 1: currently running → ONGOING
-            Class.objects.filter(
-                starts_at__lte=now, ends_at__gte=now,
-            ).exclude(status_cached=Class.STATUS_ONGOING).exclude(
-                status_cached=Class.STATUS_CANCELLED,
-            ).update(status_cached=Class.STATUS_ONGOING)
-            # Step 2: fully ended (covers UPCOMING and ONGOING that ran past ends_at) → COMPLETED
-            Class.objects.filter(
-                ends_at__lt=now,
-            ).exclude(status_cached=Class.STATUS_COMPLETED).exclude(
-                status_cached=Class.STATUS_CANCELLED,
-            ).update(status_cached=Class.STATUS_COMPLETED)
+            from django.core.cache import cache  # noqa: PLC0415
+            _cache_key = "scheduling:status_sync_last_run"
+            if not cache.get(_cache_key):
+                now = timezone.now()
+                Class.objects.filter(
+                    starts_at__lte=now, ends_at__gte=now,
+                ).exclude(status_cached=Class.STATUS_ONGOING).exclude(
+                    status_cached=Class.STATUS_CANCELLED,
+                ).update(status_cached=Class.STATUS_ONGOING)
+                Class.objects.filter(
+                    ends_at__lt=now,
+                ).exclude(status_cached=Class.STATUS_COMPLETED).exclude(
+                    status_cached=Class.STATUS_CANCELLED,
+                ).update(status_cached=Class.STATUS_COMPLETED)
+                cache.set(_cache_key, True, timeout=60)
+                # Notify participants for classes newly transitioned to COMPLETED
+                from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
+                from datetime import timedelta  # noqa: PLC0415
+                just_ended = Class.objects.filter(
+                    ends_at__lt=now,
+                    ends_at__gte=now - timedelta(seconds=60),
+                    status_cached=Class.STATUS_COMPLETED,
+                ).select_related("group")
+                for _cls in just_ended.iterator(chunk_size=50):
+                    _notify_fb(_cls)
         qs = self._scoped_queryset(request)
         qs = apply_class_filters(qs, request.query_params)
         context: dict = {"request": request}
@@ -143,7 +155,7 @@ class ClassViewSet(ViewSet):
                     {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-        serializer = ClassWriteSerializer(data=request.data)
+        serializer = ClassWriteSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         # Belt-and-suspenders: run model-level clean() before the DB write.
         from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
@@ -204,8 +216,20 @@ class ClassViewSet(ViewSet):
                 {"errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        serializer = ClassWriteSerializer(cls, data=request.data, partial=True)
+        serializer = ClassWriteSerializer(cls, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
+
+        # Re-check ownership if group is being changed
+        new_group = serializer.validated_data.get("group")
+        if new_group and new_group.id != cls.group_id:
+            if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, new_group.id):
+                return Response(self._SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, new_group.id):
+                return Response(
+                    {"errors": [{"code": "perm.not_lead_mentor_of_group",
+                                 "message": "You are not the Lead Mentor for the new group."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         # When the admin reschedules a COMPLETED class (changes starts_at or ends_at)
         # without explicitly setting a new status, reset status_cached so it re-derives
@@ -218,14 +242,15 @@ class ClassViewSet(ViewSet):
         ):
             serializer.validated_data["status_cached"] = Class.STATUS_UPCOMING
 
-        # Belt-and-suspenders: apply pending changes to a scratch copy and run
-        # model-level clean() before committing the DB write.
+        # Validate a scratch copy so the live instance is never mutated before save.
+        import copy  # noqa: PLC0415
         from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
         from rest_framework.exceptions import ValidationError as DRFValidationError  # noqa: PLC0415
+        cls_scratch = copy.copy(cls)
         for _field, _val in serializer.validated_data.items():
-            setattr(cls, _field, _val)
+            setattr(cls_scratch, _field, _val)
         try:
-            cls.full_clean(exclude=["id"])
+            cls_scratch.full_clean(exclude=["id"])
         except DjangoValidationError as exc:
             raise DRFValidationError(detail=exc.message_dict)
 
@@ -292,7 +317,8 @@ class ClassViewSet(ViewSet):
         else:
             # Content-only edit by a co-Sub-Mentor → CO_SUB_MENTOR_EDITED_CLASS (debounced per 5 min)
             if request.user.role == "SUB_MENTOR":
-                debounce_window = _tz2.now().strftime("%Y%m%d%H") + str(_tz2.now().minute // 5)
+                _now2 = _tz2.now()
+                debounce_window = _now2.strftime("%Y%m%d%H") + str(_now2.minute // 5)
                 _ni2(
                     group=cls_fresh.group,
                     notification_type="CO_SUB_MENTOR_EDITED_CLASS",
@@ -322,13 +348,59 @@ class ClassViewSet(ViewSet):
         class_id = cls.id
         group = cls.group
         date_str = cls.starts_at.strftime("%d %b %Y")
-        cls.delete()
+
+        from apps.assignments.models import AssignmentTask  # noqa: PLC0415
+        affected_task_ids = list(
+            AssignmentTask.objects.filter(class_obj=cls).values_list("id", flat=True)
+        )
+
+        try:
+            cls.delete()
+        except ProtectedError:
+            return Response(
+                {"errors": [{"code": "class.has_attendance",
+                             "message": "Cannot delete a class that has attendance records. Cancel it instead."}]},
+                status=status.HTTP_409_CONFLICT,
+            )
         log_action(
             actor=request.user,
             action="class.deleted",
             target_type="Class",
             target_id=class_id,
             metadata={"title": title},
+        )
+        if affected_task_ids:
+            log_action(
+                actor=request.user,
+                action="assignment.class_unlinked",
+                target_type="Class",
+                target_id=class_id,
+                metadata={"task_ids": [str(t) for t in affected_task_ids], "title": title},
+            )
+
+        from apps.groups.models import GroupMembership  # noqa: PLC0415
+        from apps.notifications.models import Notification  # noqa: PLC0415
+        from django.utils import timezone as _tz_del  # noqa: PLC0415
+        _member_ids = list(
+            GroupMembership.objects.filter(group=group).values_list("user_id", flat=True)
+        )
+        _now_del = _tz_del.now()
+        Notification.objects.bulk_create(
+            [
+                Notification(
+                    user_id=uid,
+                    type="CLASS_CANCELLED",
+                    title=f"Class cancelled: {title}",
+                    body=f'Class "{title}" on {date_str} has been cancelled.',
+                    link="/me/calendar",
+                    dedupe_key=f"class_deleted:{class_id}:{uid}",
+                    sent_at=_now_del,
+                    payload={"group_id": str(group.id)},
+                )
+                for uid in _member_ids
+            ],
+            ignore_conflicts=True,
+            batch_size=500,
         )
         from apps.notifications.services import notify_sub_mentors as _ni3  # noqa: PLC0415
         _ni3(
@@ -464,15 +536,23 @@ class RecurringClassView(APIView):
             from django.utils.timezone import AmbiguousTimeError, NonExistentTimeError  # noqa: PLC0415
             try:
                 starts_at = _tz.make_aware(datetime.combine(day, d["start_time"]), tz)
-            except (AmbiguousTimeError, NonExistentTimeError):
+            except NonExistentTimeError:
                 starts_at = _tz.make_aware(
                     datetime.combine(day, d["start_time"]) + timedelta(hours=1), tz
                 )
+            except AmbiguousTimeError:
+                starts_at = _tz.make_aware(
+                    datetime.combine(day, d["start_time"]), tz, is_dst=False
+                )
             try:
                 ends_at = _tz.make_aware(datetime.combine(day, d["end_time"]), tz)
-            except (AmbiguousTimeError, NonExistentTimeError):
+            except NonExistentTimeError:
                 ends_at = _tz.make_aware(
                     datetime.combine(day, d["end_time"]) + timedelta(hours=1), tz
+                )
+            except AmbiguousTimeError:
+                ends_at = _tz.make_aware(
+                    datetime.combine(day, d["end_time"]), tz, is_dst=False
                 )
             classes_to_create.append(
                 Class(
@@ -488,22 +568,77 @@ class RecurringClassView(APIView):
                 )
             )
 
-        created = Class.objects.bulk_create(classes_to_create)
+        from django.db import transaction  # noqa: PLC0415
+        with transaction.atomic():
+            created = Class.objects.bulk_create(classes_to_create)
+            log_action(
+                actor=request.user,
+                action="class.recurring_created",
+                target_type="Class",
+                target_id=str(created[0].id) if created else "bulk",
+                metadata={
+                    "title": d["title"],
+                    "group_id": str(group.id),
+                    "count": len(created),
+                    "days_of_week": list(days_set),
+                    "start_date": d["start_date"].isoformat(),
+                    "end_date": d["end_date"].isoformat(),
+                },
+            )
 
-        log_action(
-            actor=request.user,
-            action="class.recurring_created",
-            target_type="ClassGroup",
-            target_id=group.id,
-            metadata={
-                "title": d["title"],
-                "group_id": str(group.id),
-                "count": len(created),
-                "days_of_week": list(days_set),
-                "start_date": d["start_date"].isoformat(),
-                "end_date": d["end_date"].isoformat(),
-            },
-        )
+        # Fix status_cached for past/ongoing classes — bulk_create skips save()
+        from django.utils import timezone as _tz_fix  # noqa: PLC0415
+        _now_fix = _tz_fix.now()
+        _past_ids = [c.id for c in created if c.ends_at < _now_fix]
+        if _past_ids:
+            Class.objects.filter(id__in=_past_ids).update(status_cached=Class.STATUS_COMPLETED)
+        _ongoing_ids = [c.id for c in created if c.starts_at <= _now_fix <= c.ends_at]
+        if _ongoing_ids:
+            Class.objects.filter(id__in=_ongoing_ids).update(status_cached=Class.STATUS_ONGOING)
+
+        if created:
+            from apps.notifications.services import notify_sub_mentors as _ni_rec  # noqa: PLC0415
+            from apps.groups.models import GroupMembership as _GM_rec  # noqa: PLC0415
+            from apps.notifications.models import Notification as _Notif_rec  # noqa: PLC0415
+            from django.utils import timezone as _tz_rec  # noqa: PLC0415
+            _now_rec = _tz_rec.now()
+            _start_str = created[0].starts_at.strftime("%d %b %Y")
+            _end_str = created[-1].starts_at.strftime("%d %b %Y")
+            _body = (
+                f'{len(created)} recurring class{"es" if len(created) != 1 else ""}'
+                f' "{d["title"]}" scheduled from {_start_str} to {_end_str}'
+                f' in {group.name}.'
+            )
+            _member_ids = list(
+                _GM_rec.objects.filter(group=group).values_list("user_id", flat=True)
+            )
+            _Notif_rec.objects.bulk_create(
+                [
+                    _Notif_rec(
+                        user_id=uid,
+                        type="CLASS_SCHEDULED",
+                        title=f"New recurring classes: {d['title']}",
+                        body=_body,
+                        link="/me/calendar",
+                        dedupe_key=f"recurring_scheduled:{group.id}:{_start_str}:{uid}",
+                        sent_at=_now_rec,
+                        payload={"group_id": str(group.id)},
+                    )
+                    for uid in _member_ids
+                ],
+                ignore_conflicts=True,
+                batch_size=500,
+            )
+            _ni_rec(
+                group=group,
+                notification_type="CLASS_SCHEDULED_BY_ADMIN",
+                title=f"Recurring classes scheduled: {d['title']}",
+                body=_body,
+                link="/sub-mentor/classes",
+                payload={"group_id": str(group.id)},
+                actor=request.user,
+                dedupe_suffix=f"recurring:{_start_str}",
+            )
 
         return Response(
             {"data": {"created": len(created), "dates": [c.starts_at.date().isoformat() for c in created]}},
@@ -515,7 +650,7 @@ class RecurringClassView(APIView):
 class ClassActivityView(APIView):
     """GET /classes/{pk}/activity — audit trail for a class (admin + Sub-Mentor)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminOrLeadMentorOrSubMentor]
 
     def get(self, request: Request, pk: str) -> Response:
         from django.db.models import Q  # noqa: PLC0415
@@ -523,12 +658,6 @@ class ClassActivityView(APIView):
         from apps.audit.serializers import AuditLogSerializer  # noqa: PLC0415
         from apps.attendance.models import AttendanceSession  # noqa: PLC0415
         from apps.assignments.models import AssignmentTask  # noqa: PLC0415
-
-        if request.user.role not in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
-            return Response(
-                {"errors": [{"code": "perm.denied", "message": "Access denied."}]},
-                status=status.HTTP_403_FORBIDDEN,
-            )
 
         cls = get_object_or_404(Class, pk=pk)
 
@@ -586,8 +715,10 @@ class ClassCountsView(APIView):
         if request.user.role == "PARTICIPANT":
             qs = qs.filter(group__memberships__user=request.user).distinct()
         elif request.user.role == "SUB_MENTOR":
-            from apps.common.scoping import sub_mentor_class_qs  # noqa: PLC0415
-            qs = sub_mentor_class_qs(request.user)
+            if not sub_mentor_can_view_all(request.user):
+                from apps.common.scoping import sub_mentor_class_qs  # noqa: PLC0415
+                qs = sub_mentor_class_qs(request.user)
+            # else: full queryset (view-all enabled)
         elif request.user.role == "LEAD_MENTOR":
             from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
             managed_ids = GroupLeadMentor.objects.filter(lead_mentor=request.user).values_list("group_id", flat=True)
@@ -597,9 +728,13 @@ class ClassCountsView(APIView):
             qs = qs.filter(group_id=group_id)
         rows = qs.values("status_cached").annotate(n=Count("id"))
         result = {r["status_cached"]: r["n"] for r in rows}
-        past_upcoming = qs.filter(status_cached=Class.STATUS_UPCOMING, starts_at__lt=timezone.now()).count()
+        now = timezone.now()
+        past_upcoming = qs.filter(
+            status_cached=Class.STATUS_UPCOMING, starts_at__lt=now
+        ).count()
+        true_upcoming = result.get("UPCOMING", 0) - past_upcoming
         return Response({"data": {
-            "UPCOMING":      result.get("UPCOMING",  0),
+            "UPCOMING":      true_upcoming,
             "ONGOING":       result.get("ONGOING",   0),
             "COMPLETED":     result.get("COMPLETED", 0),
             "CANCELLED":     result.get("CANCELLED", 0),
@@ -614,19 +749,22 @@ class MarkPastClassesCompletedView(APIView):
 
     def post(self, request: Request) -> Response:
         now = timezone.now()
+        newly_transitioned_ids = list(
+            Class.objects.filter(
+                status_cached=Class.STATUS_UPCOMING,
+                starts_at__lt=now,
+            ).values_list("id", flat=True)
+        )
         updated = Class.objects.filter(
-            status_cached=Class.STATUS_UPCOMING,
-            starts_at__lt=now,
+            id__in=newly_transitioned_ids,
         ).update(status_cached=Class.STATUS_COMPLETED)
 
-        # Notify participants for each newly completed class
         if updated > 0:
             from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
-            completed_qs = Class.objects.filter(
-                status_cached=Class.STATUS_COMPLETED,
-                starts_at__lt=now,
+            newly_done_qs = Class.objects.filter(
+                id__in=newly_transitioned_ids,
             ).select_related("group")
-            for _cls in completed_qs.iterator(chunk_size=100):
+            for _cls in newly_done_qs.iterator(chunk_size=100):
                 _notify_fb(_cls)
 
         log_action(

@@ -3,7 +3,6 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, parseISO } from 'date-fns';
-import { toUTC } from '@/lib/dates';
 import { CalendarIcon, Video } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -27,10 +26,7 @@ const editSchema = z.object({
     (v) => (typeof v === 'string' ? v.trim() : v) || undefined,
     z.string().url('Must be a valid URL (e.g. https://meet.google.com/...)').optional(),
   ),
-  date: z.date({ required_error: 'Date is required' })
-    .refine(d => d >= new Date(new Date().setHours(0, 0, 0, 0)), {
-      message: 'Class date cannot be in the past',
-    }),
+  date: z.date({ required_error: 'Date is required' }),
   start_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   end_time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
   allow_late_attendance: z.boolean().default(false),
@@ -66,8 +62,8 @@ export function EditClassDialog({ cls, open, onClose }: Props) {
         title: values.title,
         description: values.description ?? '',
         meeting_link: values.meeting_link ?? '',
-        starts_at: toUTC(new Date(`${dateStr}T${values.start_time}`)),
-        ends_at:   toUTC(new Date(`${dateStr}T${values.end_time}`)),
+        starts_at: new Date(`${dateStr}T${values.start_time}:00`).toISOString(),
+        ends_at:   new Date(`${dateStr}T${values.end_time}:00`).toISOString(),
         allow_late_attendance: values.allow_late_attendance,
       } as never);
     },

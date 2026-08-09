@@ -60,6 +60,20 @@ def send_class_start_reminders() -> int:
         created = Notification.objects.bulk_create(notifications, ignore_conflicts=True)
         total += len(created)
 
+    # Notify sub-mentors and lead mentor for each upcoming class
+    from apps.notifications.services import notify_sub_mentors as _ni_task  # noqa: PLC0415
+    for cls in upcoming:
+        _ni_task(
+            group=cls.group,
+            notification_type="CLASS_STARTING_SOON",
+            title=f"Class starting soon: {cls.title}",
+            body=f'"{cls.title}" starts in 15 minutes.',
+            link=f"/sub-mentor/classes/{cls.id}",
+            payload={"class_id": str(cls.id)},
+            actor=None,
+            dedupe_suffix=f"reminder:{cls.id}",
+        )
+
     return total
 
 

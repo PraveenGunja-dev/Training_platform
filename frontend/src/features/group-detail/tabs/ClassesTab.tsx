@@ -27,14 +27,15 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   const isSubMentor = user?.role === 'SUB_MENTOR';
-  const isStaff = isAdmin || isSubMentor;
+  const isLeadMentor = user?.role === 'LEAD_MENTOR';
+  const isStaff = isAdmin || isSubMentor || isLeadMentor;
   const navigate = useNavigate();
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [subGroupFilter, setSubGroupFilter] = useState('__all__');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['classes', { group_id: groupId }],
-    queryFn: () => classesApi.list({ group_id: groupId }),
+    queryFn: () => classesApi.list({ group_id: groupId, page_size: 500 }),
   });
 
   const { data: subGroupsData } = useQuery({
@@ -73,7 +74,7 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
                 </SelectContent>
               </Select>
             )}
-            {isAdmin && (
+            {(isAdmin || isLeadMentor) && (
               <Button size="sm" onClick={() => setScheduleOpen(true)}>
                 <Plus className="h-4 w-4 mr-1.5" />
                 Schedule Class
@@ -116,7 +117,8 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
                   key={c.id}
                   className={`${isStaff ? 'cursor-pointer' : ''} ${isPastUpcoming(c) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-slate-50'}`}
                   onClick={() => {
-                    if (isAdmin) navigate(`/lead-mentor/classes/${c.id}`);
+                    if (isAdmin) navigate(`/admin/classes/${c.id}`);
+                    else if (isLeadMentor) navigate(`/lead-mentor/classes/${c.id}`);
                     else if (isSubMentor) navigate(`/sub-mentor/classes/${c.id}`);
                   }}
                 >

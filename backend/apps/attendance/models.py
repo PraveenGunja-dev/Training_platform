@@ -10,7 +10,7 @@ class AttendanceSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     class_obj = models.ForeignKey(
         "scheduling.Class",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         db_column="class_id",
         related_name="attendance_sessions",
     )

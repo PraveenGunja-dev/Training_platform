@@ -53,6 +53,9 @@ class ClassSerializer(serializers.ModelSerializer):
         ]
 
     def get_participants_count(self, obj: Class) -> int:
+        if obj.sub_group_id:
+            from apps.groups.models import SubGroupMembership  # noqa: PLC0415
+            return SubGroupMembership.objects.filter(sub_group_id=obj.sub_group_id).count()
         from apps.groups.models import GroupMembership
         return GroupMembership.objects.filter(group=obj.group).count()
 
@@ -101,24 +104,23 @@ class ClassSerializer(serializers.ModelSerializer):
 
     def get_my_record(self, obj: Class) -> dict | None:
         request = self.context.get("request")
-        if request is None or not hasattr(request.user, "role") or request.user.role != "PARTICIPANT":
+        if not request or not request.user.is_authenticated:
             return None
-        try:
-            from apps.attendance.models import AttendanceRecord, AttendanceSession  # type: ignore[import]  # noqa: PLC0415
-        except ImportError:
+        if request.user.role != "PARTICIPANT":
             return None
-        session = AttendanceSession.objects.filter(class_obj=obj, status="ACTIVE").first()
-        if session is None:
-            return None
-        record = AttendanceRecord.objects.filter(session=session, user=request.user).first()
-        if record is None:
+        from apps.attendance.models import AttendanceRecord  # noqa: PLC0415
+        record = (
+            AttendanceRecord.objects
+            .filter(user=request.user, session__class_obj=obj)
+            .select_related("session")
+            .order_by("-session__started_at")
+            .first()
+        )
+        if not record:
             return None
         return {
-            "id": str(record.id),
             "session_id": str(record.session_id),
-            "user_id": str(record.user_id),
-            "marked_at": record.marked_at.isoformat(),
-            "status": record.status,
+            "marked_at": record.marked_at.isoformat() if record.marked_at else None,
         }
 
     def get_related_tasks(self, obj: Class) -> list:
@@ -171,14 +173,13 @@ class ClassSerializer(serializers.ModelSerializer):
         ]
 
     def get_lead_mentor(self, obj: Class) -> dict | None:
-        from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
-        ga = GroupLeadMentor.objects.filter(group=obj.group).select_related("lead_mentor").first()
-        if ga is None:
+        glm = getattr(obj.group, "lead_mentor_assignment", None)
+        if glm is None or glm.lead_mentor is None:
             return None
         return {
-            "id": str(ga.lead_mentor_id),
-            "full_name": ga.lead_mentor.full_name,
-            "email": ga.lead_mentor.email,
+            "id": str(glm.lead_mentor_id),
+            "full_name": glm.lead_mentor.full_name,
+            "email": glm.lead_mentor.email,
         }
 
     def to_representation(self, instance: Class) -> dict:
@@ -228,8 +229,28 @@ class ClassWriteSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs: dict) -> dict:
-        starts_at = attrs.get("starts_at")
-        open_at = attrs.get("attendance_open_at")
+        # ── Status transition enforcement ──────────────────────────────────────
+        new_status = attrs.get("status_cached")
+        if new_status and self.instance:
+            old_status = self.instance.status_cached
+            request = self.context.get("request")
+            is_admin = request and getattr(request.user, "role", None) == "ADMIN"
+            TERMINAL = {Class.STATUS_CANCELLED, Class.STATUS_COMPLETED}
+            if old_status in TERMINAL and not is_admin:
+                raise serializers.ValidationError(
+                    {"status_cached": f"Cannot change status from {old_status}."}
+                )
+
+        # ── Time ordering (partial-update safe) ────────────────────────────────
+        starts_at = attrs.get("starts_at", getattr(self.instance, "starts_at", None))
+        ends_at   = attrs.get("ends_at",   getattr(self.instance, "ends_at",   None))
+        if starts_at and ends_at and ends_at <= starts_at:
+            raise serializers.ValidationError(
+                {"ends_at": "End time must be after start time."}
+            )
+
+        # ── Attendance window checks ───────────────────────────────────────────
+        open_at  = attrs.get("attendance_open_at")
         close_at = attrs.get("attendance_close_at")
         if open_at and starts_at and open_at >= starts_at:
             raise serializers.ValidationError(
@@ -239,13 +260,15 @@ class ClassWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"attendance_close_at": "Must be after class start time."}
             )
-        sub_group = attrs.get('sub_group')
-        group = attrs.get('group')
-        if sub_group is not None and group is not None:
-            if str(sub_group.parent_group_id) != str(group.id):
-                raise serializers.ValidationError(
-                    {'sub_group_id': 'Sub-group does not belong to the selected group.'}
-                )
+
+        # ── Sub-group / parent-group cross-check (partial-update safe) ─────────
+        sub_group = attrs.get("sub_group", getattr(self.instance, "sub_group", None))
+        group     = attrs.get("group",     getattr(self.instance, "group",     None))
+        if sub_group and group and str(sub_group.parent_group_id) != str(group.id):
+            raise serializers.ValidationError(
+                {"sub_group_id": "Sub-group does not belong to the selected group."}
+            )
+
         return attrs
 
 

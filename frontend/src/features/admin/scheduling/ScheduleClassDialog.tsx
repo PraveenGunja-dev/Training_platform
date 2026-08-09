@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { format, addDays } from 'date-fns';
-import { toUTC } from '@/lib/dates';
 import { CalendarIcon, Video, Users, Repeat, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { scheduleSchema, type ScheduleFormValues } from './scheduleSchema';
@@ -112,22 +111,28 @@ function SharedFields({ form, groups, subGroups }: SharedFieldsProps) {
       {/* Group */}
       <div className="space-y-1.5">
         <Label htmlFor="group_id">Group</Label>
-        <Controller
-          name="group_id"
-          control={form.control}
-          render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger id="group_id">
-                <SelectValue placeholder="Select a group" />
-              </SelectTrigger>
-              <SelectContent>
-                {groups.map(g => (
-                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
+        {groups.length === 0 ? (
+          <div className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground animate-pulse">
+            Loading groups…
+          </div>
+        ) : (
+          <Controller
+            name="group_id"
+            control={form.control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="group_id">
+                  <SelectValue placeholder="Select a group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        )}
         {errors.group_id && <p className="text-xs text-rose-600">{errors.group_id.message}</p>}
       </div>
 
@@ -241,8 +246,8 @@ function SingleForm({ groups, defaultGroupId, onClose }: Omit<ScheduleClassDialo
   const mutation = useMutation({
     mutationFn: (values: ScheduleFormValues) => {
       const dateStr = format(values.date, 'yyyy-MM-dd');
-      const startsAt = toUTC(new Date(`${dateStr}T${values.start_time}`));
-      const endsAt   = toUTC(new Date(`${dateStr}T${values.end_time}`));
+      const startsAt = new Date(`${dateStr}T${values.start_time}:00`).toISOString();
+      const endsAt   = new Date(`${dateStr}T${values.end_time}:00`).toISOString();
       return classesApi.create({
         group_id: values.group_id,
         title: values.title,
@@ -508,6 +513,11 @@ function RecurringForm({ groups, defaultGroupId, onClose }: Omit<ScheduleClassDi
         {errors.days_of_week && (
           <p className="text-xs text-rose-600">{errors.days_of_week.message}</p>
         )}
+        {daysOfWeek.length > 0 && previewCount === 0 && (
+          <p className="text-xs text-amber-600">
+            No matching dates in the selected range for the chosen days. Expand the date range or change the days.
+          </p>
+        )}
       </div>
 
       {/* Start / End times */}
@@ -562,7 +572,7 @@ function RecurringForm({ groups, defaultGroupId, onClose }: Omit<ScheduleClassDi
             ? 'Creating…'
             : previewCount > 0
               ? `Create ${previewCount} Class${previewCount !== 1 ? 'es' : ''}`
-              : 'Create Recurring'}
+              : 'No dates match — adjust range or days'}
         </Button>
       </DialogFooter>
     </form>
@@ -573,11 +583,15 @@ function RecurringForm({ groups, defaultGroupId, onClose }: Omit<ScheduleClassDi
 
 export function ScheduleClassDialog({ open, onClose, groups, defaultGroupId }: ScheduleClassDialogProps) {
   const [mode, setMode] = useState<'single' | 'recurring'>('single');
+  const [sharedGroupId, setSharedGroupId] = useState(defaultGroupId ?? '');
 
-  // Reset to single mode when dialog closes
+  // Reset state when dialog closes
   useEffect(() => {
-    if (!open) setMode('single');
-  }, [open]);
+    if (!open) {
+      setMode('single');
+      setSharedGroupId(defaultGroupId ?? '');
+    }
+  }, [open, defaultGroupId]);
 
   function handleClose() {
     onClose();
@@ -622,9 +636,9 @@ export function ScheduleClassDialog({ open, onClose, groups, defaultGroupId }: S
         </div>
 
         {mode === 'single' ? (
-          <SingleForm groups={groups} defaultGroupId={defaultGroupId} onClose={handleClose} />
+          <SingleForm groups={groups} defaultGroupId={sharedGroupId || defaultGroupId} onClose={handleClose} />
         ) : (
-          <RecurringForm groups={groups} defaultGroupId={defaultGroupId} onClose={handleClose} />
+          <RecurringForm groups={groups} defaultGroupId={sharedGroupId || defaultGroupId} onClose={handleClose} />
         )}
       </DialogContent>
     </Dialog>
