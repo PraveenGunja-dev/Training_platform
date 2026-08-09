@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, UserCircle, UserPlus, Trash2, Pencil, Check, X, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '@/store/auth';
 import { groupsApi } from '@/api/groups';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +12,6 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { ErrorState } from '@/components/states/ErrorState';
 
 function Skeleton() {
@@ -29,11 +25,8 @@ function Skeleton() {
 }
 
 export default function LeadMentorSubGroupDetailPage() {
-  const { subGroupId } = useParams<{ subGroupId: string }>();
-  const { user } = useAuthStore();
+  const { subGroupId, groupId } = useParams<{ subGroupId: string; groupId: string }>();
   const qc = useQueryClient();
-  const groupIds = user?.lead_mentor_of_group_ids ?? [];
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(groupIds[0] ?? '');
 
   // Rename state
   const [renaming, setRenaming] = useState(false);
@@ -44,24 +37,24 @@ export default function LeadMentorSubGroupDetailPage() {
   const [addSearch, setAddSearch] = useState('');
 
   const { data: groupData } = useQuery({
-    queryKey: ['group', selectedGroupId],
-    queryFn: () => groupsApi.get(selectedGroupId!),
-    enabled: !!selectedGroupId,
+    queryKey: ['group', groupId],
+    queryFn: () => groupsApi.get(groupId!),
+    enabled: !!groupId,
     staleTime: 60_000,
   });
 
   const { data: sgData, isLoading, isError, refetch } = useQuery({
-    queryKey: ['sub-group', selectedGroupId, subGroupId],
-    queryFn: () => groupsApi.getSubGroup(selectedGroupId!, subGroupId!),
-    enabled: !!selectedGroupId && !!subGroupId,
+    queryKey: ['sub-group', groupId, subGroupId],
+    queryFn: () => groupsApi.getSubGroup(groupId!, subGroupId!),
+    enabled: !!groupId && !!subGroupId,
     staleTime: 0,
   });
 
   const renameMutation = useMutation({
-    mutationFn: (name: string) => groupsApi.updateSubGroup(selectedGroupId!, subGroupId!, { name }),
+    mutationFn: (name: string) => groupsApi.updateSubGroup(groupId!, subGroupId!, { name }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['sub-group', selectedGroupId, subGroupId] });
-      void qc.invalidateQueries({ queryKey: ['sub-groups', selectedGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-group', groupId, subGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-groups', groupId] });
       toast.success('Sub-group renamed.');
       setRenaming(false);
     },
@@ -71,11 +64,11 @@ export default function LeadMentorSubGroupDetailPage() {
   const removeMutation = useMutation({
     mutationFn: (userId: string) => {
       const currentIds = (sgData?.data?.participants ?? []).map(p => p.id).filter(id => id !== userId);
-      return groupsApi.updateSubGroup(selectedGroupId!, subGroupId!, { user_ids: currentIds });
+      return groupsApi.updateSubGroup(groupId!, subGroupId!, { user_ids: currentIds });
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['sub-group', selectedGroupId, subGroupId] });
-      void qc.invalidateQueries({ queryKey: ['sub-groups', selectedGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-group', groupId, subGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-groups', groupId] });
       toast.success('Participant removed.');
     },
     onError: () => toast.error('Failed to remove participant.'),
@@ -85,11 +78,11 @@ export default function LeadMentorSubGroupDetailPage() {
     mutationFn: (newIds: string[]) => {
       const currentIds = (sgData?.data?.participants ?? []).map(p => p.id);
       const merged = [...new Set([...currentIds, ...newIds])];
-      return groupsApi.updateSubGroup(selectedGroupId!, subGroupId!, { user_ids: merged });
+      return groupsApi.updateSubGroup(groupId!, subGroupId!, { user_ids: merged });
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['sub-group', selectedGroupId, subGroupId] });
-      void qc.invalidateQueries({ queryKey: ['sub-groups', selectedGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-group', groupId, subGroupId] });
+      void qc.invalidateQueries({ queryKey: ['sub-groups', groupId] });
       toast.success('Participants added.');
       setAddOpen(false);
       setAddSearch('');
@@ -128,15 +121,6 @@ export default function LeadMentorSubGroupDetailPage() {
     renameMutation.mutate(trimmed);
   }
 
-  if (groupIds.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-        <p className="text-sm">You are not assigned as admin for any group.</p>
-        <p className="text-xs mt-1 text-slate-400">Contact a Super Admin to get access.</p>
-      </div>
-    );
-  }
-
   if (isLoading) return <Skeleton />;
 
   if (isError || !sg) {
@@ -153,17 +137,6 @@ export default function LeadMentorSubGroupDetailPage() {
 
   return (
     <div className="space-y-6 p-6">
-      {groupIds.length > 1 && (
-        <div className="mb-4">
-          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-            <SelectTrigger className="w-64"><SelectValue placeholder="Select group" /></SelectTrigger>
-            <SelectContent>
-              {groupIds.map(id => <SelectItem key={id} value={id}>{id}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       <Link to="/lead-mentor/sub-groups" className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-800 transition-colors">
         <ArrowLeft className="h-4 w-4" />
         Back to Sub-Groups

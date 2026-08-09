@@ -22,7 +22,7 @@ export function AssignmentsTab({ groupId, group }: { groupId: string; group: Cla
   const [createOpen, setCreateOpen] = useState(false);
   const [subGroupFilter, setSubGroupFilter] = useState('__all__');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['assignments', 'group', groupId],
     queryFn: () => assignmentsApi.list({ group_id: groupId }),
   });
@@ -71,6 +71,10 @@ export function AssignmentsTab({ groupId, group }: { groupId: string; group: Cla
         {isLoading ? (
           <div className="space-y-2 p-4 animate-pulse" aria-busy="true">
             {[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-slate-100 rounded-lg" />)}
+          </div>
+        ) : isError ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Failed to load assignments. <button onClick={() => void refetch()} className="underline">Try again</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground/70">

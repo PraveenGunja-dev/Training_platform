@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
-from apps.common.permissions import IsAdminOrLeadMentorOrSubMentor, IsAdminOrSubMentor
+from apps.common.permissions import IsAdmin, IsAdminOrLeadMentorOrSubMentor, IsAdminOrSubMentor
 from apps.common.scoping import lead_mentor_owns_group, sub_mentor_class_qs, sub_mentor_owns_group
 from apps.common.visibility import sub_mentor_can_view_all
 
@@ -610,14 +610,9 @@ class ClassCountsView(APIView):
 @extend_schema(exclude=True)
 class MarkPastClassesCompletedView(APIView):
     """POST /admin/classes/mark-past-completed — bulk-complete all past UPCOMING classes."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
 
     def post(self, request: Request) -> Response:
-        if request.user.role != "ADMIN":
-            return Response(
-                {"errors": [{"code": "perm.admin_required", "message": "Admin access required."}], "data": None},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         now = timezone.now()
         updated = Class.objects.filter(
             status_cached=Class.STATUS_UPCOMING,

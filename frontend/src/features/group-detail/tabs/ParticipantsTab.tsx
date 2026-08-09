@@ -166,12 +166,13 @@ export function ParticipantsTab({ groupId, participants, groupName }: Participan
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [subGroupFilter, setSubGroupFilter] = useState<string>('');
+  const [removeTarget, setRemoveTarget] = useState<GroupParticipant | null>(null);
 
   const isAdmin = user?.role === 'ADMIN';
 
   function handleParticipantClick(p: GroupParticipant) {
     if (user?.role === 'ADMIN') {
-      navigate(`/lead-mentor/users/${p.id}`);
+      navigate(`/admin/users/${p.id}`);
     } else if (user?.role === 'SUB_MENTOR') {
       navigate(`/sub-mentor/participants/${p.id}`, { state: { participant: p, groupName } });
     } else if (user?.role === 'LEAD_MENTOR') {
@@ -290,7 +291,7 @@ export function ParticipantsTab({ groupId, participants, groupName }: Participan
                         variant="ghost"
                         size="sm"
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => removeMutation.mutate(p.id)}
+                        onClick={() => setRemoveTarget(p)}
                         disabled={removeMutation.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -310,6 +311,35 @@ export function ParticipantsTab({ groupId, participants, groupName }: Participan
         groupId={groupId}
         existingIds={participants.map(p => p.id)}
       />
+
+      <Dialog open={!!removeTarget} onOpenChange={open => { if (!open) setRemoveTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove participant?</DialogTitle>
+            <DialogDescription>
+              Remove <strong>{removeTarget?.full_name}</strong> from this group?
+              Their past attendance records will be preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={removeMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={removeMutation.isPending}
+              onClick={() => {
+                if (removeTarget) {
+                  removeMutation.mutate(removeTarget.id);
+                  setRemoveTarget(null);
+                }
+              }}
+            >
+              {removeMutation.isPending ? 'Removing...' : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

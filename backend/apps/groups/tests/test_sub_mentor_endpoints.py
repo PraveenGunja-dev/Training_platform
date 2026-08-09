@@ -152,9 +152,10 @@ class TestAssignInstructors:
         admin_client.post(f"/training/api/v1/groups/{group.id}/sub-mentors", payload, format="json")
         audit_rows = AuditLog.objects.filter(action="sub_mentor_assigned")
         assert audit_rows.count() == 2
-        meta = audit_rows.first().metadata
-        assert meta["group_id"] == str(group.id)
-        assert meta["group_title"] == group.name
+        row = audit_rows.first()
+        # T03-040: target_type/target_id now point to ClassGroup, not User
+        assert str(row.target_id) == str(group.id)
+        assert row.metadata["group_title"] == group.name
 
     def test_participant_user_id_returns_400(self, admin_client, group, participant):
         resp = admin_client.post(
@@ -210,7 +211,8 @@ class TestUnassignInstructor:
         admin_client.delete(f"/training/api/v1/groups/{group.id}/sub-mentors/{instructor.id}")
         row = AuditLog.objects.filter(action="sub_mentor_unassigned").first()
         assert row is not None
-        assert row.metadata["group_id"] == str(group.id)
+        # T03-040: target_type/target_id now point to ClassGroup, not User
+        assert str(row.target_id) == str(group.id)
 
     def test_unassign_nonexistent_returns_404(self, admin_client, group, instructor2):
         # instructor2 is not assigned to group

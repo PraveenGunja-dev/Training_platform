@@ -403,7 +403,7 @@ export function GroupHeader({
     onError: () => toast.error('Failed to remove Lead Mentor.'),
   });
 
-  const { data: instData } = useQuery({
+  const { data: instData, isLoading: subMentorsLoading, isError: subMentorsError } = useQuery({
     queryKey: ['group-sub-mentors', group.id],
     queryFn: () => groupsApi.getSubMentors(group.id),
     staleTime: 30_000,
@@ -531,13 +531,19 @@ export function GroupHeader({
               )}
 
               {/* SubMentors row */}
-              {(sub_mentors.length > 0 || isAdmin) && (
+              {(subMentorsLoading || subMentorsError || sub_mentors.length > 0 || isAdmin) && (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Sub-Mentors:
                   </span>
 
-                  {sub_mentors.map(inst => (
+                  {subMentorsLoading ? (
+                    <span className="text-sm text-slate-400 animate-pulse">Loading...</span>
+                  ) : subMentorsError ? (
+                    <span className="text-sm text-red-400 italic">Failed to load sub-mentors.</span>
+                  ) : null}
+
+                  {!subMentorsLoading && !subMentorsError && sub_mentors.map(inst => (
                     <span
                       key={inst.id}
                       className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg shadow-sm"
@@ -558,7 +564,7 @@ export function GroupHeader({
                     </span>
                   ))}
 
-                  {sub_mentors.length === 0 && !isAdmin && (
+                  {!subMentorsLoading && !subMentorsError && sub_mentors.length === 0 && !isAdmin && (
                     <span className="text-sm text-slate-400 italic">None assigned</span>
                   )}
 

@@ -79,6 +79,7 @@ class AttendanceRecord(models.Model):
         ]
         indexes = [
             models.Index(fields=["session", "user"], name="att_rec_session_user_idx"),
+            models.Index(fields=["user"], name="att_rec_user_idx"),
         ]
 
     def __str__(self) -> str:

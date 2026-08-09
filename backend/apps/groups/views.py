@@ -1,3 +1,4 @@
+import uuid as _uuid
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -188,29 +189,21 @@ class ClassGroupViewSet(ViewSet):
         return Response({"data": ClassGroupDetailSerializer(detail).data})
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
-        from django.utils import timezone as _tz  # noqa: PLC0415
+        from django.db import transaction  # noqa: PLC0415
+        from apps.attendance.models import AttendanceSession  # noqa: PLC0415
+        from apps.scheduling.models import Class as ClassModel  # noqa: PLC0415
+
         group = get_object_or_404(ClassGroup, pk=pk)
-        group.is_archived = True
-        group.save()
 
-        # Cascade: close any active attendance sessions for this group's classes
-        try:
-            from apps.attendance.models import AttendanceSession  # noqa: PLC0415
+        with transaction.atomic():
+            group.is_archived = True
+            group.save(update_fields=["is_archived"])
             AttendanceSession.objects.filter(
-                class_obj__group=group,
-                status="ACTIVE",
-            ).update(status="ENDED", ended_at=_tz.now())
-        except Exception:
-            pass
-
-        # Cascade: cancel upcoming classes for this group
-        try:
-            from apps.scheduling.models import Class as ClassModel  # noqa: PLC0415
-            ClassModel.objects.filter(group=group, status_cached="UPCOMING").update(
-                status_cached="CANCELLED"
-            )
-        except Exception:
-            pass
+                class_obj__group=group, status="ACTIVE"
+            ).update(status="ENDED", ended_at=timezone.now())
+            ClassModel.objects.filter(
+                group=group, status_cached="UPCOMING"
+            ).update(status_cached="CANCELLED")
 
         log_action(
             actor=request.user,
@@ -308,9 +301,9 @@ class ClassGroupViewSet(ViewSet):
                     log_action(
                         actor=request.user,
                         action=SUB_MENTOR_ASSIGNED,
-                        target_type="User",
-                        target_id=uid,
-                        metadata={"group_id": str(group.id), "group_title": group.name},
+                        target_type="ClassGroup",
+                        target_id=group.id,
+                        metadata={"user_id": str(uid), "group_title": group.name},
                     )
                     new_sub_mentor = gi.sub_mentor
                     from apps.notifications.services import create_inapp, notify_sub_mentors  # noqa: PLC0415
@@ -320,7 +313,7 @@ class ClassGroupViewSet(ViewSet):
                         title=f"Assigned to group: {group.name}",
                         body=f"You have been assigned as a Sub-Mentor for group {group.name}.",
                         link=f"/sub-mentor/groups/{group.id}",
-                        dedupe_key=f"group_assigned:{group.id}:{new_sub_mentor.id}",
+                        dedupe_key=f"group_assigned:{group.id}:{new_sub_mentor.id}:{_uuid.uuid4()}",
                         payload={
                             "group_id": str(group.id),
                             "group_title": group.name,
@@ -361,9 +354,9 @@ class ClassGroupViewSet(ViewSet):
         log_action(
             actor=request.user,
             action=SUB_MENTOR_UNASSIGNED,
-            target_type="User",
-            target_id=user_id,
-            metadata={"group_id": str(group.id), "group_title": group.name},
+            target_type="ClassGroup",
+            target_id=group.id,
+            metadata={"user_id": str(user_id), "group_title": group.name},
         )
         from apps.notifications.services import create_inapp  # noqa: PLC0415
         now_ts = timezone.now().strftime("%Y%m%d%H%M")
@@ -417,7 +410,13 @@ class ClassGroupViewSet(ViewSet):
         if request.method == "PUT":
             write_ser = GroupLeadMentorWriteSerializer(data=request.data)
             write_ser.is_valid(raise_exception=True)
-            user = User.objects.get(id=write_ser.validated_data["user_id"])
+            try:
+                user = User.objects.get(id=write_ser.validated_data["user_id"])
+            except User.DoesNotExist:
+                return Response(
+                    {"errors": [{"code": "user.not_found", "message": "User not found."}], "data": None},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             ga, _ = GroupLeadMentor.objects.update_or_create(
                 group=group,
                 defaults={"lead_mentor": user, "assigned_by": request.user},
@@ -437,7 +436,7 @@ class ClassGroupViewSet(ViewSet):
                     f"You can now manage participants, Sub-Mentors, and monitor analytics for your batch."
                 ),
                 link="/lead-mentor/dashboard",
-                dedupe_key=f"lead_mentor_assigned:{group.id}:{user.id}",
+                dedupe_key=f"lead_mentor_assigned:{group.id}:{user.id}:{_uuid.uuid4()}",
                 payload={"group_id": str(group.id), "group_name": group.name},
             )
             log_action(
@@ -535,12 +534,12 @@ class ClassGroupViewSet(ViewSet):
         submission_completion = {"completed": completed, "total": max(total_possible, completed)}
 
         # Top participants
+        att_sessions_total = AttendanceSession.objects.filter(class_obj__group=group).count()
         participant_rows = []
         for m in members_iter:
             user_obj = m.user
-            att_sessions = AttendanceSession.objects.filter(class_obj__group=group).count()
             attended = AttendanceRecord.objects.filter(session__class_obj__group=group, user=user_obj).count()
-            att_rate = round(attended / att_sessions * 100, 1) if att_sessions else 0.0
+            att_rate = round(attended / att_sessions_total * 100, 1) if att_sessions_total else 0.0
             subs = Submission.objects.filter(user=user_obj, task__group=group).values("task_id").distinct().count()
             participant_rows.append({
                 "id": str(user_obj.id),
@@ -567,6 +566,17 @@ class SubGroupViewSet(ViewSet):
     """
     permission_classes = [IsAuthenticated]
 
+    def _caller_has_read_access(self, group_pk: str) -> bool:
+        """True if caller may read sub-groups (Admin, Lead Mentor, assigned Sub-Mentor, or group member)."""
+        user = self.request.user
+        if user.role == "ADMIN" or _is_lead_mentor_of(user, group_pk):
+            return True
+        if user.role == "SUB_MENTOR":
+            return sub_mentor_owns_group(user, group_pk)
+        if user.role == "PARTICIPANT":
+            return GroupMembership.objects.filter(user=user, group_id=group_pk).exists()
+        return False
+
     def _caller_has_write_access(self) -> bool:
         """True if caller is Admin, Lead Mentor of the group, or assigned Sub-Mentor."""
         user = self.request.user
@@ -581,6 +591,11 @@ class SubGroupViewSet(ViewSet):
         return get_object_or_404(ClassGroup, pk=group_pk, is_archived=False)
 
     def list(self, request: Request, group_pk: str | None = None) -> Response:
+        if not self._caller_has_read_access(group_pk):
+            return Response(
+                {"errors": [{"code": "perm.forbidden", "message": "You do not have access to this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         group = self._get_group(group_pk)
         sub_groups = (
             SubGroup.objects
@@ -590,6 +605,11 @@ class SubGroupViewSet(ViewSet):
         return Response({'data': SubGroupSerializer(sub_groups, many=True).data})
 
     def retrieve(self, request: Request, group_pk: str | None = None, pk: str | None = None) -> Response:
+        if not self._caller_has_read_access(group_pk):
+            return Response(
+                {"errors": [{"code": "perm.forbidden", "message": "You do not have access to this group."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         group = self._get_group(group_pk)
         sub_group = get_object_or_404(
             SubGroup.objects.prefetch_related('memberships__user'),
@@ -637,6 +657,13 @@ class SubGroupViewSet(ViewSet):
             )
 
         sub_group.refresh_from_db()
+        log_action(
+            actor=request.user,
+            action="sub_group.created",
+            target_type="ClassGroup",
+            target_id=group.id,
+            metadata={"sub_group_id": str(sub_group.id), "name": sub_group.name},
+        )
         return Response(
             {'data': SubGroupSerializer(
                 SubGroup.objects.prefetch_related('memberships__user').get(pk=sub_group.pk)
@@ -676,6 +703,13 @@ class SubGroupViewSet(ViewSet):
                 )
 
         sub_group.save()
+        log_action(
+            actor=request.user,
+            action="sub_group.updated",
+            target_type="ClassGroup",
+            target_id=group.id,
+            metadata={"sub_group_id": str(sub_group.id), "name": sub_group.name},
+        )
         return Response({
             'data': SubGroupSerializer(
                 SubGroup.objects.prefetch_related('memberships__user').get(pk=sub_group.pk)
@@ -687,7 +721,16 @@ class SubGroupViewSet(ViewSet):
             return Response({'detail': 'Admin only.'}, status=403)
         group = self._get_group(group_pk)
         sub_group = get_object_or_404(SubGroup, pk=pk, parent_group=group)
+        sub_group_name = sub_group.name
+        sub_group_id = str(sub_group.id)
         sub_group.delete()
+        log_action(
+            actor=request.user,
+            action="sub_group.deleted",
+            target_type="ClassGroup",
+            target_id=group.id,
+            metadata={"sub_group_id": sub_group_id, "name": sub_group_name},
+        )
         return Response(status=204)
 
 

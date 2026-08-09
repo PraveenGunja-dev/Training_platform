@@ -247,13 +247,18 @@ function SubGroupCard({
   isAdmin: boolean;
   onDelete: (sg: SubGroup) => void;
 }) {
+  const { user } = useAuthStore();
   const MAX_SHOWN = 5;
   const shown = subGroup.participants.slice(0, MAX_SHOWN);
   const overflow = subGroup.participants_count - MAX_SHOWN;
 
+  const subGroupPath = user?.role === 'ADMIN'
+    ? `/admin/groups/${groupId}/sub-groups/${subGroup.id}`
+    : `/lead-mentor/groups/${groupId}/sub-groups/${subGroup.id}`;
+
   return (
     <Link
-      to={`/lead-mentor/groups/${groupId}/sub-groups/${subGroup.id}`}
+      to={subGroupPath}
       className="block bg-white rounded-xl border border-violet-100 shadow-sm overflow-hidden hover:border-violet-300 hover:shadow-md transition-all"
     >
       <div className="h-1 bg-gradient-to-r from-violet-500 to-purple-400" />
@@ -316,7 +321,7 @@ export function SubGroupsTab({ groupId, groupParticipants }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SubGroup | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['sub-groups', groupId],
     queryFn: () => groupsApi.listSubGroups(groupId),
     staleTime: 30_000,
@@ -350,6 +355,10 @@ export function SubGroupsTab({ groupId, groupParticipants }: Props) {
           {[1, 2, 3].map(i => (
             <div key={i} className="h-24 bg-slate-100 rounded-xl animate-pulse" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="text-center py-8 text-muted-foreground">
+          Failed to load sub-groups. <button onClick={() => void refetch()} className="underline">Try again</button>
         </div>
       ) : subGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 rounded-xl border-2 border-dashed border-violet-100 bg-violet-50/40">
