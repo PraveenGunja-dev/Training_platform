@@ -145,6 +145,7 @@ export const router = createBrowserRouter([
       { path: 'analytics', element: <LeadMentorAnalyticsPage /> },
       { path: 'sub-groups', element: <LeadMentorSubGroupsPage /> },
       { path: 'sub-groups/:subGroupId', element: <LeadMentorSubGroupDetailPage /> },
+      { path: 'groups/:groupId/sub-groups/:subGroupId', element: <LeadMentorSubGroupDetailPage /> },
       { path: 'assignments', element: <SubMentorAssignmentsPage /> },
       { path: 'assignments/:id', element: <SubMentorAssignmentDetailPage /> },
       { path: 'submissions', element: <SubMentorSubmissionsPage /> },

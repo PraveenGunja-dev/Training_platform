@@ -59,7 +59,7 @@ def add_participants(
                 title="Added to group",
                 body=f"You have been added to {group.name}.",
                 link="/me/dashboard",
-                dedupe_key=f"group_added:{group.id}:{user.id}",
+                dedupe_key=f"group_added:{group.id}:{user.id}:{_uuid.uuid4()}",
                 payload={"group_id": str(group.id), "group_name": group.name},
             )
         # Notify Sub-Mentors that new participants joined.
@@ -92,7 +92,9 @@ def remove_participant(
     actor: Any,
 ) -> None:
     """Remove a single participant from a group."""
-    GroupMembership.objects.filter(group=group, user_id=str(user_id)).delete()
+    deleted_count, _ = GroupMembership.objects.filter(group=group, user_id=str(user_id)).delete()
+    if deleted_count == 0:
+        return
     log_action(
         actor=actor,
         action="group.participant_removed",

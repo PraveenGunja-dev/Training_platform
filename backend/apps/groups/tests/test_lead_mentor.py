@@ -72,21 +72,32 @@ def group(db, admin_user):
     )
 
 
+@pytest.fixture
+def lead_mentor_assignee(db):
+    """User with LEAD_MENTOR role used as assignment target in T03-007 role-check tests."""
+    return User.objects.create_user(
+        email=f"lmassignee{_uid()}@ga.test",
+        password="pass",
+        full_name="Lead Mentor Assignee",
+        role="LEAD_MENTOR",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-def test_assign_lead_mentor(admin_client, group, instructor_user):
+def test_assign_lead_mentor(admin_client, group, lead_mentor_assignee):
     resp = admin_client.put(
         f"/training/api/v1/groups/{group.id}/lead-mentor",
-        {"user_id": str(instructor_user.id)},
+        {"user_id": str(lead_mentor_assignee.id)},
         format="json",
     )
     assert resp.status_code == 200
-    assert GroupLeadMentor.objects.filter(group=group, lead_mentor=instructor_user).exists()
-    assert resp.data["data"]["email"] == instructor_user.email
+    assert GroupLeadMentor.objects.filter(group=group, lead_mentor=lead_mentor_assignee).exists()
+    assert resp.data["data"]["email"] == lead_mentor_assignee.email
 
 
 @pytest.mark.django_db
@@ -113,17 +124,17 @@ def test_remove_lead_mentor(admin_client, group, instructor_user, admin_user):
 
 
 @pytest.mark.django_db
-def test_assign_lead_mentor_is_idempotent(admin_client, group, instructor_user, participant_user, admin_user):
-    """Reassigning replaces the previous admin."""
+def test_assign_lead_mentor_is_idempotent(admin_client, group, lead_mentor_assignee, instructor_user, admin_user):
+    """Reassigning replaces the previous lead mentor. Both users need LEAD_MENTOR/ADMIN role (T03-007)."""
     GroupLeadMentor.objects.create(group=group, lead_mentor=instructor_user, assigned_by=admin_user)
     resp = admin_client.put(
         f"/training/api/v1/groups/{group.id}/lead-mentor",
-        {"user_id": str(participant_user.id)},
+        {"user_id": str(lead_mentor_assignee.id)},
         format="json",
     )
     assert resp.status_code == 200
     assert GroupLeadMentor.objects.filter(group=group).count() == 1
-    assert GroupLeadMentor.objects.get(group=group).lead_mentor == participant_user
+    assert GroupLeadMentor.objects.get(group=group).lead_mentor == lead_mentor_assignee
 
 
 @pytest.mark.django_db

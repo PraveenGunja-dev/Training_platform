@@ -222,6 +222,16 @@ export default function LeadMentorSubGroupsPage() {
     staleTime: 60_000,
   });
 
+  const { data: allGroupsData } = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => groupsApi.list(),
+    staleTime: 60_000,
+    enabled: groupIds.length > 1,
+  });
+  const groupNameById = Object.fromEntries(
+    (allGroupsData?.data ?? []).map(g => [g.id, g.name])
+  );
+
   const deleteMutation = useMutation({
     mutationFn: (subGroupId: string) => groupsApi.deleteSubGroup(selectedGroupId!, subGroupId),
     onSuccess: () => {
@@ -254,7 +264,7 @@ export default function LeadMentorSubGroupsPage() {
             </SelectTrigger>
             <SelectContent>
               {groupIds.map(id => (
-                <SelectItem key={id} value={id}>{id}</SelectItem>
+                <SelectItem key={id} value={id}>{groupNameById[id] ?? id}</SelectItem>
               ))}
             </SelectContent>
           </Select>

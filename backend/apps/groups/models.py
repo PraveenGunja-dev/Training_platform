@@ -55,6 +55,7 @@ class GroupMembership(models.Model):
 
 
 class GroupSubMentor(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     group = models.ForeignKey(
         ClassGroup,
         on_delete=models.CASCADE,
@@ -76,7 +77,9 @@ class GroupSubMentor(models.Model):
     )
 
     class Meta:
-        unique_together = ("group", "sub_mentor")
+        constraints = [
+            models.UniqueConstraint(fields=["group", "sub_mentor"], name="uniq_group_sub_mentor"),
+        ]
         indexes = [
             models.Index(fields=["sub_mentor", "group"], name="grp_sub_mentor_lookup_idx"),
         ]
@@ -102,11 +105,17 @@ class SubGroup(TimestampedModel):
     )
 
     class Meta:
-        unique_together = ('parent_group', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=['parent_group', 'name'], name='uniq_subgroup_name_per_group'),
+        ]
         ordering = ['name']
 
     def __str__(self) -> str:
-        return f"{self.parent_group.name} / {self.name}"
+        try:
+            parent_name = self.parent_group.name
+        except Exception:
+            parent_name = str(self.parent_group_id)
+        return f"{parent_name} / {self.name}"
 
 
 class SubGroupMembership(models.Model):
@@ -124,7 +133,9 @@ class SubGroupMembership(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('sub_group', 'user')
+        constraints = [
+            models.UniqueConstraint(fields=['sub_group', 'user'], name='uniq_subgroup_membership'),
+        ]
         indexes = [
             models.Index(fields=['sub_group', 'user'], name='sgm_sub_user_idx'),
             models.Index(fields=['user'], name='sgm_user_idx'),  # covers user-alone queries
@@ -143,7 +154,9 @@ class GroupLeadMentor(TimestampedModel):
     )
     lead_mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="lead_mentor_of_groups",
     )
     assigned_by = models.ForeignKey(
@@ -159,4 +172,5 @@ class GroupLeadMentor(TimestampedModel):
         verbose_name_plural = "Group Lead Mentors"
 
     def __str__(self):
-        return f"{self.lead_mentor.full_name} → {self.group.name}"
+        mentor_name = self.lead_mentor.full_name if self.lead_mentor_id and self.lead_mentor else "(unassigned)"
+        return f"{mentor_name} → {self.group.name}"

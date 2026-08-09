@@ -27,6 +27,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["id", "created_by", "created_at"]
 
     def get_created_by_name(self, obj: ClassGroup) -> str | None:
         return obj.created_by.full_name if obj.created_by else None
@@ -78,7 +79,7 @@ class ClassGroupDetailSerializer(ClassGroupListSerializer):
         )
 
         result = []
-        for m in obj.memberships.all():
+        for m in obj.memberships.select_related("user").all():
             attended = attendance_map.get(m.user_id, 0)
             att_rate = round(min(attended / total_sessions * 100, 100), 1) if total_sessions else 0.0
             submitted = submission_map.get(m.user_id, 0)
@@ -185,7 +186,7 @@ class SubGroupSerializer(serializers.ModelSerializer):
         ]
 
     def get_participants_count(self, obj: SubGroup) -> int:
-        return obj.memberships.count()
+        return len(obj.memberships.all())
 
 
 class SubGroupWriteSerializer(serializers.Serializer):
@@ -201,15 +202,24 @@ class SubGroupWriteSerializer(serializers.Serializer):
 
 
 class GroupLeadMentorSerializer(serializers.ModelSerializer):
-    """Read serializer — returns Lead Mentor user details."""
-    lead_mentor_id = serializers.UUIDField(source="lead_mentor.id", read_only=True)
-    full_name = serializers.CharField(source="lead_mentor.full_name", read_only=True)
-    email = serializers.EmailField(source="lead_mentor.email", read_only=True)
+    """Read serializer — returns Lead Mentor user details. Null-safe for SET_NULL FK."""
+    lead_mentor_id = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
     assigned_at = serializers.DateTimeField(source="created_at", read_only=True)
 
     class Meta:
         model = GroupLeadMentor
         fields = ["lead_mentor_id", "full_name", "email", "assigned_at"]
+
+    def get_lead_mentor_id(self, obj: GroupLeadMentor):
+        return str(obj.lead_mentor_id) if obj.lead_mentor_id else None
+
+    def get_full_name(self, obj: GroupLeadMentor):
+        return obj.lead_mentor.full_name if obj.lead_mentor_id and obj.lead_mentor else None
+
+    def get_email(self, obj: GroupLeadMentor):
+        return obj.lead_mentor.email if obj.lead_mentor_id and obj.lead_mentor else None
 
 
 class GroupLeadMentorWriteSerializer(serializers.Serializer):
@@ -217,7 +227,12 @@ class GroupLeadMentorWriteSerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
 
     def validate_user_id(self, value):
-        User = get_user_model()
-        if not User.objects.filter(id=value, is_active=True).exists():
-            raise serializers.ValidationError("No active user with this ID.")
+        user = User.objects.filter(id=value, is_active=True).first()
+        if not user:
+            raise serializers.ValidationError("User not found or inactive.")
+        if user.role not in ("LEAD_MENTOR", "ADMIN"):
+            raise serializers.ValidationError(
+                f"User '{user.full_name}' has role '{user.role}' and cannot be assigned as Lead Mentor. "
+                "Only users with the LEAD_MENTOR or ADMIN role can be assigned."
+            )
         return value

@@ -20,7 +20,7 @@ export function AnalyticsTab({ groupId }: { groupId: string }) {
   });
   const subGroups = subGroupsData?.data ?? [];
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['group-analytics', groupId, subGroupId || 'all'],
     queryFn: () => groupsApi.analytics(groupId, subGroupId ? { sub_group_id: subGroupId } : undefined),
   });
@@ -61,9 +61,15 @@ export function AnalyticsTab({ groupId }: { groupId: string }) {
         </div>
       )}
 
-      {isLoading || !analytics ? (
-        <div className="py-8 text-center text-sm text-muted-foreground/70">Loading analytics...</div>
-      ) : (
+      {isLoading
+        ? <div className="py-8 text-center text-sm text-muted-foreground/70">Loading analytics...</div>
+        : isError
+          ? <div className="text-center py-8 text-muted-foreground">
+              Failed to load analytics. <button onClick={() => void refetch()} className="underline">Try again</button>
+            </div>
+          : !analytics
+            ? <div className="text-center py-8 text-muted-foreground">No analytics data available.</div>
+            : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Attendance Trend */}

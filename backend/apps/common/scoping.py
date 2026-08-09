@@ -90,7 +90,7 @@ def lead_mentor_group_qs(user):
     from apps.groups.models import ClassGroup, GroupLeadMentor  # noqa: PLC0415
 
     assigned_ids = GroupLeadMentor.objects.filter(lead_mentor=user).values_list("group_id", flat=True)
-    return ClassGroup.objects.filter(pk__in=assigned_ids)
+    return ClassGroup.objects.filter(pk__in=assigned_ids, is_archived=False)
 
 
 def lead_mentor_class_qs(user):
