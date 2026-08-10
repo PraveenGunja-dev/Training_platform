@@ -113,10 +113,10 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
       }
       vals = { ...vals, doc_type: customDocType.trim().toUpperCase() };
     }
-    // Validate file type and size before consuming a presigned URL slot
-    const validation = validateFile(pendingFile);
-    if (!validation.ok) {
-      toast.error(validation.error);
+    try {
+      validateFile(pendingFile);
+    } catch (e) {
+      toast.error((e as Error).message);
       return;
     }
     setUploading(true);

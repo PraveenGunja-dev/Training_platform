@@ -11,6 +11,7 @@ import { formatDate, formatCountdown } from '@/lib/dates';
 import { formatBytes } from '@/lib/fileValidation';
 import { useCountdown } from '@/hooks/useCountdown';
 import { submissionsApi } from '@/api/submissions';
+import { assignmentsApi } from '@/api/assignments';
 import type { AssignmentTask, Submission } from '@/lib/types';
 
 function getLatestSub(subs: Submission[]): Submission | undefined {
@@ -173,21 +174,32 @@ export function TaskUploadCard({ task }: TaskUploadCardProps) {
               variant="outline"
               size="sm"
               className="flex items-center gap-1.5"
-              onClick={() => window.open(latestSub.file_url, '_blank')}
+              onClick={async () => {
+                try {
+                  await assignmentsApi.downloadSubmission(latestSub.id, latestSub.file_name);
+                } catch {
+                  // download error is silent; toast from API client if needed
+                }
+              }}
             >
               <Download className="h-3.5 w-3.5" />
               Download
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5"
-              onClick={() => setReuploadMode(true)}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Re-upload
-            </Button>
+            {!task.is_closed && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5"
+                onClick={() => setReuploadMode(true)}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Re-upload
+              </Button>
+            )}
           </div>
+          {task.is_closed && (
+            <p className="text-xs text-slate-400 mt-2">This assignment is closed — re-upload is not available.</p>
+          )}
 
           {mySubs.length > 1 && (
             <p className="text-xs text-muted-foreground/70">{mySubs.length} versions total</p>

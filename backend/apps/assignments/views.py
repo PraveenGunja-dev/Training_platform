@@ -139,7 +139,7 @@ class AssignmentTaskViewSet(ViewSet):
                         type="CLASS_TASK_ASSIGNED",
                         title=f"Assignment allocated: {task.title}",
                         body=f'"{task.title}" has been assigned to your class. Opens {open_str}.',
-                        link=f"/me/classes/{task.class_obj_id}",
+                        link=f"/me/tasks/{task.id}",
                         dedupe_key=f"class_task_assigned:{task.id}:{uid}",
                         sent_at=now,
                         payload={"task_id": str(task.id), "class_id": str(task.class_obj_id)},
@@ -228,6 +228,21 @@ class AssignmentTaskViewSet(ViewSet):
                 {"errors": [{"code": "validation_error", "message": str(ser.errors)}], "data": None},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if 'group' in ser.validated_data:
+            new_group = ser.validated_data['group']
+            if new_group.pk != task.group_id:
+                if task.submissions.exists():
+                    return Response(
+                        {
+                            "errors": [{
+                                "code": "assignment.group_change_blocked",
+                                "message": "Cannot change the group of an assignment that already has submissions. Delete and recreate the assignment instead.",
+                            }],
+                            "data": None,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+
         was_open = task.is_open
         for field, value in ser.validated_data.items():
             setattr(task, field, value)
@@ -265,13 +280,18 @@ class AssignmentTaskViewSet(ViewSet):
         task_id = task.id
         task_title = task.title
         task_group_id = str(task.group_id)
+        submissions_count = task.submissions.count()
         task.delete()
         log_action(
             actor=request.user,
             action="assignment.task_deleted",
             target_type="AssignmentTask",
             target_id=task_id,
-            metadata={"title": task_title, "group_id": task_group_id},
+            metadata={
+                "title": task_title,
+                "group_id": task_group_id,
+                "submissions_deleted": submissions_count,
+            },
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -292,6 +312,9 @@ class AssignmentTaskViewSet(ViewSet):
         file_type = file.content_type
         file_size = file.size
 
+        if len(file_name) > 255:
+            return _validation_error('file', 'File name must be 255 characters or fewer. Please rename the file and try again.')
+
         try:
             validate_file(file_name, file_size, file_type)
         except FileValidationError as exc:
@@ -300,8 +323,8 @@ class AssignmentTaskViewSet(ViewSet):
         note = request.data.get('note', '')
         user_id = request.data.get('user_id')
 
-        # Determine target user: Admin can specify user_id for on-behalf submission
-        if user_id and request.user.role == "ADMIN":
+        # Determine target user: Admin/Sub-Mentor/Lead-Mentor can specify user_id for on-behalf submission
+        if user_id and request.user.role in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR"):
             target_user = get_object_or_404(User, pk=user_id)
         else:
             target_user = request.user
@@ -464,7 +487,7 @@ class AssignmentTaskViewSet(ViewSet):
             )
         subs = (
             Submission.objects.filter(task=task)
-            .select_related("user", "submitted_by")
+            .select_related("user", "submitted_by", "review", "review__reviewer")
             .order_by("user__full_name", "-version")
         )
         status_param = request.query_params.get("status")
@@ -473,7 +496,24 @@ class AssignmentTaskViewSet(ViewSet):
         search_param = request.query_params.get("search")
         if search_param:
             subs = subs.filter(user__full_name__icontains=search_param)
-        return Response({"data": SubmissionSerializer(subs, many=True).data})
+
+        page_size_raw = request.query_params.get("page_size")
+        page_raw = request.query_params.get("page", "1")
+        try:
+            page_size = min(int(page_size_raw), 200) if page_size_raw else None
+            page = max(int(page_raw), 1)
+        except (ValueError, TypeError):
+            page_size, page = None, 1
+
+        total = subs.count()
+        if page_size:
+            offset = (page - 1) * page_size
+            subs = subs[offset: offset + page_size]
+
+        return Response({
+            "data": SubmissionSerializer(subs, many=True).data,
+            "meta": {"total": total, "page": page, "page_size": page_size},
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +545,9 @@ class ParticipantSubmissionsView(APIView):
             .select_related("task")
             .order_by("-submitted_at")
         )
+        task_id = request.query_params.get("task_id")
+        if task_id:
+            subs = subs.filter(task_id=task_id)
         return Response({"data": SubmissionSerializer(subs, many=True).data})
 
 
@@ -536,11 +579,17 @@ class SubmissionFileView(APIView):
                     {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-        elif request.user.role != "ADMIN" and sub.user_id != request.user.id:
-            return Response(
-                {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        elif request.user.role != "ADMIN":
+            if sub.user_id != request.user.id:
+                return Response(
+                    {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if not GroupMembership.objects.filter(group_id=sub.task.group_id, user=request.user).exists():
+                return Response(
+                    {"errors": [{"code": "perm.denied", "message": "Access denied."}], "data": None},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         if not sub.file_data:
             return Response(
                 {"errors": [{"code": "not_found", "message": "File not available."}], "data": None},
@@ -639,14 +688,21 @@ class SubmissionReviewView(APIView):
             )
         validated = ser.validated_data
 
+        import copy  # noqa: PLC0415
         from django.core.exceptions import ValidationError as DjangoValidationError  # noqa: PLC0415
         try:
-            _tmp_review = SubmissionReview(
-                submission=submission,
-                reviewer=request.user,
-                **validated,
-            )
-            _tmp_review.full_clean(exclude=["submission", "reviewer"])
+            if existing_review is not None:
+                _tmp_review = copy.copy(existing_review)
+                _tmp_review.reviewer = request.user
+                for field, value in validated.items():
+                    setattr(_tmp_review, field, value)
+            else:
+                _tmp_review = SubmissionReview(
+                    submission=submission,
+                    reviewer=request.user,
+                    **validated,
+                )
+            _tmp_review.full_clean(exclude=["submission", "reviewer", "id"])
         except DjangoValidationError as e:
             return Response(
                 {"errors": [{"code": "validation_error", "message": str(e)}], "data": None},

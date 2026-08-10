@@ -47,14 +47,27 @@ export const assignmentsApi = {
   listByClass: (classId: string) =>
     apiClient.get<ApiEnvelope<AssignmentTask[]>>('/assignments', { params: { class_id: classId } }).then(r => r.data),
   // Submit assignment (multipart: file + note + optional user_id)
-  submitAssignment: (taskId: string, file: File, note?: string, userId?: string) => {
+  submitAssignment: (
+    taskId: string,
+    file: File,
+    note = '',
+    userId?: string,
+    onUploadProgress?: (pct: number) => void,
+  ) => {
     const fd = new FormData();
     fd.append('file', file);
     if (note) fd.append('note', note);
     if (userId) fd.append('user_id', userId);
     return apiClient.post<ApiEnvelope<Submission>>(
       `/assignments/${taskId}/submissions`, fd,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: onUploadProgress
+          ? (e) => {
+              if (e.total) onUploadProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          : undefined,
+      },
     ).then(r => r.data);
   },
   listSubmissions: (taskId: string, params?: { status?: string; search?: string }) =>

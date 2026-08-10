@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { SubmissionStatusBadge } from './SubmissionStatusBadge';
 import { formatDate } from '@/lib/dates';
 import { formatBytes } from '@/lib/fileValidation';
+import { assignmentsApi } from '@/api/assignments';
 import type { Submission, AssignmentTask } from '@/lib/types';
 
 interface SubmissionRowProps {
@@ -64,7 +65,9 @@ export function SubmissionRow({ submission, task }: SubmissionRowProps) {
               variant="ghost"
               size="sm"
               className="h-7 gap-1.5"
-              onClick={() => window.open(submission.file_url, '_blank')}
+              onClick={async () => {
+                await assignmentsApi.downloadSubmission(submission.id, submission.file_name);
+              }}
             >
               <Download className="h-3.5 w-3.5" />
               Download
@@ -124,7 +127,8 @@ export function SubmissionRow({ submission, task }: SubmissionRowProps) {
                 Reviewed by{' '}
                 <span className="font-medium text-slate-500">{review.reviewer_name ?? 'SubMentor'}</span>
                 {' · '}
-                {new Date(review.reviewed_at).toLocaleDateString('en-US', {
+                Last reviewed{' '}
+                {new Date(review.updated_at).toLocaleDateString('en-US', {
                   day: 'numeric', month: 'short', year: 'numeric',
                 })}
               </p>

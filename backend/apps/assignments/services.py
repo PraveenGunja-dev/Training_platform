@@ -33,7 +33,7 @@ def create_submission(
     Enforces late_policy. Re-uploads create a new version row (history preserved).
     """
     now = timezone.now()
-    is_admin = actor.role == "ADMIN"
+    is_admin = actor.role in ("ADMIN", "SUB_MENTOR", "LEAD_MENTOR")
 
     # Group membership check (participants only)
     if not is_admin:
@@ -52,6 +52,20 @@ def create_submission(
                     "This assignment is restricted to a sub-group you are not part of.",
                     403,
                 )
+
+    if task.is_closed and not is_admin:
+        raise AssignmentError(
+            "assignment.closed",
+            "This assignment has been closed and is no longer accepting submissions.",
+            422,
+        )
+
+    if not is_admin and now < task.upload_open_at:
+        raise AssignmentError(
+            "assignment.upload_window_not_open",
+            "The submission window has not opened yet.",
+            422,
+        )
 
     past_deadline = now > task.deadline_at
 

@@ -112,7 +112,7 @@ export function SubmissionsTable({ taskId, latePolicy, participants, taskTitle =
             </button>
           ))}
         </div>
-        {latePolicy === 'ADMIN_ONLY' && (
+        {latePolicy !== 'STRICT' && (
           <Button size="sm" variant="outline" onClick={() => setShowManualUpload(true)}>
             <Upload className="h-3.5 w-3.5 mr-1.5" />
             Upload on Behalf
@@ -255,7 +255,8 @@ export function SubmissionsTable({ taskId, latePolicy, participants, taskTitle =
                               Reviewed by{' '}
                               <span className="font-medium text-slate-500">{review.reviewer_name ?? 'Reviewer'}</span>
                               {' · '}
-                              {new Date(review.reviewed_at).toLocaleDateString('en-US', {
+                              Last reviewed{' '}
+                              {new Date(review.updated_at).toLocaleDateString('en-US', {
                                 day: 'numeric', month: 'short', year: 'numeric',
                               })}
                             </p>
