@@ -42,8 +42,8 @@ export function FeedbackCard({ review }: FeedbackCardProps) {
       )}
 
       <p className="text-xs text-slate-400">
-        Reviewed by {review.reviewer_name ?? 'SubMentor'} ·{' '}
-        {new Date(review.reviewed_at).toLocaleDateString('en-US', {
+        Last reviewed by {review.reviewer_name ?? 'SubMentor'} ·{' '}
+        {new Date(review.updated_at).toLocaleDateString('en-US', {
           day: 'numeric', month: 'short', year: 'numeric',
         })}
       </p>

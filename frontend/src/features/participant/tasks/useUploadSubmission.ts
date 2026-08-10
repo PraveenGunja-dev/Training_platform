@@ -11,11 +11,9 @@ export function useUploadSubmission(task: AssignmentTask) {
 
   const mutation = useMutation({
     mutationFn: async (file: File) => {
-      const validation = validateFile(file);
-      if (!validation.ok) throw new Error(validation.error);
-
+      validateFile(file);
       setProgress(0);
-      const result = await assignmentsApi.submitAssignment(task.id, file);
+      const result = await assignmentsApi.submitAssignment(task.id, file, '', undefined, setProgress);
       setProgress(100);
       return result;
     },

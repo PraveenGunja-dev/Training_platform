@@ -93,6 +93,8 @@ export function ReviewDialog({
     onSuccess: () => {
       toast.success('Review saved.');
       void queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-submission'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
       onOpenChange(false);
     },
     onError: () => {

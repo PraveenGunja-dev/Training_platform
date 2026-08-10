@@ -118,8 +118,12 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
 
   const handleUpload = async () => {
     if (!pendingFile || !confirmed) return;
-    const validation = validateFile(pendingFile);
-    if (!validation.ok) { toast.error(validation.error); return; }
+    try {
+      validateFile(pendingFile);
+    } catch (e) {
+      toast.error((e as Error).message);
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();

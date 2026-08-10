@@ -36,6 +36,8 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
     resolver: zodResolver(schema),
   });
 
+  const [uploadError, setUploadError] = useState('');
+
   const mutation = useMutation({
     mutationFn: async (vals: FormValues) => {
       return assignmentsApi.submitAssignment(taskId, vals.file, vals.note ?? '', vals.participant_id);
@@ -43,7 +45,13 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['submissions', taskId] });
       reset();
+      setUploadError('');
       onClose();
+    },
+    onError: (err: unknown) => {
+      const apiMessage =
+        (err as any)?.response?.data?.errors?.[0]?.message ?? 'Upload failed. Please try again.';
+      setUploadError(apiMessage);
     },
   });
 
@@ -99,8 +107,8 @@ export function ManualSubmissionUploadDialog({ taskId, participants, open, onClo
             />
           </div>
 
-          {mutation.isError && (
-            <p className="text-xs text-red-600">Upload failed. Please try again.</p>
+          {uploadError && (
+            <p className="text-xs text-red-600">{uploadError}</p>
           )}
 
           <DialogFooter>

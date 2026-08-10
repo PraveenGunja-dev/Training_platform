@@ -126,10 +126,10 @@ export function CreateAssignmentDialog({ open, onClose, groups, defaultGroupId, 
   const mutation = useMutation({
     mutationFn: async (values: AssignmentFormValues) => {
       if (pendingFile) {
-        // Validate file before upload
-        const validation = validateFile(pendingFile);
-        if (!validation.ok) {
-          toast.error(validation.error);
+        try {
+          validateFile(pendingFile);
+        } catch (e) {
+          toast.error((e as Error).message);
           setUploadProgress('idle');
           return;
         }

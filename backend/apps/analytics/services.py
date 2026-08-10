@@ -50,8 +50,14 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
     classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
-    submitted = Submission.objects.filter(status="SUBMITTED").count()
-    late = Submission.objects.filter(status="LATE_SUBMITTED").count()
+    submitted = (
+        Submission.objects.filter(status="SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
+    late = (
+        Submission.objects.filter(status="LATE_SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
     pending_approvals = ParticipantSharedDoc.objects.filter(status="PENDING").count()
     video_uploads = Submission.objects.filter(file_type__startswith="video/").count()
     doc_uploads = Submission.objects.filter(file_type="application/pdf").count()
@@ -75,7 +81,7 @@ def _compute_admin_payload(group_id: str | None = None) -> dict:
     trend_days = []
     for i in range(13, -1, -1):
         day = today - timedelta(days=i)
-        count = Submission.objects.filter(submitted_at__date=day).count()
+        count = Submission.objects.filter(submitted_at__date=day).values("task_id", "user_id").distinct().count()
         trend_days.append({"date": day.isoformat(), "count": count})
 
     # --- Attendance pie (last 30 days) ---
@@ -342,8 +348,14 @@ def compute_sub_mentor_payload(user) -> dict:
     classes_today = Class.objects.filter(starts_at__date=today, **_class_q).count()
     classes_upcoming = Class.objects.filter(starts_at__gt=now, **_class_q).exclude(status_cached="CANCELLED").count()
     classes_completed = Class.objects.filter(ends_at__lt=now, **_class_q).exclude(status_cached="CANCELLED").count()
-    submitted = Submission.objects.filter(task__group_id__in=assigned_group_ids, status="SUBMITTED").count()
-    late = Submission.objects.filter(task__group_id__in=assigned_group_ids, status="LATE_SUBMITTED").count()
+    submitted = (
+        Submission.objects.filter(task__group_id__in=assigned_group_ids, status="SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
+    late = (
+        Submission.objects.filter(task__group_id__in=assigned_group_ids, status="LATE_SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
     pending_approvals = ParticipantSharedDoc.objects.filter(
         group_id__in=assigned_group_ids, status="PENDING"
     ).count()
@@ -793,8 +805,14 @@ def compute_lead_mentor_payload(group_id: str) -> dict:
     classes_today = Class.objects.filter(group_id=group_id, starts_at__date=today).count()
     classes_upcoming = Class.objects.filter(group_id=group_id, starts_at__gt=now).exclude(status_cached="CANCELLED").count()
     classes_completed = Class.objects.filter(group_id=group_id, ends_at__lt=now).exclude(status_cached="CANCELLED").count()
-    submitted = Submission.objects.filter(task__group_id=group_id, status="SUBMITTED").count()
-    late = Submission.objects.filter(task__group_id=group_id, status="LATE_SUBMITTED").count()
+    submitted = (
+        Submission.objects.filter(task__group_id=group_id, status="SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
+    late = (
+        Submission.objects.filter(task__group_id=group_id, status="LATE_SUBMITTED")
+        .values("task_id", "user_id").distinct().count()
+    )
     pending_approvals = ParticipantSharedDoc.objects.filter(group_id=group_id, status="PENDING").count()
     open_tasks_count = AssignmentTask.objects.filter(group_id=group_id, is_open=True, is_closed=False).count()
     total_submissions_expected = total_participants * open_tasks_count

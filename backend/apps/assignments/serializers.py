@@ -106,14 +106,20 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
     is_open = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs: dict) -> dict:
+        from django.utils import timezone as _tz
         upload_open = attrs.get("upload_open_at")
         deadline = attrs.get("deadline_at")
         if upload_open and deadline and upload_open >= deadline:
             raise serializers.ValidationError(
                 {"deadline_at": "deadline_at must be after upload_open_at."}
             )
+        if deadline and not self.partial:
+            if deadline <= _tz.now():
+                raise serializers.ValidationError(
+                    {"deadline_at": "Deadline must be a future date and time."}
+                )
         sub_group = attrs.get('sub_group')
-        group = attrs.get('group')
+        group = attrs.get('group') or (self.instance.group if self.instance else None)
         if sub_group is not None and group is not None:
             if str(sub_group.parent_group_id) != str(group.id):
                 raise serializers.ValidationError(
@@ -157,6 +163,10 @@ class SubmissionReviewSerializer(serializers.ModelSerializer):
         if grade_numeric is not None and grade_letter:
             raise serializers.ValidationError(
                 {"grade": "Cannot set both numeric and letter grade."}
+            )
+        if grade_numeric is not None and not (0 <= float(grade_numeric) <= 100):
+            raise serializers.ValidationError(
+                {"grade_numeric": "Numeric grade must be between 0 and 100."}
             )
         return attrs
 
