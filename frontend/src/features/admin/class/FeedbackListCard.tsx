@@ -9,7 +9,7 @@ interface FeedbackListCardProps {
 }
 
 export function FeedbackListCard({ classId }: FeedbackListCardProps) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['class-feedback', classId],
     queryFn: () => feedbackApi.list(classId),
   });
@@ -41,6 +41,8 @@ export function FeedbackListCard({ classId }: FeedbackListCardProps) {
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 text-[#5A7A9A] animate-spin" />
           </div>
+        ) : isError ? (
+          <p className="text-sm text-red-500 py-4 text-center">Failed to load feedback.</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-[#5A7A9A] py-4 text-center">No feedback submitted yet.</p>
         ) : (

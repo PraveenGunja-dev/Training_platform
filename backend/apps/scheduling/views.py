@@ -109,22 +109,18 @@ class ClassViewSet(ViewSet):
                 ).exclude(status_cached=Class.STATUS_ONGOING).exclude(
                     status_cached=Class.STATUS_CANCELLED,
                 ).update(status_cached=Class.STATUS_ONGOING)
-                Class.objects.filter(
-                    ends_at__lt=now,
-                ).exclude(status_cached=Class.STATUS_COMPLETED).exclude(
-                    status_cached=Class.STATUS_CANCELLED,
-                ).update(status_cached=Class.STATUS_COMPLETED)
+                newly_completed_ids = list(
+                    Class.objects.filter(ends_at__lt=now)
+                    .exclude(status_cached=Class.STATUS_COMPLETED)
+                    .exclude(status_cached=Class.STATUS_CANCELLED)
+                    .values_list("id", flat=True)
+                )
+                if newly_completed_ids:
+                    Class.objects.filter(pk__in=newly_completed_ids).update(status_cached=Class.STATUS_COMPLETED)
+                    from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
+                    for _cls in Class.objects.filter(pk__in=newly_completed_ids).select_related("group").iterator(chunk_size=50):
+                        _notify_fb(_cls)
                 cache.set(_cache_key, True, timeout=60)
-                # Notify participants for classes newly transitioned to COMPLETED
-                from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
-                from datetime import timedelta  # noqa: PLC0415
-                just_ended = Class.objects.filter(
-                    ends_at__lt=now,
-                    ends_at__gte=now - timedelta(seconds=60),
-                    status_cached=Class.STATUS_COMPLETED,
-                ).select_related("group")
-                for _cls in just_ended.iterator(chunk_size=50):
-                    _notify_fb(_cls)
         qs = self._scoped_queryset(request)
         qs = apply_class_filters(qs, request.query_params)
         context: dict = {"request": request}
@@ -256,14 +252,7 @@ class ClassViewSet(ViewSet):
 
         cls = serializer.save()
 
-        # Notify participants when a class is explicitly marked COMPLETED
         _new_status = serializer.validated_data.get("status_cached")
-        if _new_status == Class.STATUS_COMPLETED:
-            from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
-            _cls_for_notif = get_object_or_404(
-                Class.objects.select_related("group"), pk=cls.pk
-            )
-            _notify_fb(_cls_for_notif)
 
         log_action(
             actor=request.user,
@@ -273,6 +262,10 @@ class ClassViewSet(ViewSet):
             metadata={"title": cls.title},
         )
         cls_fresh = get_object_or_404(Class.objects.select_related("group", "created_by"), pk=cls.pk)
+
+        if _new_status == Class.STATUS_COMPLETED:
+            from apps.notifications.services import notify_feedback_requested as _notify_fb  # noqa: PLC0415
+            _notify_fb(cls_fresh)
 
         # Notify group members when the class is rescheduled
         from django.utils import timezone as _tz2  # noqa: PLC0415
@@ -637,7 +630,7 @@ class RecurringClassView(APIView):
                 link="/sub-mentor/classes",
                 payload={"group_id": str(group.id)},
                 actor=request.user,
-                dedupe_suffix=f"recurring:{_start_str}",
+                dedupe_suffix=f"recur:{_now_rec.strftime('%Y%m%d%H%M%S')}",
             )
 
         return Response(
