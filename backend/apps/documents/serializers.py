@@ -79,11 +79,20 @@ class DocumentWriteSerializer(serializers.Serializer):
 
     def validate(self, data):
         visibility = data.get('visibility', Document.VIS_GROUP)
+        class_obj = data.get('class_obj')
+        group = data.get('group')
+
+        # Cross-group guard: class must belong to the stated group
+        if class_obj and group and class_obj.group_id != group.pk:
+            raise serializers.ValidationError(
+                {'class_id': 'The selected class does not belong to the selected group.'}
+            )
+
         if visibility == Document.VIS_SELECTED and not data.get('allowed_user_ids'):
             raise serializers.ValidationError(
                 {'allowed_user_ids': 'At least one user must be selected for "Selected Participants Only" visibility.'}
             )
-        if visibility == Document.VIS_PUBLIC_TO_CLASS and not data.get('class_obj'):
+        if visibility == Document.VIS_PUBLIC_TO_CLASS and not class_obj:
             raise serializers.ValidationError(
                 {'class_id': 'A linked class is required for "Public to Assigned Class" visibility.'}
             )

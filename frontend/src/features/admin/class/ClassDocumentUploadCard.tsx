@@ -68,6 +68,7 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
   const [description, setDescription] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
 
   const { data } = useQuery({
     queryKey: ['documents', { group_id: groupId }],
@@ -136,16 +137,18 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
       fd.append('visibility', 'PUBLIC_TO_CLASS');
       fd.append('allowed_user_ids', JSON.stringify([]));
 
-      await documentsApi.create(fd);
+      await documentsApi.create(fd, (pct) => setUploadPct(pct));
 
       void queryClient.invalidateQueries({ queryKey: ['documents', { group_id: groupId }] });
       const typeLabel = typeChoice === 'MOM' ? 'MOM' : typeChoice === 'CUSTOM' ? (customTypeInput.trim() || 'Custom') : 'Normal Doc';
       toast.success(`${typeLabel} uploaded and published to participants.`);
       reset();
-    } catch {
-      toast.error('Upload failed. Please try again.');
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.errors?.[0]?.message;
+      toast.error(msg ?? 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
+      setUploadPct(0);
     }
   };
 
@@ -369,6 +372,16 @@ export function ClassDocumentUploadCard({ classId, groupId }: Props) {
                 Cancel
               </Button>
             </div>
+            {uploading && (
+              <div className="w-full space-y-1">
+                <div className="flex justify-between text-xs text-violet-700 font-medium">
+                  <span>Uploading…</span><span>{uploadPct}%</span>
+                </div>
+                <div className="w-full bg-violet-100 rounded-full h-1">
+                  <div className="bg-violet-600 h-1 rounded-full transition-all" style={{ width: `${uploadPct}%` }} />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
