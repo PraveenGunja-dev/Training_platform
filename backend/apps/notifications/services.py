@@ -115,12 +115,19 @@ def notify_feedback_requested(class_session) -> int:
     """
     from django.utils import timezone as _tz  # noqa: PLC0415
 
+    from apps.attendance.models import AttendanceRecord  # noqa: PLC0415
     from apps.groups.models import GroupMembership  # noqa: PLC0415
 
     member_ids = list(
-        GroupMembership.objects.filter(group=class_session.group)
+        AttendanceRecord.objects.filter(session__class_obj=class_session)
         .values_list("user_id", flat=True)
+        .distinct()
     )
+    if not member_ids:
+        member_ids = list(
+            GroupMembership.objects.filter(group=class_session.group)
+            .values_list("user_id", flat=True)
+        )
     if not member_ids:
         return 0
 

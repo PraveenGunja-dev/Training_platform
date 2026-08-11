@@ -13,6 +13,7 @@ import {
   RefreshCw,
   UserMinus,
   Upload,
+  Star,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatRelative } from '@/lib/dates';
@@ -50,6 +51,8 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   SHARED_UPLOAD_PENDING:          Upload,
   SUBMISSION_REVIEWED:            CheckCircle,
   LEAD_MENTOR_ASSIGNED:           Users,
+  GROUP_DOCUMENT_ADDED:           FolderOpen,
+  CLASS_FEEDBACK_REQUESTED:       Star,
 };
 
 interface NotificationItemProps {

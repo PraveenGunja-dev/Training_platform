@@ -81,27 +81,24 @@ function PreferencesCard() {
           </button>
         </div>
 
-        {/* Digest submissions */}
-        <div className="flex items-center justify-between gap-4">
+        {/* Digest submissions — coming soon */}
+        <div className="flex items-center justify-between gap-4 opacity-50 cursor-not-allowed">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50">
               <Upload className="h-4 w-4 text-[#0066BB]" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-800">Digest submissions</p>
-              <p className="text-xs text-slate-500">Get one daily summary instead of per-submission alerts</p>
+              <p className="text-sm font-medium text-slate-800">Submission digest emails</p>
+              <p className="text-xs text-slate-500">Daily summary of submissions (coming soon)</p>
             </div>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={prefs.digest_submissions}
-            aria-label="Digest submissions"
-            disabled={updateMutation.isPending}
-            onClick={() => updateMutation.mutate({ digest_submissions: !prefs.digest_submissions })}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-              prefs.digest_submissions ? 'bg-[#0052A5]' : 'bg-slate-200'
-            } disabled:opacity-60`}
+            aria-label="Submission digest (coming soon)"
+            disabled
+            className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border-2 border-transparent transition-colors bg-slate-200 opacity-60"
           >
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
               prefs.digest_submissions ? 'translate-x-5' : 'translate-x-0'
@@ -133,7 +130,7 @@ export default function SubMentorNotificationsPage() {
     data, fetchNextPage, hasNextPage, isFetchingNextPage,
     isLoading, isError, refetch,
   } = useInfiniteQuery({
-    queryKey: ['notifications', 'infinite', { unreadOnly }],
+    queryKey: ['notifications', 'list', { unreadOnly }],
     queryFn:  ({ pageParam }) =>
       notificationsApi.list({
         cursor:      pageParam as string | undefined,

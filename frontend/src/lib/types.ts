@@ -37,7 +37,9 @@ export type NotificationType =
   | 'PARTICIPANTS_REMOVED_FROM_GROUP'
   | 'SHARED_UPLOAD_PENDING'
   | 'SUBMISSION_REVIEWED'
-  | 'LEAD_MENTOR_ASSIGNED';
+  | 'LEAD_MENTOR_ASSIGNED'
+  | 'GROUP_DOCUMENT_ADDED'
+  | 'CLASS_FEEDBACK_REQUESTED';
 
 export interface NotificationPreference {
   in_app_enabled: boolean;

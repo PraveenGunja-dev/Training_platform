@@ -28,7 +28,7 @@ export default function NotificationsPage() {
     data, fetchNextPage, hasNextPage, isFetchingNextPage,
     isLoading, isError, refetch,
   } = useInfiniteQuery({
-    queryKey: ['notifications', 'infinite', { unreadOnly }],
+    queryKey: ['notifications', 'list', { unreadOnly }],
     queryFn:  ({ pageParam }) =>
       notificationsApi.list({
         cursor:      pageParam as string | undefined,

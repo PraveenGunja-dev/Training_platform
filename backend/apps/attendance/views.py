@@ -253,6 +253,18 @@ class AdminRecordOverrideView(APIView):
                 "user_id": str(record.user_id),
             },
         )
+        if record.user_id:
+            from apps.notifications.services import create_inapp  # noqa: PLC0415
+            _status_label = dict(AttendanceRecord.STATUS_CHOICES).get(new_status, new_status)
+            create_inapp(
+                user=record.user,
+                type="ATTENDANCE_OVERRIDE",
+                title="Attendance Updated",
+                body=f"Your attendance for {record.session.class_obj.title} was updated to {_status_label}.",
+                link=f"/me/classes/{record.session.class_obj_id}",
+                dedupe_key=f"attendance_override_{record.pk}_{new_status}",
+                payload={"record_id": str(record.pk), "new_status": new_status},
+            )
         return Response({"data": AttendanceRecordSerializer(record).data})
 
 

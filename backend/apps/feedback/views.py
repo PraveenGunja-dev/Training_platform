@@ -251,14 +251,20 @@ class FeedbackAdminView(APIView):
 
         agg = qs.aggregate(avg_rating=Avg("rating"), total_count=Count("id"))
 
-        class_ids_in_qs = qs.values_list("class_session_id", flat=True).distinct()
-        enrolled_count = GroupMembership.objects.filter(
-            group__classes__id__in=class_ids_in_qs
-        ).distinct().count()
+        class_ids_in_qs = list(qs.values_list("class_session_id", flat=True).distinct())
+        group_class_counts = (
+            Class.objects.filter(pk__in=class_ids_in_qs)
+            .values("group_id")
+            .annotate(cls_count=Count("id"))
+        )
+        total_possible = sum(
+            GroupMembership.objects.filter(group_id=row["group_id"]).count() * row["cls_count"]
+            for row in group_class_counts
+        )
         submitted_count = agg["total_count"] or 0
         response_rate = (
-            round(submitted_count / enrolled_count * 100, 1)
-            if enrolled_count
+            round(submitted_count / total_possible * 100, 1)
+            if total_possible
             else 0.0
         )
 

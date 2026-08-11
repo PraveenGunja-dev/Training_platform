@@ -6,7 +6,7 @@ from django.db import models
 
 class Notification(models.Model):
     TYPE_CHOICES = [
-        ("DEADLINE_REMINDER", "Deadline Reminder"),
+        ("DEADLINE_REMINDER", "Deadline Reminder"),   # legacy seed data only; use DEADLINE_APPROACHING in code
         ("TASK_OPENED", "Task Opened"),
         ("SHARED_DOC_RESULT", "Shared Doc Result"),
         ("CLASS_SCHEDULED", "Class Scheduled"),
@@ -20,7 +20,7 @@ class Notification(models.Model):
         ("ATTENDANCE_CLOSING_SOON", "Attendance Closing Soon"),
         ("ATTENDANCE_OVERRIDE", "Attendance Override"),
         ("GROUP_ADDED", "Added to Group"),
-        ("INVITE_RESENT", "Invite Resent"),
+        ("INVITE_RESENT", "Invite Resent"),  # reserved — invited user has no session yet; may be used for admin audit trail
         # Sub-Mentor notification types
         ("GROUP_ASSIGNED", "Group Assigned"),
         ("GROUP_UNASSIGNED", "Group Unassigned"),
