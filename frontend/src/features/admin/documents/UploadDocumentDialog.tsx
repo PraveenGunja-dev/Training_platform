@@ -39,7 +39,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
   const [dragging, setDragging] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<'idle' | 'saving'>('idle');
+  const [uploadPct, setUploadPct] = useState(0);
   const [customDocType, setCustomDocType] = useState('');
 
   const { register, handleSubmit, watch, setValue, control, reset, formState: { errors } } = useForm<DocumentFormValues>({
@@ -94,7 +94,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
   const handleClose = () => {
     reset();
     setPendingFile(null);
-    setUploadProgress('idle');
+    setUploadPct(0);
     setCustomDocType('');
     onClose();
   };
@@ -120,8 +120,8 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
       return;
     }
     setUploading(true);
+    setUploadPct(0);
     try {
-      setUploadProgress('saving');
       const fd = new FormData();
       fd.append('file', pendingFile);
       fd.append('group_id', vals.group_id);
@@ -133,21 +133,19 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
       const allowedIds = vals.visibility === 'SELECTED' ? (vals.allowed_user_ids ?? []) : [];
       fd.append('allowed_user_ids', JSON.stringify(allowedIds));
 
-      await documentsApi.create(fd);
+      await documentsApi.create(fd, (pct) => setUploadPct(pct));
 
       qc.invalidateQueries({ queryKey: ['documents'] });
       toast.success('Document uploaded successfully.');
       handleClose();
-    } catch {
-      toast.error('Upload failed. Please try again.');
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.errors?.[0]?.message;
+      toast.error(msg ?? 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
-      setUploadProgress('idle');
+      setUploadPct(0);
     }
   };
-
-  const progressLabel =
-    uploadProgress === 'saving' ? 'Uploading document…' : '';
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
@@ -336,10 +334,18 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
           )}
 
           {/* ── Upload progress ─────────────────────────────────────── */}
-          {uploadProgress !== 'idle' && (
-            <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
-              <span className="h-4 w-4 rounded-full border-2 border-violet-200 border-t-violet-600 animate-spin flex-shrink-0" />
-              <p className="text-sm font-medium text-violet-700">{progressLabel}</p>
+          {uploading && (
+            <div className="space-y-1.5 px-3 py-2.5 rounded-xl bg-violet-50 border border-violet-200">
+              <div className="flex items-center justify-between text-sm text-violet-700">
+                <span className="font-medium">Uploading…</span>
+                <span>{uploadPct}%</span>
+              </div>
+              <div className="w-full bg-violet-100 rounded-full h-1.5">
+                <div
+                  className="bg-violet-600 h-1.5 rounded-full transition-all duration-150"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
             </div>
           )}
 
@@ -355,7 +361,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
               {uploading ? (
                 <span className="flex items-center gap-1.5">
                   <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  {progressLabel || 'Uploading…'}
+                  Uploading…
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5">

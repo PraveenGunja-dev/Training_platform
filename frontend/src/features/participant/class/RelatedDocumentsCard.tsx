@@ -80,7 +80,7 @@ function DocItem({ doc }: { doc: { id: string; title: string; description: strin
 }
 
 export function RelatedDocumentsCard({ classId, groupId }: Props) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['documents', { group_id: groupId }],
     queryFn: () => documentsApi.list({ group_id: groupId }),
     enabled: !!groupId,
@@ -114,7 +114,13 @@ export function RelatedDocumentsCard({ classId, groupId }: Props) {
           </div>
         )}
 
-        {!isLoading && docs.length === 0 && (
+        {!isLoading && isError && (
+          <div className="flex flex-col items-center py-6 text-center">
+            <p className="text-xs text-rose-500 font-medium">Failed to load documents.</p>
+          </div>
+        )}
+
+        {!isLoading && !isError && docs.length === 0 && (
           <div className="flex flex-col items-center py-6 text-center">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-violet-50 mb-2">
               <FolderOpen className="h-5 w-5 text-violet-300" />

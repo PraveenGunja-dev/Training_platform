@@ -31,6 +31,9 @@ export default function DocumentsPage() {
   const { data: docsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['documents'],
     queryFn:  () => documentsApi.list(),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: groupsData } = useQuery({

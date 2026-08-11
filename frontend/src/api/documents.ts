@@ -19,9 +19,12 @@ export const documentsApi = {
   get: (id: string) =>
     apiClient.get<ApiEnvelope<Document>>(`/documents/${id}`).then(r => r.data),
   // Upload document: send file + metadata as multipart
-  create: (formData: FormData) =>
+  create: (formData: FormData, onUploadProgress?: (pct: number) => void) =>
     apiClient.post<ApiEnvelope<Document>>('/documents', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onUploadProgress
+        ? (e) => { if (e.total) onUploadProgress(Math.round((e.loaded / e.total) * 100)); }
+        : undefined,
     }).then(r => r.data),
   update: (id: string, body: Partial<Document>) =>
     apiClient.patch<ApiEnvelope<Document>>(`/documents/${id}`, body).then(r => r.data),

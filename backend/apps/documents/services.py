@@ -23,6 +23,10 @@ def document_visible_to(doc: Document, user) -> bool:
         from apps.groups.models import GroupSubMentor  # noqa: PLC0415
         return GroupSubMentor.objects.filter(sub_mentor=user, group_id=doc.group_id).exists()
 
+    if user.role == "LEAD_MENTOR":
+        from apps.groups.models import GroupLeadMentor  # noqa: PLC0415
+        return GroupLeadMentor.objects.filter(lead_mentor=user, group_id=doc.group_id).exists()
+
     if doc.visibility == Document.VIS_STAFF_ONLY:
         return False
 

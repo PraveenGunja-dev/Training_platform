@@ -36,6 +36,7 @@ from .services import approve_shared, document_visible_to, reject_shared
 
 User = get_user_model()
 
+_MAX_UPLOAD_BYTES: int = 50 * 1024 * 1024  # 50 MB hard cap
 
 _SUB_MENTOR_DENIED = {
     "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
@@ -99,16 +100,19 @@ class DocumentViewSet(ViewSet):
             if group_id:
                 qs = qs.filter(group_id=group_id)
             return Response({"data": DocumentSerializer(qs, many=True).data})
-        # Participant: filter by visibility rules
+        # Participant: pre-filter at DB level, then apply fine-grained visibility in Python
         user_group_ids = set(
             GroupMembership.objects.filter(user=request.user).values_list("group_id", flat=True)
         )
+        if not user_group_ids:
+            return Response({"data": []})
+        # Scope to user's groups only and drop STAFF_ONLY at the DB layer
+        qs = qs.filter(group_id__in=user_group_ids).exclude(visibility=Document.VIS_STAFF_ONLY)
         user_id_str = str(request.user.id)
         visible = []
         for doc in qs:
             if doc.visibility == Document.VIS_GROUP:
-                if doc.group_id in user_group_ids:
-                    visible.append(doc)
+                visible.append(doc)  # already filtered by group_id__in
             elif doc.visibility == Document.VIS_SELECTED:
                 if user_id_str in doc.allowed_user_ids:
                     visible.append(doc)
@@ -129,8 +133,27 @@ class DocumentViewSet(ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         file_name = uploaded_file.name
+        if len(file_name) > 255:
+            return Response(
+                {
+                    "errors": [{"code": "validation_error", "message": "File name must be 255 characters or fewer."}],
+                    "data": None,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         file_type = uploaded_file.content_type
         file_size = uploaded_file.size
+        if file_size > _MAX_UPLOAD_BYTES:
+            return Response(
+                {
+                    "errors": [{
+                        "code": "validation_error",
+                        "message": f"File must not exceed 50 MB. Received {file_size / (1024 * 1024):.1f} MB.",
+                    }],
+                    "data": None,
+                },
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
         try:
             validate_file(file_name, file_size, file_type)
         except FileValidationError as exc:
@@ -193,6 +216,14 @@ class DocumentViewSet(ViewSet):
         elif doc.visibility == Document.VIS_SELECTED:
             # Always notify only the explicitly chosen users, regardless of class linkage
             recipient_ids = [uid for uid in doc.allowed_user_ids if uid]
+            if recipient_ids:
+                # Guard against stale UUIDs referencing deleted users
+                from django.contrib.auth import get_user_model as _gum  # noqa: PLC0415
+                _User = _gum()
+                valid_ids = set(
+                    map(str, _User.objects.filter(pk__in=recipient_ids).values_list("id", flat=True))
+                )
+                recipient_ids = [uid for uid in recipient_ids if uid in valid_ids]
             if recipient_ids:
                 Notification.objects.bulk_create(
                     [
@@ -294,6 +325,29 @@ class DocumentViewSet(ViewSet):
         if not ser.is_valid():
             return _validation_error(ser.errors)
         d = ser.validated_data
+
+        # Re-check ownership if group_id is being changed
+        if 'group' in d and d['group'].pk != doc.group_id:
+            new_group_pk = d['group'].pk
+            if request.user.role == "SUB_MENTOR" and not sub_mentor_owns_group(request.user, new_group_pk):
+                return Response(_SUB_MENTOR_DENIED, status=status.HTTP_403_FORBIDDEN)
+            if request.user.role == "LEAD_MENTOR" and not lead_mentor_owns_group(request.user, new_group_pk):
+                return Response(
+                    {
+                        "errors": [{"code": "perm.not_lead_mentor_of_group", "message": "You are not the Lead Mentor for the target group."}],
+                        "data": None,
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # Cross-group check: if class is being changed, verify it belongs to the effective group
+        new_class = d.get('class_obj')
+        effective_group_id = d['group'].pk if 'group' in d else doc.group_id
+        if new_class and new_class.group_id != effective_group_id:
+            return _validation_error(
+                {'class_id': 'The selected class does not belong to this document\'s group.'}
+            )
+
         for field, value in d.items():
             setattr(doc, field, value)
         doc.save()
@@ -355,7 +409,8 @@ class DocumentViewSet(ViewSet):
         import urllib.parse
         response = HttpResponse(bytes(doc.file_data), content_type=doc.file_type)
         safe_name = urllib.parse.quote(doc.file_name)
-        response['Content-Disposition'] = f'attachment; filename="{doc.file_name}"; filename*=UTF-8\'\'{safe_name}'
+        _escaped_name = doc.file_name.replace('\\', '\\\\').replace('"', '\\"')
+        response['Content-Disposition'] = f'attachment; filename="{_escaped_name}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(doc.file_data)
         return response
 
@@ -507,8 +562,27 @@ class GroupSharedUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         file_name = uploaded_file.name
+        if len(file_name) > 255:
+            return Response(
+                {
+                    "errors": [{"code": "validation_error", "message": "File name must be 255 characters or fewer."}],
+                    "data": None,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         file_type = uploaded_file.content_type
         file_size = uploaded_file.size
+        if file_size > _MAX_UPLOAD_BYTES:
+            return Response(
+                {
+                    "errors": [{
+                        "code": "validation_error",
+                        "message": f"File must not exceed 50 MB. Received {file_size / (1024 * 1024):.1f} MB.",
+                    }],
+                    "data": None,
+                },
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
         try:
             validate_file(file_name, file_size, file_type)
         except FileValidationError as exc:
@@ -747,6 +821,7 @@ class SharedDocFileView(APIView):
         import urllib.parse
         response = HttpResponse(bytes(shared.file_data), content_type=shared.file_type)
         safe_name = urllib.parse.quote(shared.file_name)
-        response['Content-Disposition'] = f'attachment; filename="{shared.file_name}"; filename*=UTF-8\'\'{safe_name}'
+        _escaped_name = shared.file_name.replace('\\', '\\\\').replace('"', '\\"')
+        response['Content-Disposition'] = f'attachment; filename="{_escaped_name}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(shared.file_data)
         return response
