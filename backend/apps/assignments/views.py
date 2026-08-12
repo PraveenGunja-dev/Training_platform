@@ -12,8 +12,9 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
+from apps.accounts.throttles import UploadRateThrottle
 from apps.common.permissions import IsAdmin
-from apps.common.file_validation import FileValidationError, validate_file
+from apps.common.file_validation import FileValidationError, _safe_filename, safe_content_type, validate_file
 from apps.common.scoping import (
     sub_mentor_assignment_qs,
     sub_mentor_owns_group,
@@ -59,6 +60,11 @@ def _validation_error(field: str, message: str, code: str = "invalid") -> Respon
 
 class AssignmentTaskViewSet(ViewSet):
     serializer_class = AssignmentTaskSerializer
+
+    def get_throttles(self):
+        if self.action == "submit":
+            return [UploadRateThrottle()]
+        return super().get_throttles()
 
     _SUB_MENTOR_DENIED = {
         "errors": [{"code": "perm.not_sub_mentor_of_group", "message": "You are not assigned as a Sub-Mentor for this group."}],
@@ -464,10 +470,11 @@ class AssignmentTaskViewSet(ViewSet):
             )
         from django.http import HttpResponse
         import urllib.parse
-        response = HttpResponse(bytes(task.question_file_data), content_type=task.question_file_type)
+        response = HttpResponse(bytes(task.question_file_data), content_type=safe_content_type(task.question_file_type))
         safe_name = urllib.parse.quote(task.question_file_name)
-        response['Content-Disposition'] = f'attachment; filename="{task.question_file_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Disposition'] = f'attachment; filename="{_safe_filename(task.question_file_name)}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(task.question_file_data)
+        response['Content-Security-Policy'] = 'sandbox'
         return response
 
     # GET /assignments/:id/submissions (Admin or Sub-Mentor on assigned group)
@@ -597,10 +604,11 @@ class SubmissionFileView(APIView):
             )
         from django.http import HttpResponse
         import urllib.parse
-        response = HttpResponse(bytes(sub.file_data), content_type=sub.file_type)
+        response = HttpResponse(bytes(sub.file_data), content_type=safe_content_type(sub.file_type))
         safe_name = urllib.parse.quote(sub.file_name)
-        response['Content-Disposition'] = f'attachment; filename="{sub.file_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Disposition'] = f'attachment; filename="{_safe_filename(sub.file_name)}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(sub.file_data)
+        response['Content-Security-Policy'] = 'sandbox'
         return response
 
 

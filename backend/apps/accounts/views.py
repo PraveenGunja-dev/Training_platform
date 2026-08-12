@@ -27,7 +27,8 @@ from .serializers import (
 from apps.audit.services import log_action
 from .services import authenticate_user, consume_setup_token
 from apps.common.file_validation import validate_image_bytes, InvalidImageError
-from .throttles import ChangePasswordThrottle, LoginRateThrottle, RefreshTokenThrottle
+from .tokens import DynamicRefreshToken
+from .throttles import ChangePasswordThrottle, LoginRateThrottle, RefreshTokenThrottle, UploadRateThrottle
 
 
 
@@ -100,7 +101,7 @@ class LoginView(APIView):
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
 
-        refresh = cast(RefreshToken, RefreshToken.for_user(user))
+        refresh = cast(DynamicRefreshToken, DynamicRefreshToken.for_user(user))
         response = Response(
             {"data": {"access": str(refresh.access_token), "user": UserSerializer(user).data}},
             status=status.HTTP_200_OK,
@@ -174,6 +175,7 @@ class LogoutView(APIView):
 @extend_schema(exclude=True)
 class SetPasswordView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request: Request) -> Response:
         serializer = SetPasswordSerializer(data=request.data)
@@ -191,7 +193,7 @@ class SetPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        refresh = cast(RefreshToken, RefreshToken.for_user(user))
+        refresh = cast(DynamicRefreshToken, DynamicRefreshToken.for_user(user))
         response = Response(
             {"data": {"access": str(refresh.access_token), "user": UserSerializer(user).data}},
             status=status.HTTP_200_OK,
@@ -304,6 +306,7 @@ class MeView(APIView):
 @extend_schema(exclude=True)
 class MePhotoView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UploadRateThrottle]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request: Request) -> Response:

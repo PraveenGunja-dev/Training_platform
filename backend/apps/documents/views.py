@@ -11,7 +11,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
 
 from apps.audit.services import log_action
-from apps.common.file_validation import FileValidationError, validate_file
+from apps.accounts.throttles import UploadRateThrottle
+from apps.common.file_validation import FileValidationError, _safe_filename, safe_content_type, validate_file
 from apps.common.scoping import (
     sub_mentor_document_qs,
     sub_mentor_owns_group,
@@ -78,6 +79,11 @@ def _validation_error(errors: dict | str) -> Response:
 class DocumentViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = DocumentSerializer
+
+    def get_throttles(self):
+        if self.action == "create":
+            return [UploadRateThrottle()]
+        return super().get_throttles()
 
     def _base_qs(self):
         return Document.objects.defer('file_data').select_related("group", "class_obj", "uploaded_by")
@@ -407,11 +413,11 @@ class DocumentViewSet(ViewSet):
             )
         from django.http import HttpResponse
         import urllib.parse
-        response = HttpResponse(bytes(doc.file_data), content_type=doc.file_type)
+        response = HttpResponse(bytes(doc.file_data), content_type=safe_content_type(doc.file_type))
         safe_name = urllib.parse.quote(doc.file_name)
-        _escaped_name = doc.file_name.replace('\\', '\\\\').replace('"', '\\"')
-        response['Content-Disposition'] = f'attachment; filename="{_escaped_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Disposition'] = f'attachment; filename="{_safe_filename(doc.file_name)}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(doc.file_data)
+        response['Content-Security-Policy'] = 'sandbox'
         return response
 
 
@@ -517,6 +523,7 @@ class MeSharedUploadsView(APIView):
 @extend_schema(exclude=True)
 class GroupSharedUploadView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UploadRateThrottle]
 
     def post(self, request: Request, group_id: str) -> Response:
         group = get_object_or_404(ClassGroup, pk=group_id)
@@ -819,9 +826,9 @@ class SharedDocFileView(APIView):
             )
         from django.http import HttpResponse
         import urllib.parse
-        response = HttpResponse(bytes(shared.file_data), content_type=shared.file_type)
+        response = HttpResponse(bytes(shared.file_data), content_type=safe_content_type(shared.file_type))
         safe_name = urllib.parse.quote(shared.file_name)
-        _escaped_name = shared.file_name.replace('\\', '\\\\').replace('"', '\\"')
-        response['Content-Disposition'] = f'attachment; filename="{_escaped_name}"; filename*=UTF-8\'\'{safe_name}'
+        response['Content-Disposition'] = f'attachment; filename="{_safe_filename(shared.file_name)}"; filename*=UTF-8\'\'{safe_name}'
         response['Content-Length'] = len(shared.file_data)
+        response['Content-Security-Policy'] = 'sandbox'
         return response

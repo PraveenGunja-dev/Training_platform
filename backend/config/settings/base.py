@@ -56,6 +56,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.middleware.ContentSecurityPolicyMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -111,9 +112,8 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# No Django-level upload size limit — enforcement is handled at the infrastructure layer (nginx)
-DATA_UPLOAD_MAX_MEMORY_SIZE = None
-FILE_UPLOAD_MAX_MEMORY_SIZE = None
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52_428_800  # 50 MB hard cap per multipart request
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52_428_800
 
 # Redis cache (django-redis)
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
@@ -148,6 +148,7 @@ REST_FRAMEWORK = {
         "refresh_token": "30/minute",
         "change_password": "20/hour",
         "invite": "30/hour",
+        "upload": "20/hour",
     },
 }
 
@@ -165,6 +166,22 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("apps.accounts.tokens.DynamicAccessToken",),
     "TOKEN_OBTAIN_SERIALIZER": "apps.accounts.tokens.DynamicTokenObtainPairSerializer",
 }
+
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# Content-Security-Policy — restrict resource origins
+# 'unsafe-inline' is required for Vite-injected inline styles in the React SPA.
+CSP_HEADER = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self';"
+)
 
 JWT_REFRESH_COOKIE_NAME = "refresh_token"
 JWT_REFRESH_COOKIE_PATH = "/training/api/v1/auth/refresh"

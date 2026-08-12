@@ -23,3 +23,8 @@ class InviteRateThrottle(UserRateThrottle):
     Effective rate: see DEFAULT_THROTTLE_RATES['invite'] in settings.
     """
     scope = "invite"
+
+
+class UploadRateThrottle(UserRateThrottle):
+    """20 file uploads per hour per authenticated user."""
+    scope = "upload"
