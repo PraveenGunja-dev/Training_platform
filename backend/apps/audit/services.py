@@ -11,6 +11,8 @@ def log_action(
     metadata: dict | None = None,
 ) -> AuditLog:
     """Central helper used by every app to write an audit entry."""
+    if target_id is None:
+        target_id = ""
     return AuditLog.objects.create(
         actor=actor,
         action=action,

@@ -13,37 +13,36 @@ from .models import AuditLog
 from .serializers import AuditLogSerializer
 
 
+def _apply_audit_filters(qs, request):
+    actor_id = request.query_params.get("actor_id")
+    if actor_id:
+        qs = qs.filter(actor_id=actor_id)
+    action = request.query_params.get("action")
+    if action:
+        qs = qs.filter(action=action)
+    target_type = request.query_params.get("target_type")
+    if target_type:
+        qs = qs.filter(target_type=target_type)
+    from_dt = request.query_params.get("from")
+    if from_dt:
+        parsed = parse_datetime(from_dt)
+        if parsed:
+            qs = qs.filter(created_at__gte=parsed)
+    to_dt = request.query_params.get("to")
+    if to_dt:
+        parsed = parse_datetime(to_dt)
+        if parsed:
+            qs = qs.filter(created_at__lte=parsed)
+    return qs
+
+
 @extend_schema(exclude=True)
 class AuditLogListView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request: Request):
         qs = AuditLog.objects.select_related("actor").all()
-
-        actor_id = request.query_params.get("actor_id")
-        if actor_id:
-            qs = qs.filter(actor_id=actor_id)
-
-        action = request.query_params.get("action")
-        if action:
-            qs = qs.filter(action=action)
-
-        target_type = request.query_params.get("target_type")
-        if target_type:
-            qs = qs.filter(target_type=target_type)
-
-        from_dt = request.query_params.get("from")
-        if from_dt:
-            parsed = parse_datetime(from_dt)
-            if parsed:
-                qs = qs.filter(created_at__gte=parsed)
-
-        to_dt = request.query_params.get("to")
-        if to_dt:
-            parsed = parse_datetime(to_dt)
-            if parsed:
-                qs = qs.filter(created_at__lte=parsed)
-
+        qs = _apply_audit_filters(qs, request)
         paginator = AuditCursorPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = AuditLogSerializer(page, many=True)
@@ -74,30 +73,7 @@ class AuditLogExportView(APIView):
 
     def get(self, request: Request) -> StreamingHttpResponse:
         qs = AuditLog.objects.select_related("actor").order_by("-created_at")
-
-        actor_id = request.query_params.get("actor_id")
-        if actor_id:
-            qs = qs.filter(actor_id=actor_id)
-
-        action = request.query_params.get("action")
-        if action:
-            qs = qs.filter(action=action)
-
-        target_type = request.query_params.get("target_type")
-        if target_type:
-            qs = qs.filter(target_type=target_type)
-
-        from_dt = request.query_params.get("from")
-        if from_dt:
-            parsed = parse_datetime(from_dt)
-            if parsed:
-                qs = qs.filter(created_at__gte=parsed)
-
-        to_dt = request.query_params.get("to")
-        if to_dt:
-            parsed = parse_datetime(to_dt)
-            if parsed:
-                qs = qs.filter(created_at__lte=parsed)
+        qs = _apply_audit_filters(qs, request)
 
         def rows():
             buffer = _EchoBuffer()
