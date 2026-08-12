@@ -163,6 +163,7 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "AUTH_TOKEN_CLASSES": ("apps.accounts.tokens.DynamicAccessToken",),
+    "TOKEN_OBTAIN_SERIALIZER": "apps.accounts.tokens.DynamicTokenObtainPairSerializer",
 }
 
 JWT_REFRESH_COOKIE_NAME = "refresh_token"

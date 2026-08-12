@@ -34,9 +34,6 @@ class SystemSettings(models.Model):
     """Singleton — always query with SystemSettings.get_solo(). Never call .create() directly."""
 
     timezone = models.CharField(max_length=64, default="UTC")
-    doc_max_mb = models.PositiveIntegerField(default=25)
-    image_max_mb = models.PositiveIntegerField(default=10)
-    video_max_mb = models.PositiveIntegerField(default=500)
     reminder_offsets = models.JSONField(default=list)
     session_lifetime_hours = models.PositiveIntegerField(default=24)
     sub_mentors_can_view_all_classes = models.BooleanField(default=False)
