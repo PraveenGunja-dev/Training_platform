@@ -345,8 +345,8 @@ export function SettingsForm({
       {/* ── SubMentor Calendar Visibility ────────────────────────── */}
       <SectionCard
         icon={GraduationCap}
-        title="SubMentor Calendar Visibility"
-        description="Control which classes sub_mentors can see by default"
+        title="Sub-Mentor Calendar Visibility"
+        description="Control which classes Sub-Mentors can see by default"
         accent="bg-gradient-to-r from-[#0052A5] to-[#E31837]"
       >
         <div className="flex items-start gap-4">
@@ -371,10 +371,10 @@ export function SettingsForm({
           </button>
           <div>
             <p className="text-sm font-medium text-slate-700">
-              Allow sub_mentors to view classes from all groups (read-only)
+              Allow Sub-Mentors to view classes from all groups (read-only)
             </p>
             <p className="text-xs text-slate-500 mt-0.5">
-              When on, sub_mentors see every class on the calendar and reports. They can
+              When on, Sub-Mentors see every class on the calendar and reports. They can
               still only edit classes for groups they are assigned to.
             </p>
           </div>

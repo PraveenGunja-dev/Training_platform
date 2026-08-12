@@ -76,3 +76,33 @@ apiClient.interceptors.response.use(
     throw error;
   },
 );
+
+/**
+ * Pre-emptive token refresh called on app mount when user is known but accessToken
+ * was not persisted. Coordinates with the 401 interceptor via the shared
+ * isRefreshing flag to prevent simultaneous refresh races.
+ */
+export function preflightRefresh(): void {
+  const { logout } = useAuthStore.getState();
+  if (isRefreshing) return;
+
+  isRefreshing = true;
+  axios
+    .post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+    .then(({ data }) => {
+      const newToken: string = data.data.access;
+      useAuthStore.setState({ accessToken: newToken });
+      refreshQueue.forEach(({ resolve }) => resolve(newToken));
+      refreshQueue = [];
+    })
+    .catch((e) => {
+      refreshQueue.forEach(({ reject }) => reject(e));
+      refreshQueue = [];
+      logout();
+      queryClient.clear();
+      window.location.href = import.meta.env.BASE_URL + 'login';
+    })
+    .finally(() => {
+      isRefreshing = false;
+    });
+}

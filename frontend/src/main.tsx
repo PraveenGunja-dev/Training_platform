@@ -2,25 +2,18 @@ import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import axios from 'axios';
 import './index.css';
 import App from './App.tsx';
 import { queryClient } from '@/lib/query-client';
 import { useAuthStore } from '@/store/auth';
+import { preflightRefresh } from '@/lib/api-client';
 
 function AuthInitializer() {
-  const { user, accessToken, setAuth, logout } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
 
   useEffect(() => {
     if (user && !accessToken) {
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
-      axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true })
-        .then(res => {
-          setAuth(user, res.data.data.access);
-        })
-        .catch(() => {
-          logout();
-        });
+      preflightRefresh();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
