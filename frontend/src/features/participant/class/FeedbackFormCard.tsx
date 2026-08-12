@@ -117,7 +117,11 @@ export function FeedbackFormCard({ cls }: FeedbackFormCardProps) {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}
+                maxLength={2000}
               />
+              <p className="text-xs text-muted-foreground text-right">
+                {comment.length}/2000
+              </p>
             </div>
 
             {errorMsg && <p className="text-xs text-red-500">{errorMsg}</p>}

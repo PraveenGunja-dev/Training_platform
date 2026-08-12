@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -104,12 +105,26 @@ class SubmitFeedbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        feedback = ClassFeedback.objects.create(
-            class_session=class_session,
-            participant=request.user,
-            rating=data["rating"],
-            comment=data.get("comment", ""),
-        )
+        try:
+            feedback = ClassFeedback.objects.create(
+                class_session=class_session,
+                participant=request.user,
+                rating=data["rating"],
+                comment=data.get("comment", ""),
+            )
+        except IntegrityError:
+            return Response(
+                {
+                    "errors": [
+                        {
+                            "code": "already_submitted",
+                            "message": "You have already submitted feedback for this class.",
+                        }
+                    ],
+                    "data": None,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(
             {"data": ClassFeedbackReadSerializer(feedback).data},
             status=status.HTTP_201_CREATED,
@@ -252,13 +267,20 @@ class FeedbackAdminView(APIView):
         agg = qs.aggregate(avg_rating=Avg("rating"), total_count=Count("id"))
 
         class_ids_in_qs = list(qs.values_list("class_session_id", flat=True).distinct())
-        group_class_counts = (
+        group_class_counts = list(
             Class.objects.filter(pk__in=class_ids_in_qs)
             .values("group_id")
             .annotate(cls_count=Count("id"))
         )
+        group_ids_for_rate = [row["group_id"] for row in group_class_counts]
+        group_member_counts = {
+            row["group_id"]: row["member_cnt"]
+            for row in GroupMembership.objects.filter(group_id__in=group_ids_for_rate)
+            .values("group_id")
+            .annotate(member_cnt=Count("id"))
+        }
         total_possible = sum(
-            GroupMembership.objects.filter(group_id=row["group_id"]).count() * row["cls_count"]
+            group_member_counts.get(row["group_id"], 0) * row["cls_count"]
             for row in group_class_counts
         )
         submitted_count = agg["total_count"] or 0

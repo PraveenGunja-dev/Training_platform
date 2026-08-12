@@ -12,7 +12,7 @@ class ClassFeedbackWriteSerializer(serializers.Serializer):
 
     class_session_id = serializers.UUIDField()
     rating = serializers.DecimalField(max_digits=3, decimal_places=1)
-    comment = serializers.CharField(required=False, allow_blank=True, default="")
+    comment = serializers.CharField(required=False, allow_blank=True, default="", max_length=2000)
 
     def validate_rating(self, value: Decimal) -> Decimal:
         if value < Decimal("1.0") or value > Decimal("5.0"):
