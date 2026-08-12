@@ -75,6 +75,7 @@ export interface SystemSettings {
   reminder_offsets: number[];
   session_lifetime_hours: number;
   sub_mentors_can_view_all_classes?: boolean;
+  attendance_drift_threshold_minutes: number;
 }
 
 export interface GroupSubMentor {

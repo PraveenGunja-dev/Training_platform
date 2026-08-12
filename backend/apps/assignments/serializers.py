@@ -127,6 +127,15 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
                 )
         return attrs
 
+    def create(self, validated_data):
+        if not validated_data.get('reminder_offsets'):
+            try:
+                from apps.common.models import SystemSettings
+                validated_data['reminder_offsets'] = SystemSettings.get_solo().reminder_offsets or []
+            except Exception:
+                pass
+        return super().create(validated_data)
+
 
 # ---------------------------------------------------------------------------
 # Submission — read

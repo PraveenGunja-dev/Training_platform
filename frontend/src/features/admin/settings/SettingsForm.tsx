@@ -66,6 +66,7 @@ const DEFAULT_VALUES: SystemSettings = {
   reminder_offsets: [60, 30, 10],
   session_lifetime_hours: 24,
   sub_mentors_can_view_all_classes: false,
+  attendance_drift_threshold_minutes: 30,
 };
 
 function SectionCard({
@@ -269,7 +270,24 @@ export function SettingsForm({
             <p className="text-xs text-red-500">{errors.session_lifetime_hours.message}</p>
           )}
           <p className="text-xs text-slate-400">
-            How long a refresh token stays valid (1–720 h). Applied to new logins.
+            How long an access token stays valid (1–720 h). Applied to new logins.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Attendance Drift Threshold (minutes)</Label>
+          <Input
+            type="number"
+            min={1}
+            max={120}
+            {...register('attendance_drift_threshold_minutes', { valueAsNumber: true })}
+            className="w-36"
+          />
+          {errors.attendance_drift_threshold_minutes && (
+            <p className="text-xs text-red-500">{errors.attendance_drift_threshold_minutes.message}</p>
+          )}
+          <p className="text-xs text-slate-400">
+            Max clock-drift minutes tolerated when auto-matching attendance (1–120 min).
           </p>
         </div>
 

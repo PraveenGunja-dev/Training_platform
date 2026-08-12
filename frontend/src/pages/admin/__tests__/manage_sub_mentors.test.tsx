@@ -367,6 +367,7 @@ const baseSettings: SettingsFormValues = {
   reminder_offsets: [],
   session_lifetime_hours: 24,
   sub_mentors_can_view_all_classes: false,
+  attendance_drift_threshold_minutes: 30,
 };
 
 describe('SettingsForm — SubMentor visibility toggle', () => {

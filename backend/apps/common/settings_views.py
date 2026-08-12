@@ -14,6 +14,14 @@ from apps.common.permissions import IsAdmin
 from .models import SystemSettings
 from .serializers import SystemSettingsSerializer
 
+_AUDITABLE_FIELDS = [
+    "timezone",
+    "reminder_offsets",
+    "session_lifetime_hours",
+    "sub_mentors_can_view_all_classes",
+    "attendance_drift_threshold_minutes",
+]
+
 
 @extend_schema(exclude=True)
 class AdminSettingsView(APIView):
@@ -25,20 +33,46 @@ class AdminSettingsView(APIView):
 
     def patch(self, request: Request) -> Response:
         settings_obj = SystemSettings.get_solo()
-        old_visibility = settings_obj.sub_mentors_can_view_all_classes
+
+        old_snapshot = {
+            f: getattr(settings_obj, f)
+            for f in _AUDITABLE_FIELDS
+            if f in request.data
+        }
+
         ser = SystemSettingsSerializer(settings_obj, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
-        if "sub_mentors_can_view_all_classes" in request.data:
-            new_visibility = settings_obj.sub_mentors_can_view_all_classes
-            if old_visibility != new_visibility:
-                log_action(
-                    actor=request.user,
-                    action=SUB_MENTOR_VISIBILITY_CHANGED,
-                    target_type="SystemSettings",
-                    target_id=1,
-                    metadata={"scope": "system", "old": old_visibility, "new": new_visibility},
-                )
+
+        changes = {
+            f: {"old": old_snapshot[f], "new": getattr(settings_obj, f)}
+            for f in old_snapshot
+            if old_snapshot[f] != getattr(settings_obj, f)
+        }
+
+        if changes:
+            log_action(
+                actor=request.user,
+                action="system.settings_updated",
+                target_type="SystemSettings",
+                target_id="1",
+                metadata=changes,
+            )
+
+        visibility_change = changes.get("sub_mentors_can_view_all_classes")
+        if visibility_change:
+            log_action(
+                actor=request.user,
+                action=SUB_MENTOR_VISIBILITY_CHANGED,
+                target_type="SystemSettings",
+                target_id="1",
+                metadata={
+                    "scope": "system",
+                    "old": visibility_change["old"],
+                    "new": visibility_change["new"],
+                },
+            )
+
         return Response({"data": ser.data})
 
 
@@ -51,8 +85,13 @@ class ForceLogoutView(APIView):
 
         qs = OutstandingToken.objects.exclude(user=request.user)
         cleared = qs.count()
-        for token in qs:
-            BlacklistedToken.objects.get_or_create(token=token)
+        already_blacklisted_ids = set(
+            BlacklistedToken.objects.filter(token__in=qs).values_list("token_id", flat=True)
+        )
+        BlacklistedToken.objects.bulk_create(
+            [BlacklistedToken(token=t) for t in qs if t.pk not in already_blacklisted_ids],
+            ignore_conflicts=True,
+        )
         log_action(
             actor=request.user,
             action="system.force_logout_all",
