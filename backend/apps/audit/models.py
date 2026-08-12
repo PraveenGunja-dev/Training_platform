@@ -2,6 +2,19 @@ from django.conf import settings
 from django.db import models
 
 
+class AuditLogQuerySet(models.QuerySet):
+    def delete(self, *args, **kwargs):
+        raise PermissionError("AuditLog entries cannot be deleted.")
+
+    def update(self, *args, **kwargs):
+        raise PermissionError("AuditLog entries are append-only and cannot be updated.")
+
+
+class AuditLogManager(models.Manager):
+    def get_queryset(self):
+        return AuditLogQuerySet(self.model, using=self._db)
+
+
 class AuditLog(models.Model):
     """Append-only audit trail for all important system actions."""
 
@@ -17,6 +30,8 @@ class AuditLog(models.Model):
     target_id = models.CharField(max_length=100)
     metadata = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = AuditLogManager()
 
     class Meta:
         db_table = "audit_log"

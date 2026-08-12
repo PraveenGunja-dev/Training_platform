@@ -81,15 +81,19 @@ class UserViewSet(
         s.is_valid(raise_exception=True)
         s.save()
 
-        log_action(
-            actor=request.user,
-            action="user.updated",
-            target_type="User",
-            target_id=user.id,
-            metadata={"fields": list(request.data.keys())},
-        )
+        _role_changed   = "role" in request.data and user.role != old_role
+        _status_changed = "is_active" in request.data and user.is_active != old_is_active
 
-        if "role" in request.data and user.role != old_role:
+        if not _role_changed and not _status_changed:
+            log_action(
+                actor=request.user,
+                action="user.updated",
+                target_type="User",
+                target_id=user.id,
+                metadata={"fields": list(request.data.keys())},
+            )
+
+        if _role_changed:
             log_action(
                 actor=request.user,
                 action="user.role_changed",
@@ -98,7 +102,7 @@ class UserViewSet(
                 metadata={"old_role": old_role, "new_role": user.role},
             )
 
-        if "is_active" in request.data and user.is_active != old_is_active:
+        if _status_changed:
             block_action = "user.unblocked" if user.is_active else "user.blocked"
             log_action(
                 actor=request.user,
