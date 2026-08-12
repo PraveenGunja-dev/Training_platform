@@ -74,14 +74,14 @@ export function StarRating({ value, onChange, readOnly = false, size = 'md' }: S
               <>
                 <button
                   type="button"
-                  className="absolute inset-y-0 left-0 w-1/2 focus:outline-none"
+                  className="absolute inset-y-0 left-0 w-1/2 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-inset focus-visible:rounded-l-sm"
                   aria-label={`${star - 0.5} stars`}
                   onMouseEnter={() => setHoverValue(star - 0.5)}
                   onClick={() => onChange?.(star - 0.5)}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 w-1/2 focus:outline-none"
+                  className="absolute inset-y-0 right-0 w-1/2 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-inset focus-visible:rounded-r-sm"
                   aria-label={`${star} stars`}
                   onMouseEnter={() => setHoverValue(star)}
                   onClick={() => onChange?.(star)}

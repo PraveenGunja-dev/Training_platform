@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Users, Search, Ban, UserCheck, Trash2, ShieldCheck, User, AlertTriangle, Eye } from 'lucide-react';
+import { Plus, Users, Search, Ban, UserCheck, Trash2, ShieldCheck, User, AlertTriangle, Eye, MoreHorizontal } from 'lucide-react';
 import { usersApi } from '@/api/users';
 import { formatDate, formatRelative } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
@@ -305,8 +305,8 @@ export default function AdminUsersPage() {
                         <div className="flex items-center justify-end gap-1">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost" title="Actions">
-                                <Eye className="h-3.5 w-3.5" />
+                              <Button size="sm" variant="ghost" aria-label="User actions">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-44">
