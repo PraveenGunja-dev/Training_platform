@@ -585,6 +585,11 @@ class RecurringClassView(APIView):
         _past_ids = [c.id for c in created if c.ends_at < _now_fix]
         if _past_ids:
             Class.objects.filter(id__in=_past_ids).update(status_cached=Class.STATUS_COMPLETED)
+            from apps.notifications.services import notify_feedback_requested as _notify_fb_rec  # noqa: PLC0415
+            for _cls in (
+                Class.objects.filter(id__in=_past_ids).select_related("group").iterator(chunk_size=50)
+            ):
+                _notify_fb_rec(_cls)
         _ongoing_ids = [c.id for c in created if c.starts_at <= _now_fix <= c.ends_at]
         if _ongoing_ids:
             Class.objects.filter(id__in=_ongoing_ids).update(status_cached=Class.STATUS_ONGOING)

@@ -6,7 +6,7 @@ import {
 import { GRID_COLOR, AXIS_TICK, C } from '@/features/charts/chartTokens';
 
 interface FeedbackTrendChartProps {
-  data: Array<{ date: string; avg: number }>;
+  data: Array<{ date: string; avg: number | null }>;
 }
 
 export function FeedbackTrendChart({ data }: FeedbackTrendChartProps) {
@@ -62,13 +62,14 @@ export function FeedbackTrendChart({ data }: FeedbackTrendChartProps) {
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
+                const val = payload[0].value as number | null;
                 return (
                   <div className="bg-white border border-[#C5D8EC] rounded-xl shadow-card-md px-3 py-2 text-xs">
                     <p className="font-semibold text-[#00285A] mb-1">{label}</p>
                     <p className="text-[#5A7A9A]">
                       Avg rating:{' '}
                       <span className="font-semibold text-[#00285A]">
-                        ★ {(payload[0].value as number).toFixed(2)}
+                        {val != null ? `★ ${val.toFixed(2)}` : 'No data'}
                       </span>
                     </p>
                   </div>

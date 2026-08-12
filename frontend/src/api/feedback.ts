@@ -10,6 +10,7 @@ export interface ClassFeedback {
 }
 
 export interface FeedbackListItem {
+  id: string;
   participant_name: string;
   rating: number;
   comment: string;
@@ -41,7 +42,7 @@ export interface FeedbackAnalyticsResponse {
   rating_distribution: RatingBucket[];
   top_classes: ClassRatingItem[];
   bottom_classes: ClassRatingItem[];
-  avg_rating_over_time: Array<{ date: string; avg: number }>;
+  avg_rating_over_time: Array<{ date: string; avg: number | null }>;
   overall_avg: number;
   total_feedbacks: number;
 }

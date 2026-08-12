@@ -64,8 +64,8 @@ export function FeedbackListCard({ classId }: FeedbackListCardProps) {
 
             {/* Feedback rows */}
             <div className="divide-y divide-[#EBF3FB]">
-              {items.map((item, idx) => (
-                <div key={idx} className="py-3 grid grid-cols-[1fr_auto] gap-3">
+              {items.map((item) => (
+                <div key={item.id} className="py-3 grid grid-cols-[1fr_auto] gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#00285A] truncate">{item.participant_name}</p>
                     <p className="text-xs text-[#5A7A9A] mt-0.5 line-clamp-2">

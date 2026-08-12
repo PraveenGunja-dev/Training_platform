@@ -1280,8 +1280,7 @@ def compute_feedback_analytics(filters: dict) -> dict:
     current = range_start
     while current <= range_end:
         iso = current.isoformat()
-        if iso in daily_agg:
-            avg_rating_over_time.append({"date": iso, "avg": daily_agg[iso]})
+        avg_rating_over_time.append({"date": iso, "avg": daily_agg.get(iso)})
         current += _dt.timedelta(days=1)
 
     return {
