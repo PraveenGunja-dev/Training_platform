@@ -49,7 +49,7 @@ def add_participants(
             added.append(uid_str)
 
     if to_create:
-        GroupMembership.objects.bulk_create(to_create)
+        GroupMembership.objects.bulk_create(to_create, ignore_conflicts=True)
 
     if added:
         for user in User.objects.filter(id__in=added):

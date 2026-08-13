@@ -54,9 +54,15 @@ class ClassSerializer(serializers.ModelSerializer):
 
     def get_participants_count(self, obj: Class) -> int:
         if obj.sub_group_id:
+            count = getattr(obj, "sub_group_member_count", None)
+            if count is not None:
+                return count
             from apps.groups.models import SubGroupMembership  # noqa: PLC0415
             return SubGroupMembership.objects.filter(sub_group_id=obj.sub_group_id).count()
-        from apps.groups.models import GroupMembership
+        count = getattr(obj, "group_member_count", None)
+        if count is not None:
+            return count
+        from apps.groups.models import GroupMembership  # noqa: PLC0415
         return GroupMembership.objects.filter(group=obj.group).count()
 
     def get_created_by_name(self, obj: Class) -> str | None:
@@ -68,11 +74,13 @@ class ClassSerializer(serializers.ModelSerializer):
             from apps.attendance.services import maybe_end_expired_session  # noqa: PLC0415
         except ImportError:
             return None
-        session = (
-            AttendanceSession.objects.select_related("started_by", "ended_by")
-            .filter(class_obj=obj, status="ACTIVE")
-            .first()
-        )
+        sessions = getattr(obj, "prefetched_sessions", None)
+        if sessions is None:
+            sessions = list(
+                AttendanceSession.objects.select_related("started_by", "ended_by")
+                .filter(class_obj=obj, status="ACTIVE")
+            )
+        session = next((s for s in sessions if s.status == "ACTIVE"), None)
         if session is None:
             return None
         session = maybe_end_expired_session(session)
@@ -108,14 +116,18 @@ class ClassSerializer(serializers.ModelSerializer):
             return None
         if request.user.role != "PARTICIPANT":
             return None
-        from apps.attendance.models import AttendanceRecord  # noqa: PLC0415
-        record = (
-            AttendanceRecord.objects
-            .filter(user=request.user, session__class_obj=obj)
-            .select_related("session")
-            .order_by("-session__started_at")
-            .first()
-        )
+        my_records = self.context.get("my_records")
+        if my_records is not None:
+            record = my_records.get(obj.pk)
+        else:
+            from apps.attendance.models import AttendanceRecord  # noqa: PLC0415
+            record = (
+                AttendanceRecord.objects
+                .filter(user=request.user, session__class_obj=obj)
+                .select_related("session")
+                .order_by("-session__started_at")
+                .first()
+            )
         if not record:
             return None
         return {
@@ -145,12 +157,14 @@ class ClassSerializer(serializers.ModelSerializer):
             from apps.attendance.models import AttendanceSession  # noqa: PLC0415
         except ImportError:
             return None
-        session = (
-            AttendanceSession.objects.select_related("started_by", "ended_by")
-            .filter(class_obj=obj)
-            .order_by("-started_at")
-            .first()
-        )
+        sessions = getattr(obj, "prefetched_sessions", None)
+        if sessions is None:
+            sessions = list(
+                AttendanceSession.objects.select_related("started_by", "ended_by")
+                .filter(class_obj=obj)
+                .order_by("-started_at")[:1]
+            )
+        session = sessions[0] if sessions else None
         if session is None:
             return None
         return {

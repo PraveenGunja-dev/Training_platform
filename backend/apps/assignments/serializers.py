@@ -128,12 +128,14 @@ class AssignmentTaskWriteSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        import logging  # noqa: PLC0415
+        _log = logging.getLogger(__name__)
         if not validated_data.get('reminder_offsets'):
             try:
-                from apps.common.models import SystemSettings
-                validated_data['reminder_offsets'] = SystemSettings.get_solo().reminder_offsets or []
+                from apps.common.models import SystemSettings  # noqa: PLC0415
+                validated_data.setdefault('reminder_offsets', SystemSettings.get_solo().reminder_offsets or [])
             except Exception:
-                pass
+                _log.warning("Could not fetch SystemSettings for reminder_offsets default; using []", exc_info=True)
         return super().create(validated_data)
 
 

@@ -19,8 +19,9 @@ import { DOC_TYPES, documentSchema, type DocumentFormValues } from './documentSc
 import { documentsApi } from '@/api/documents';
 import { validateFile } from '@/lib/fileValidation';
 import { classesApi } from '@/api/classes';
+import { groupsApi } from '@/api/groups';
 import { apiClient } from '@/lib/api-client';
-import type { ApiEnvelope, ClassGroup, GroupDetail, DocVisibility } from '@/lib/types';
+import type { ApiEnvelope, GroupDetail, DocVisibility } from '@/lib/types';
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -59,7 +60,7 @@ export function UploadDocumentDialog({ open, onClose, defaultGroupId }: Props) {
 
   const groupsQuery = useQuery({
     queryKey: ['groups'],
-    queryFn: () => apiClient.get<ApiEnvelope<ClassGroup[]>>('/groups').then(r => r.data),
+    queryFn: () => groupsApi.list(),
   });
 
   const classesQuery = useQuery({

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Search, FolderKanban, Users, Plus, Calendar, ArrowRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -176,6 +177,7 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
       reset();
       onClose();
     },
+    onError: () => toast.error('Failed to create group. Please try again.'),
   });
 
   return (
@@ -237,7 +239,7 @@ export default function AdminGroupsPage() {
   const [createOpen, setCreateOpen]   = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['groups', 'admin'],
+    queryKey: ['groups', { is_archived: false }],
     queryFn:  () => groupsApi.list({ is_archived: false }),
   });
 

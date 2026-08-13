@@ -158,6 +158,7 @@ def end_session(*, session: AttendanceSession, actor, is_auto: bool = False) -> 
 
 @transaction.atomic
 def mark_attendance(*, session: AttendanceSession, user) -> AttendanceRecord:
+    session = AttendanceSession.objects.select_for_update().get(pk=session.pk)
     if session.status != "ACTIVE":
         raise AttendanceError("attendance.session_ended", "Session is no longer active", 422)
     if not GroupMembership.objects.filter(group=session.class_obj.group, user=user).exists():

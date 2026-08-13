@@ -94,17 +94,30 @@ class DocumentViewSet(ViewSet):
         group_id = request.query_params.get("group_id")
         if group_id:
             qs = qs.filter(group_id=group_id)
+        from apps.common.pagination import EnvelopePageNumberPagination  # noqa: PLC0415
         if request.user.role == "ADMIN":
+            paginator = EnvelopePageNumberPagination()
+            page = paginator.paginate_queryset(qs, request)
+            if page is not None:
+                return paginator.get_paginated_response(DocumentSerializer(page, many=True).data)
             return Response({"data": DocumentSerializer(qs, many=True).data})
         if request.user.role == "SUB_MENTOR":
             qs = sub_mentor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
             if group_id:
                 qs = qs.filter(group_id=group_id)
+            paginator = EnvelopePageNumberPagination()
+            page = paginator.paginate_queryset(qs, request)
+            if page is not None:
+                return paginator.get_paginated_response(DocumentSerializer(page, many=True).data)
             return Response({"data": DocumentSerializer(qs, many=True).data})
         if request.user.role == "LEAD_MENTOR":
             qs = lead_mentor_document_qs(request.user).select_related("group", "class_obj", "uploaded_by")
             if group_id:
                 qs = qs.filter(group_id=group_id)
+            paginator = EnvelopePageNumberPagination()
+            page = paginator.paginate_queryset(qs, request)
+            if page is not None:
+                return paginator.get_paginated_response(DocumentSerializer(page, many=True).data)
             return Response({"data": DocumentSerializer(qs, many=True).data})
         # Participant: pre-filter at DB level, then apply fine-grained visibility in Python
         user_group_ids = set(

@@ -167,10 +167,15 @@ class ClassGroupViewSet(ViewSet):
                 {"errors": [{"code": "perm.lead_mentor_required", "message": "Only an admin, Lead Mentor, or assigned Sub-Mentor can edit this group."}], "data": None},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        group = get_object_or_404(ClassGroup.objects.select_related("created_by"), pk=pk)
-        serializer = ClassGroupWriteSerializer(group, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        group = serializer.save()
+        from django.db import transaction as _txn  # noqa: PLC0415
+        with _txn.atomic():
+            group = get_object_or_404(
+                ClassGroup.objects.select_related("created_by").select_for_update(),
+                pk=pk,
+            )
+            serializer = ClassGroupWriteSerializer(group, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            group = serializer.save()
         log_action(
             actor=request.user,
             action="group.updated",

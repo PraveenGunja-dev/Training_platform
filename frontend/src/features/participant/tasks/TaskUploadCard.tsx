@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
 import { Upload, CheckCircle, Lock, AlertTriangle, RotateCcw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -178,7 +179,7 @@ export function TaskUploadCard({ task }: TaskUploadCardProps) {
                 try {
                   await assignmentsApi.downloadSubmission(latestSub.id, latestSub.file_name);
                 } catch {
-                  // download error is silent; toast from API client if needed
+                  toast.error('Could not download file. Please try again.');
                 }
               }}
             >

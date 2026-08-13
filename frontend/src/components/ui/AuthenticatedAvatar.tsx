@@ -28,12 +28,20 @@ export function AuthenticatedAvatar({
       setBlobSrc(photoUrl);
       return;
     }
-    let objectUrl: string;
+    let isCancelled = false;
+    let objectUrl: string | undefined;
     const pk = photoUrl.replace(/.*\/users\/([^/]+)\/photo.*/, '$1');
     usersApi.getPhoto(pk)
-      .then(url => { objectUrl = url; setBlobSrc(url); })
-      .catch(() => setBlobSrc(undefined));
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+      .then(url => {
+        if (isCancelled) { URL.revokeObjectURL(url); return; }
+        objectUrl = url;
+        setBlobSrc(url);
+      })
+      .catch(() => { if (!isCancelled) setBlobSrc(undefined); });
+    return () => {
+      isCancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [photoUrl]);
 
   return (
