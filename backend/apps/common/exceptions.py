@@ -1,11 +1,23 @@
+import logging
+
+from rest_framework.response import Response
 from rest_framework.views import exception_handler
+
+logger = logging.getLogger(__name__)
 
 
 def envelope_exception_handler(exc, context):
     """Wraps DRF errors as {errors: [{code, message, field?}], data: null}."""
     response = exception_handler(exc, context)
     if response is None:
-        return None
+        logger.exception("Unhandled exception in API view", exc_info=exc)
+        return Response(
+            {
+                "errors": [{"code": "server_error", "message": "An unexpected error occurred."}],
+                "data": None,
+            },
+            status=500,
+        )
 
     errors = []
     data = response.data

@@ -276,10 +276,10 @@ export default function AdminUsersPage() {
                             fallbackClassName={`text-xs font-semibold ${rc.avatarBg} ${rc.avatarText}`}
                           />
                           <div>
-                            <p className="text-sm font-semibold text-slate-800">
+                            <p className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">
                               {user.full_name || <span className="text-slate-400 italic font-normal">No name</span>}
                             </p>
-                            <p className="text-xs text-slate-400">{user.email}</p>
+                            <p className="text-xs text-slate-400 truncate max-w-[200px]">{user.email}</p>
                           </div>
                         </div>
                       </TableCell>

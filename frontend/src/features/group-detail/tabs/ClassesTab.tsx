@@ -35,7 +35,7 @@ export function ClassesTab({ groupId, group }: { groupId: string; group: ClassGr
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['classes', { group_id: groupId }],
-    queryFn: () => classesApi.list({ group_id: groupId, page_size: 500 }),
+    queryFn: () => classesApi.list({ group_id: groupId, page_size: 200 }),
   });
 
   const { data: subGroupsData } = useQuery({

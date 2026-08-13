@@ -102,7 +102,7 @@ export function Sidebar({ navItems }: SidebarProps) {
       {/* ── Nav items ───────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto py-3 px-3 space-y-5 scrollbar-none">
         {sections.map((section, i) => (
-          <div key={i}>
+          <div key={section.title ?? i}>
             {section.title && (
               <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 select-none">
                 {section.title}

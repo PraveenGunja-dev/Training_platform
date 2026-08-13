@@ -47,7 +47,8 @@ class ClassViewSet(ViewSet):
         return [IsAuthenticated()]
 
     def _base_queryset(self) -> object:
-        from django.db.models import Prefetch  # noqa: PLC0415
+        from django.db.models import Count, Prefetch  # noqa: PLC0415
+        from apps.attendance.models import AttendanceSession  # noqa: PLC0415
         from apps.assignments.models import AssignmentTask  # noqa: PLC0415
         from apps.groups.models import GroupSubMentor  # noqa: PLC0415
         return (
@@ -63,6 +64,15 @@ class ClassViewSet(ViewSet):
                     queryset=AssignmentTask.objects.order_by("upload_open_at"),
                     to_attr="prefetched_tasks",
                 ),
+                Prefetch(
+                    "attendance_sessions",
+                    queryset=AttendanceSession.objects.select_related("started_by", "ended_by").order_by("-started_at"),
+                    to_attr="prefetched_sessions",
+                ),
+            )
+            .annotate(
+                group_member_count=Count("group__memberships", distinct=True),
+                sub_group_member_count=Count("sub_group__memberships", distinct=True),
             )
         )
 
@@ -127,13 +137,29 @@ class ClassViewSet(ViewSet):
         if request.user.role == "SUB_MENTOR":
             context["assigned_group_ids"] = _sub_mentor_assigned_ids(request.user)
         try:
-            page_size = min(int(request.query_params.get("page_size", 50)), 1000)
+            page_size = min(max(int(request.query_params.get("page_size", 50)), 1), 200)
             page = max(int(request.query_params.get("page", 1)), 1)
         except (ValueError, TypeError):
-            page_size, page = 50, 1
+            return Response(
+                {"errors": [{"code": "invalid_param", "message": "page and page_size must be integers."}], "data": None},
+                status=400,
+            )
         offset = (page - 1) * page_size
         total = qs.count()
-        items = qs[offset:offset + page_size]
+        items = list(qs[offset:offset + page_size])
+        if request.user.role == "PARTICIPANT":
+            from apps.attendance.models import AttendanceRecord  # noqa: PLC0415
+            class_pks = [c.pk for c in items]
+            records = (
+                AttendanceRecord.objects
+                .filter(user=request.user, session__class_obj_id__in=class_pks)
+                .order_by("-session__started_at")
+                .select_related("session")
+            )
+            my_records: dict = {}
+            for rec in records:
+                my_records.setdefault(rec.session.class_obj_id, rec)
+            context["my_records"] = my_records
         return Response({
             "data": ClassSerializer(items, many=True, context=context).data,
             "meta": {"total": total, "page": page, "page_size": page_size},
@@ -349,10 +375,12 @@ class ClassViewSet(ViewSet):
 
         try:
             cls.delete()
-        except ProtectedError:
+        except ProtectedError as _pe:
+            _protected = {obj.__class__.__name__ for obj in _pe.protected_objects}
             return Response(
-                {"errors": [{"code": "class.has_attendance",
-                             "message": "Cannot delete a class that has attendance records. Cancel it instead."}]},
+                {"errors": [{"code": "protected",
+                             "message": f"Cannot delete: related {', '.join(sorted(_protected))} records exist."}],
+                 "data": None},
                 status=status.HTTP_409_CONFLICT,
             )
         log_action(

@@ -33,21 +33,24 @@ export default function AuditLogPage() {
   // Primary query — data lives in React Query cache, not local state
   const { data, isFetching, isLoading, isError, refetch } = useQuery({
     queryKey: ['audit', filters],
-    queryFn:  async () => {
-      const res = await auditApi.list({
-        actor_id:    filters.actorId    || undefined,
-        action:      filters.action     || undefined,
-        target_type: filters.targetType || undefined,
-        from: filters.from ? `${filters.from}T00:00:00Z` : undefined,
-        to:   filters.to   ? `${filters.to}T23:59:59.999999Z`   : undefined,
-        limit: LIMIT,
-      });
-      const meta = res.meta as { next_cursor: string | null } | undefined;
-      setCursor(meta?.next_cursor ?? null);
-      setHasMore(!!meta?.next_cursor);
-      return res;
-    },
+    queryFn:  async () => auditApi.list({
+      actor_id:    filters.actorId    || undefined,
+      action:      filters.action     || undefined,
+      target_type: filters.targetType || undefined,
+      from: filters.from ? `${filters.from}T00:00:00Z` : undefined,
+      to:   filters.to   ? `${filters.to}T23:59:59.999999Z`   : undefined,
+      limit: LIMIT,
+    }),
   });
+
+  // Sync cursor/hasMore from query data on fresh loads (not while load-more is active)
+  useEffect(() => {
+    if (extraEntries.length > 0) return;
+    const meta = data?.meta as { next_cursor?: string | null } | undefined;
+    setCursor(meta?.next_cursor ?? null);
+    setHasMore(!!meta?.next_cursor);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // First-page entries come from cache; extra pages are appended locally
   const firstPage = data?.data ?? [];

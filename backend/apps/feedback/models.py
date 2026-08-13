@@ -13,7 +13,7 @@ class ClassFeedback(models.Model):
 
     class_session = models.ForeignKey(
         "scheduling.Class",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="feedbacks",
     )
     participant = models.ForeignKey(

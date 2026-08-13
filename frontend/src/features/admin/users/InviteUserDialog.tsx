@@ -5,7 +5,6 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from 'sonner';
 import { usersApi } from '@/api/users';
 import { groupsApi } from '@/api/groups';
-import { apiClient } from '@/lib/api-client';
 import { inviteSchema, type InviteFormValues } from './userSchema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +16,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import type { ApiEnvelope, ClassGroup } from '@/lib/types';
-
 interface InviteUserDialogProps {
   open: boolean;
   onClose: () => void;
@@ -29,7 +26,7 @@ export function InviteUserDialog({ open, onClose }: InviteUserDialogProps) {
 
   const { data: groupsData } = useQuery({
     queryKey: ['groups'],
-    queryFn: () => apiClient.get<ApiEnvelope<ClassGroup[]>>('/groups').then(r => r.data),
+    queryFn: () => groupsApi.list(),
     enabled: open,
   });
   const groups = groupsData?.data ?? [];

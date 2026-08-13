@@ -11,6 +11,18 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@fullcalendar')) return 'vendor-fullcalendar';
+          if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-')) return 'vendor-recharts';
+          if (id.includes('xlsx') || id.includes('papaparse')) return 'vendor-spreadsheet';
+          if (id.includes('framer-motion')) return 'vendor-framer';
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

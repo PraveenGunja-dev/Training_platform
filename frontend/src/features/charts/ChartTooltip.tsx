@@ -22,7 +22,7 @@ export function ChartTooltip({ active, payload, label, unit = '', formatter }: C
       )}
       <div className="space-y-1">
         {payload.map((p, i) => (
-          <div key={i} className="flex items-center justify-between gap-3">
+          <div key={String(p.dataKey) ?? i} className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"
