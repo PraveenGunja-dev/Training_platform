@@ -3,8 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Search, FolderKanban, Users, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { subMentorApi, type SubMentorGroup } from '@/api/subMentor';
 import { ErrorState } from '@/components/states/ErrorState';
+import { apiClient } from '@/lib/api-client';
+import { BulkRegisterDialog } from '@/features/admin/users/BulkRegisterDialog';
 
 /* ── Card colour palette (light, professional) ──────────────────────── */
 const PALETTE = [
@@ -130,6 +133,7 @@ function GroupCard({ group, index, onClick }: { group: SubMentorGroup; index: nu
 export default function SubMentorGroupsPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [showBulkRegister, setShowBulkRegister] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['subMentor', 'my-groups'],
@@ -146,13 +150,19 @@ export default function SubMentorGroupsPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Assigned Groups</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {data
-            ? `${N} group${N !== 1 ? 's' : ''} assigned to you`
-            : 'Your assigned class groups.'}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Assigned Groups</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {data
+              ? `${N} group${N !== 1 ? 's' : ''} assigned to you`
+              : 'Your assigned class groups.'}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setShowBulkRegister(true)}>
+          <Users className="h-4 w-4 mr-1.5" />
+          Bulk Invite (CSV)
+        </Button>
       </div>
 
       {/* Search */}
@@ -196,6 +206,16 @@ export default function SubMentorGroupsPage() {
           ))}
         </div>
       )}
+
+      <BulkRegisterDialog
+        open={showBulkRegister}
+        onClose={() => setShowBulkRegister(false)}
+        allowedRoles={['PARTICIPANT']}
+        groupsFetcher={() =>
+          apiClient.get<{ data: Array<{ id: string; name: string }> }>('/me/groups').then(r => r.data.data)
+        }
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

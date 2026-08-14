@@ -23,6 +23,7 @@ from apps.common.permissions import IsAdmin
 from .filters import UserFilter
 from .serializers import (
     BulkInviteSerializer,
+    BulkRegisterSerializer,
     SubMentorListSerializer,
     InviteSerializer,
     UserDetailSerializer,
@@ -52,8 +53,13 @@ class UserViewSet(
             return UserWriteSerializer
         return UserDetailSerializer
 
+    def get_permissions(self):
+        if self.action in ("invite", "bulk_invite", "bulk_register"):
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get_throttles(self):
-        if self.action in ("invite", "bulk_invite"):
+        if self.action in ("invite", "bulk_invite", "bulk_register"):
             return [InviteRateThrottle()]
         return super().get_throttles()
 
@@ -261,6 +267,117 @@ class UserViewSet(
             metadata={"total": len(rows), "invited": invited_count},
         )
         return Response({"data": results}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="bulk-register")
+    def bulk_register(self, request: Request) -> Response:
+        """POST /users/bulk-register
+
+        Registers users with the default password (admin123).
+        Allowed for: ADMIN, LEAD_MENTOR, SUB_MENTOR.
+
+        If group_id is provided:
+        - ADMIN: any group
+        - LEAD_MENTOR: must be the lead mentor of that group
+        - SUB_MENTOR: must be assigned to that group
+        """
+        from apps.groups.models import ClassGroup, GroupLeadMentor as _GroupLeadMentor, GroupSubMentor  # noqa
+        from apps.groups.services import add_participants  # noqa
+
+        role = request.user.role
+        if role not in ("ADMIN", "LEAD_MENTOR", "SUB_MENTOR"):
+            return Response(
+                {"errors": [{"code": "perm.denied", "message": "Not authorized."}], "data": None},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        s = BulkRegisterSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        rows = s.validated_data["rows"]
+        group_id = s.validated_data.get("group_id")
+
+        # Validate group ownership for non-admin roles
+        group = None
+        if group_id:
+            try:
+                group = ClassGroup.objects.get(pk=group_id)
+            except ClassGroup.DoesNotExist:
+                return Response(
+                    {"errors": [{"code": "group.not_found", "message": "Group not found."}], "data": None},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if role == "LEAD_MENTOR":
+                if not _GroupLeadMentor.objects.filter(lead_mentor=request.user, group=group).exists():
+                    return Response(
+                        {"errors": [{"code": "perm.not_lead_mentor", "message": "You are not the lead mentor of this group."}], "data": None},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif role == "SUB_MENTOR":
+                if not GroupSubMentor.objects.filter(sub_mentor=request.user, group=group).exists():
+                    return Response(
+                        {"errors": [{"code": "perm.not_sub_mentor", "message": "You are not assigned to this group."}], "data": None},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+        results = []
+        created_user_ids = []
+        for row in rows:
+            if User.objects.filter(email__iexact=row["email"]).exists():
+                results.append({"email": row["email"], "status": "skipped", "reason": "already_exists"})
+                continue
+            try:
+                user = invite_user(
+                    email=row["email"],
+                    full_name=row["full_name"],
+                    role=row["role"],
+                    invited_by=request.user,
+                )
+                created_user_ids.append(str(user.id))
+                results.append({"email": row["email"], "status": "registered"})
+            except Exception as exc:
+                results.append({"email": row["email"], "status": "failed", "reason": str(exc)})
+
+        # Enroll PARTICIPANT users into the group
+        if group and created_user_ids:
+            participant_emails = [
+                r["email"] for r in results if r["status"] == "registered"
+            ]
+            # Get user IDs for participants only
+            participant_user_ids = list(
+                User.objects.filter(
+                    email__in=participant_emails,
+                    role="PARTICIPANT",
+                ).values_list("id", flat=True)
+            )
+            if participant_user_ids:
+                add_participants(group=group, user_ids=[str(uid) for uid in participant_user_ids], actor=request.user)
+
+        registered_count = sum(1 for r in results if r["status"] == "registered")
+        skipped_count = sum(1 for r in results if r["status"] == "skipped")
+        failed_count = sum(1 for r in results if r["status"] == "failed")
+
+        log_action(
+            actor=request.user,
+            action="user.bulk_register",
+            target_type="User",
+            target_id="batch",
+            metadata={
+                "total": len(rows),
+                "registered": registered_count,
+                "group_id": str(group_id) if group_id else None,
+            },
+        )
+
+        return Response(
+            {
+                "data": {
+                    "registered": registered_count,
+                    "skipped": skipped_count,
+                    "failed": failed_count,
+                    "results": results,
+                }
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"], url_path="resend-invite")
     def resend_invite(self, request: Request, pk=None) -> Response:

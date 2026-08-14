@@ -71,6 +71,33 @@ class BulkInviteSerializer(serializers.Serializer):
         return value
 
 
+class BulkRegisterRowSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    role = serializers.ChoiceField(choices=["ADMIN", "LEAD_MENTOR", "SUB_MENTOR", "PARTICIPANT"])
+
+    def validate_email(self, value: str) -> str:
+        return value.strip().lower()
+
+    def validate_full_name(self, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise serializers.ValidationError("Full name is required.")
+        return stripped
+
+
+class BulkRegisterSerializer(serializers.Serializer):
+    rows = BulkRegisterRowSerializer(many=True)
+    group_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_rows(self, value: list) -> list:
+        if not value:
+            raise serializers.ValidationError("At least one row required.")
+        if len(value) > 200:
+            raise serializers.ValidationError("Max 200 rows per request.")
+        return value
+
+
 class SubMentorListSerializer(serializers.ModelSerializer):
     """Minimal serializer for the Sub-Mentor picker (GET /sub-mentors)."""
 
