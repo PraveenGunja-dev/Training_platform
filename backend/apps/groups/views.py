@@ -69,13 +69,18 @@ class ClassGroupViewSet(ViewSet):
     }
 
     def _list_queryset(self, request: Request):
-        qs = ClassGroup.objects.select_related("created_by").prefetch_related("sub_mentors__sub_mentor")
+        _base_qs = ClassGroup.objects.select_related(
+            "created_by", "lead_mentor_assignment__lead_mentor"
+        ).prefetch_related("sub_mentors__sub_mentor")
+        qs = _base_qs
         if request.user.role == "PARTICIPANT":
             qs = qs.filter(memberships__user=request.user).distinct()
             qs = apply_group_filters(qs, request.query_params)
         elif request.user.role == "SUB_MENTOR":
             from apps.common.scoping import sub_mentor_group_qs  # noqa: PLC0415
-            qs = sub_mentor_group_qs(request.user).select_related("created_by")
+            qs = sub_mentor_group_qs(request.user).select_related(
+                "created_by", "lead_mentor_assignment__lead_mentor"
+            ).prefetch_related("sub_mentors__sub_mentor")
             qs = apply_group_filters(qs, request.query_params)
         else:
             qs = apply_group_filters(qs, request.query_params)
@@ -85,7 +90,9 @@ class ClassGroupViewSet(ViewSet):
         if lead_mentor_group_ids:
             existing_pks = set(qs.values_list("pk", flat=True))
             combined_pks = existing_pks | set(lead_mentor_group_ids)
-            qs = ClassGroup.objects.filter(pk__in=combined_pks).select_related("created_by").prefetch_related("sub_mentors__sub_mentor")
+            qs = ClassGroup.objects.filter(pk__in=combined_pks).select_related(
+                "created_by", "lead_mentor_assignment__lead_mentor"
+            ).prefetch_related("sub_mentors__sub_mentor")
 
         return qs
 

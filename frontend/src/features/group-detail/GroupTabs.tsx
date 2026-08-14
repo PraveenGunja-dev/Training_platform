@@ -6,6 +6,7 @@ import { ClassesTab } from './tabs/ClassesTab';
 import { AssignmentsTab } from './tabs/AssignmentsTab';
 import { DocumentsTab } from './tabs/DocumentsTab';
 import { AnalyticsTab } from './tabs/AnalyticsTab';
+import { FeedbackTab } from './tabs/FeedbackTab';
 import { groupsApi } from '@/api/groups';
 import { assignmentsApi } from '@/api/assignments';
 import { documentsApi } from '@/api/documents';
@@ -52,6 +53,7 @@ export function GroupTabs({ group }: { group: GroupDetail }) {
           Documents{docCount !== undefined ? ` (${docCount})` : ''}
         </TabsTrigger>
         <TabsTrigger value="analytics" className={TRIGGER}>Analytics</TabsTrigger>
+        <TabsTrigger value="feedback" className={TRIGGER}>Class Feedback</TabsTrigger>
       </TabsList>
 
       <TabsContent value="participants">
@@ -71,6 +73,9 @@ export function GroupTabs({ group }: { group: GroupDetail }) {
       </TabsContent>
       <TabsContent value="analytics">
         <AnalyticsTab groupId={group.id} />
+      </TabsContent>
+      <TabsContent value="feedback">
+        <FeedbackTab groupId={group.id} />
       </TabsContent>
     </Tabs>
   );
