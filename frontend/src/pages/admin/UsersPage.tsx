@@ -22,8 +22,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
+import { apiClient } from '@/lib/api-client';
 import { InviteUserDialog } from '@/features/admin/users/InviteUserDialog';
-import { BulkInviteDialog } from '@/features/admin/users/BulkInviteDialog';
+import { BulkRegisterDialog } from '@/features/admin/users/BulkRegisterDialog';
 import { ErrorState } from '@/components/states/ErrorState';
 import type { Role } from '@/lib/types';
 
@@ -409,7 +410,13 @@ export default function AdminUsersPage() {
       </Dialog>
 
       <InviteUserDialog open={showInvite} onClose={() => setShowInvite(false)} />
-      <BulkInviteDialog open={showBulk}   onClose={() => setShowBulk(false)}   />
+      <BulkRegisterDialog
+        open={showBulk}
+        onClose={() => setShowBulk(false)}
+        allowedRoles={['ADMIN', 'LEAD_MENTOR', 'SUB_MENTOR', 'PARTICIPANT']}
+        groupsFetcher={() => apiClient.get<{ data: Array<{ id: string; name: string }> }>('/groups').then(r => r.data.data)}
+        onSuccess={() => void qc.invalidateQueries({ queryKey: ['users'] })}
+      />
     </div>
   );
 }

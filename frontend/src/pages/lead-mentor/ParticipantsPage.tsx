@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
+import { BulkRegisterDialog } from '@/features/admin/users/BulkRegisterDialog';
 import { Search, UserPlus, Trash2, UserCircle, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth';
@@ -111,6 +113,7 @@ export default function LeadMentorParticipantsPage() {
   const [search, setSearch] = useState('');
   const [subGroupFilter, setSubGroupFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [showBulkRegister, setShowBulkRegister] = useState(false);
 
   const { data: groupData, isLoading } = useQuery({
     queryKey: ['group', selectedGroupId],
@@ -208,7 +211,11 @@ export default function LeadMentorParticipantsPage() {
               ))}
             </select>
           )}
-          <Button size="sm" className="ml-auto bg-teal-600 hover:bg-teal-700" onClick={() => setAddOpen(true)}>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setShowBulkRegister(true)}>
+            <Users className="h-4 w-4 mr-1.5" />
+            Bulk Invite (CSV)
+          </Button>
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => setAddOpen(true)}>
             <UserPlus className="h-4 w-4 mr-1.5" />
             Add Participants
           </Button>
@@ -287,6 +294,15 @@ export default function LeadMentorParticipantsPage() {
         onClose={() => setAddOpen(false)}
         groupId={selectedGroupId}
         existingIds={participants.map(p => p.id)}
+      />
+      <BulkRegisterDialog
+        open={showBulkRegister}
+        onClose={() => setShowBulkRegister(false)}
+        allowedRoles={['PARTICIPANT']}
+        groupsFetcher={() =>
+          apiClient.get<{ data: Array<{ id: string; name: string }> }>('/groups').then(r => r.data.data)
+        }
+        onSuccess={() => void queryClient.invalidateQueries({ queryKey: ['group'] })}
       />
     </div>
   );

@@ -8,6 +8,7 @@ from .views import SubMentorListView, UserViewSet, UserVisibilityView
 # patterns for the same URL, and Django only dispatches to the first match.
 users_list = UserViewSet.as_view({"get": "list", "post": "invite"})
 users_bulk = UserViewSet.as_view({"post": "bulk_invite"})
+users_bulk_register = UserViewSet.as_view({"post": "bulk_register"})
 users_stats = UserViewSet.as_view({"get": "stats"})
 users_business_units = UserViewSet.as_view({"get": "business_units"})
 users_detail = UserViewSet.as_view(
@@ -19,6 +20,7 @@ urlpatterns = [
     # specific paths BEFORE parameterised ones
     path("sub-mentors", SubMentorListView.as_view(), name="sub-mentors-list"),
     path("users/bulk-invite", users_bulk, name="users-bulk-invite"),
+    path("users/bulk-register", users_bulk_register, name="users-bulk-register"),
     path("users/stats", users_stats, name="users-stats"),
     path("users/business-units", users_business_units, name="users-business-units"),
     path("users", users_list, name="users-list"),

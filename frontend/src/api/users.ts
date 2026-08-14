@@ -24,6 +24,11 @@ export const usersApi = {
   resendInvite: (id: string) => apiClient.post(`/users/${id}/resend-invite`),
   bulkInvite: (rows: Array<{ email: string; role: string; full_name?: string; group_ids?: string[] }>) =>
     apiClient.post('/users/bulk-invite', { rows }).then(r => r.data),
+  bulkRegister: (rows: Array<{ full_name: string; email: string; role: string }>, groupId?: string | null) =>
+    apiClient.post<{ data: { registered: number; skipped: number; failed: number; results: Array<{ email: string; status: string; reason?: string }> } }>(
+      '/users/bulk-register',
+      { rows, group_id: groupId ?? null }
+    ).then(r => r.data),
   listSubMentors: (q?: string) =>
     apiClient.get<ApiEnvelope<User[]>>('/sub-mentors', { params: q ? { q } : undefined }).then(r => r.data),
   setVisibility: (id: string, can_view_all_classes: boolean | null) =>
