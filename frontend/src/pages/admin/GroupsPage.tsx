@@ -234,9 +234,10 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
 /* ── Page ───────────────────────────────────────────────────────────── */
 export default function AdminGroupsPage() {
   const navigate    = useNavigate();
-  const [search, setSearch]           = useState('');
+  const [search, setSearch]             = useState('');
   const [subMentorFilter, setSubMentorFilter] = useState('ALL');
-  const [createOpen, setCreateOpen]   = useState(false);
+  const [leadMentorFilter, setLeadMentorFilter] = useState('ALL');
+  const [createOpen, setCreateOpen]     = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['groups', { is_archived: false }],
@@ -251,11 +252,23 @@ export default function AdminGroupsPage() {
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
+  const leadMentorOptions = Array.from(
+    new Map(
+      allGroups
+        .filter(g => g.lead_mentor != null)
+        .map(g => [g.lead_mentor!.lead_mentor_id, g.lead_mentor!.full_name])
+    ).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
   const groups = allGroups
     .filter(g => search === '' || g.name.toLowerCase().includes(search.toLowerCase()))
     .filter(g =>
       subMentorFilter === 'ALL' ||
       (g.sub_mentors ?? []).some(i => i.id === subMentorFilter)
+    )
+    .filter(g =>
+      leadMentorFilter === 'ALL' ||
+      g.lead_mentor?.lead_mentor_id === leadMentorFilter
     )
     .sort((a, b) => a.name.replace(/[-_]/g, ' ').localeCompare(b.name.replace(/[-_]/g, ' '), undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -289,24 +302,36 @@ export default function AdminGroupsPage() {
 
         <Select value={subMentorFilter} onValueChange={setSubMentorFilter}>
           <SelectTrigger className="w-52">
-            <SelectValue placeholder="All SubMentors" />
+            <SelectValue placeholder="All Sub-Mentors" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All SubMentors</SelectItem>
+            <SelectItem value="ALL">All Sub-Mentors</SelectItem>
             {subMentorOptions.map(([id, name]) => (
               <SelectItem key={id} value={id}>{name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {subMentorFilter !== 'ALL' && (
+        <Select value={leadMentorFilter} onValueChange={setLeadMentorFilter}>
+          <SelectTrigger className="w-52">
+            <SelectValue placeholder="All Lead Mentors" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Lead Mentors</SelectItem>
+            {leadMentorOptions.map(([id, name]) => (
+              <SelectItem key={id} value={id}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(subMentorFilter !== 'ALL' || leadMentorFilter !== 'ALL') && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSubMentorFilter('ALL')}
+            onClick={() => { setSubMentorFilter('ALL'); setLeadMentorFilter('ALL'); }}
             className="text-xs h-9 px-3 border-slate-300 text-slate-600 hover:text-slate-900"
           >
-            ✕ Clear filter
+            ✕ Clear filters
           </Button>
         )}
       </div>

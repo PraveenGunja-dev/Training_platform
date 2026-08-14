@@ -20,6 +20,21 @@ export function LoginPage() {
     const panelRef = useRef<HTMLDivElement>(null);
     const [showLoader, setShowLoader] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const check = async () => {
+            try {
+                const res = await fetch('/training/api/v1/healthz', { method: 'GET', cache: 'no-store' });
+                setServerOnline(res.ok);
+            } catch {
+                setServerOnline(false);
+            }
+        };
+        check();
+        const interval = setInterval(check, 10_000);
+        return () => clearInterval(interval);
+    }, []);
     const loaderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const loaderStart = useRef<number | null>(null);
 
@@ -839,7 +854,7 @@ export function LoginPage() {
                             <img src={`${import.meta.env.BASE_URL}adani-logo-white.svg`} alt="Adani" className="lp-bm-logo" />
                             <div className="lp-bm-divider" />
                             <div>
-                                <span className="lp-bm-name">ACLP</span>
+                                <span className="lp-bm-name">Continued Leadership Programme</span>
                                 <span className="lp-bm-sub">Training Portal</span>
                             </div>
                         </div>
@@ -847,8 +862,17 @@ export function LoginPage() {
                         {/* Headline */}
                         <div className="lp-center">
                             <div className="lp-pill">
-                                <span className="lp-pill-dot" />
-                                ACLP Training Portal
+                                <span
+                                    className="lp-pill-dot"
+                                    style={{
+                                        background: serverOnline === null
+                                            ? '#888'
+                                            : serverOnline
+                                                ? '#22c55e'
+                                                : '#E31837',
+                                    }}
+                                />
+                                Adani Continued Leadership Programme
                             </div>
                             <h1 className="lp-headline">
                                 Build the<br />workforce<br />of <em>tomorrow.</em>

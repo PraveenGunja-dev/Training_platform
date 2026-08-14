@@ -94,6 +94,7 @@ export interface ClassGroup {
   is_archived: boolean;
   created_at: string;
   sub_mentors: { id: string; full_name: string; email: string; employee_code?: string; business_unit?: string }[];
+  lead_mentor?: { lead_mentor_id: string; full_name: string; email: string; assigned_at?: string } | null;
 }
 
 export interface GroupParticipant extends User {

@@ -37,7 +37,7 @@ export function TopBottomClassesTable({ topClasses, bottomClasses }: TopBottomCl
     <div className="grid grid-cols-2 gap-4">
       <div>
         <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">
-          Top 5 Classes
+          Top Rated Classes
         </p>
         <div className="space-y-1.5">
           {topClasses.slice(0, 5).map(cls => (
@@ -48,7 +48,7 @@ export function TopBottomClassesTable({ topClasses, bottomClasses }: TopBottomCl
 
       <div>
         <p className="text-xs font-semibold text-rose-600 uppercase tracking-wide mb-2">
-          Bottom 5 Classes
+          Lowest Rated Classes
         </p>
         <div className="space-y-1.5">
           {bottomClasses.slice(0, 5).map(cls => (

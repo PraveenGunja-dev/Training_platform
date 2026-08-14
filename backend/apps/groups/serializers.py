@@ -11,6 +11,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
     participants_count = serializers.SerializerMethodField()
 
     sub_mentors = serializers.SerializerMethodField()
+    lead_mentor = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassGroup
@@ -24,6 +25,7 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
             "created_by_name",
             "participants_count",
             "sub_mentors",
+            "lead_mentor",
             "created_at",
             "updated_at",
         ]
@@ -46,6 +48,19 @@ class ClassGroupListSerializer(serializers.ModelSerializer):
             }
             for gi in obj.sub_mentors.select_related("sub_mentor").all()
         ]
+
+    def get_lead_mentor(self, obj: ClassGroup) -> dict | None:
+        try:
+            lm = obj.lead_mentor_assignment
+            if lm.lead_mentor_id and lm.lead_mentor:
+                return {
+                    "lead_mentor_id": str(lm.lead_mentor_id),
+                    "full_name": lm.lead_mentor.full_name,
+                    "email": lm.lead_mentor.email,
+                }
+            return None
+        except GroupLeadMentor.DoesNotExist:
+            return None
 
 
 class ClassGroupDetailSerializer(ClassGroupListSerializer):
